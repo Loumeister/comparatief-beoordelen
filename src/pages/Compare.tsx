@@ -20,10 +20,13 @@ const Compare = () => {
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // Load data only once on mount
   useEffect(() => {
     loadData();
-    
-    // Keyboard shortcuts
+  }, []);
+
+  // Keyboard shortcuts - separate effect with proper dependencies
+  useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       // Ignore shortcuts if user is typing in an input or textarea
       const target = e.target as HTMLElement;
