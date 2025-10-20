@@ -254,11 +254,7 @@ const Compare = () => {
                 size="lg"
                 onClick={() => handleJudgement('B')}
                 disabled={saving}
-                className="h-20 text-lg"
-                style={{
-                    backgroundColor: 'hsl(var(--choice-b, 221 83% 53%))',
-                    color: 'white',
-                }}
+                className="h-20 text-lg bg-secondary hover:bg-secondary/90 text-secondary-foreground"
               >
                 <div>
                   <div className="font-bold">{currentPair.textB.anonymizedName}</div>
@@ -312,13 +308,7 @@ const Compare = () => {
           <Card className="shadow-lg">
             <CardContent className="p-6">
               <div className="mb-4">
-                <span
-                  className="inline-block px-3 py-1 rounded-full text-sm font-medium"
-                  style={{
-                    backgroundColor: 'hsl(var(--choice-b, 221 83% 95%))',
-                    color: 'hsl(var(--choice-b, 221 83% 53%))',
-                  }}
-                >
+                <span className="inline-block px-3 py-1 bg-secondary/10 text-secondary-foreground rounded-full text-sm font-medium">
                   {currentPair.textB.anonymizedName}
                 </span>
               </div>
