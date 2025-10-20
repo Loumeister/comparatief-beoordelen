@@ -58,14 +58,14 @@ const Upload = () => {
 
     if (mode === 'names') {
       const names = namesText
-        .split('\n')
+        .split(/[\n\s]+/)
         .map(n => n.trim())
         .filter(n => n.length > 0);
 
       if (names.length < 2) {
         toast({
           title: 'Minimaal 2 namen',
-          description: 'Voer minimaal 2 namen in (één per regel)',
+          description: 'Voer minimaal 2 namen in (gescheiden door spaties of enters)',
           variant: 'destructive'
         });
         return;
@@ -105,7 +105,7 @@ const Upload = () => {
       } else {
         // Store names only (no file content)
         const names = namesText
-          .split('\n')
+          .split(/[\n\s]+/)
           .map(n => n.trim())
           .filter(n => n.length > 0);
 
@@ -275,19 +275,19 @@ const Upload = () => {
                       id="names"
                       value={namesText}
                       onChange={(e) => setNamesText(e.target.value)}
-                      placeholder="Voer namen in, één per regel:&#10;&#10;Leerling 1&#10;Leerling 2&#10;Leerling 3&#10;..."
+                      placeholder="Jan Jansen Piet Pietersen Marie de Vries..."
                       rows={12}
                       className="font-mono"
                     />
                     <p className="text-sm text-muted-foreground">
-                      💡 Voor teksten op papier: typ de namen hier en vergelijk tijdens het beoordelen
+                      💡 Voor teksten op papier: typ de namen gescheiden door spaties of enters
                     </p>
                   </div>
 
                   {namesText.trim() && (
                     <div className="p-3 bg-muted rounded-lg">
                       <p className="text-sm font-medium mb-1">
-                        Aantal namen: {namesText.split('\n').filter(n => n.trim()).length}
+                        Aantal namen: {namesText.split(/[\n\s]+/).filter(n => n.trim()).length}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Minimaal 2 namen vereist
