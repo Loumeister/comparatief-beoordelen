@@ -6,6 +6,18 @@ export interface Pair {
 }
 
 /**
+ * Shuffle array using Fisher-Yates algorithm
+ */
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+/**
  * Generate balanced pairs for comparison
  * Each text appears approximately the same number of times
  * No duplicate pairs
@@ -77,5 +89,6 @@ export function generatePairs(
     }
   }
 
-  return selectedPairs;
+  // Shuffle pairs for variety
+  return shuffleArray(selectedPairs);
 }
