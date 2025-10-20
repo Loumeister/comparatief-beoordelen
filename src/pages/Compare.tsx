@@ -216,7 +216,70 @@ const Compare = () => {
 
       {/* Comparison Area */}
       <div className="max-w-7xl mx-auto p-6">
-        <div className="grid md:grid-cols-2 gap-6 mb-6">
+        {/* Judgement Controls */}
+        <Card className="shadow-lg mb-6">
+          <CardContent className="p-6">
+            <p className="text-lg font-medium mb-2">Welke tekst is beter?</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Kies de <strong>sterkere</strong> tekst. Bij twijfel: <em>Gelijkwaardig</em> (sneltoets T).
+            </p>
+
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <Button
+                size="lg"
+                onClick={() => handleJudgement('A')}
+                disabled={saving}
+                className="h-20 text-lg bg-primary hover:bg-primary/90"
+              >
+                <div>
+                  <div className="font-bold">{currentPair.textA.anonymizedName}</div>
+                  <div className="text-xs opacity-80">Sneltoets: A</div>
+                </div>
+              </Button>
+
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => handleJudgement('EQUAL')}
+                disabled={saving}
+                className="h-20 text-lg"
+              >
+                <div>
+                  <div className="font-bold">Gelijkwaardig</div>
+                  <div className="text-xs opacity-80">Sneltoets: T</div>
+                </div>
+              </Button>
+
+              <Button
+                size="lg"
+                onClick={() => handleJudgement('B')}
+                disabled={saving}
+                className="h-20 text-lg"
+                style={{
+                    backgroundColor: 'hsl(var(--choice-b, 221 83% 53%))',
+                    color: 'white',
+                }}
+              >
+                <div>
+                  <div className="font-bold">{currentPair.textB.anonymizedName}</div>
+                  <div className="text-xs opacity-80">Sneltoets: B</div>
+                </div>
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Opmerking (optioneel)</label>
+              <Textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Noteer eventuele overwegingen..."
+                rows={3}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid md:grid-cols-2 gap-6">
           {/* Text A */}
           <Card className="shadow-lg">
             <CardContent className="p-6">
@@ -279,69 +342,6 @@ const Compare = () => {
             </CardContent>
           </Card>
         </div>
-
-        {/* Judgement Controls */}
-        <Card className="shadow-lg">
-          <CardContent className="p-6">
-            <p className="text-lg font-medium mb-2">Welke tekst is beter?</p>
-            <p className="text-sm text-muted-foreground mb-4">
-              Kies de <strong>sterkere</strong> tekst. Bij twijfel: <em>Gelijkwaardig</em> (sneltoets T).
-            </p>
-
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <Button
-                size="lg"
-                onClick={() => handleJudgement('A')}
-                disabled={saving}
-                className="h-20 text-lg bg-primary hover:bg-primary/90"
-              >
-                <div>
-                  <div className="font-bold">{currentPair.textA.anonymizedName}</div>
-                  <div className="text-xs opacity-80">Sneltoets: A</div>
-                </div>
-              </Button>
-
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => handleJudgement('EQUAL')}
-                disabled={saving}
-                className="h-20 text-lg"
-              >
-                <div>
-                  <div className="font-bold">Gelijkwaardig</div>
-                  <div className="text-xs opacity-80">Sneltoets: T</div>
-                </div>
-              </Button>
-
-              <Button
-                size="lg"
-                onClick={() => handleJudgement('B')}
-                disabled={saving}
-                className="h-20 text-lg"
-                style={{
-                    backgroundColor: 'hsl(var(--choice-b, 221 83% 53%))',
-                    color: 'white',
-                }}
-              >
-                <div>
-                  <div className="font-bold">{currentPair.textB.anonymizedName}</div>
-                  <div className="text-xs opacity-80">Sneltoets: B</div>
-                </div>
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Opmerking (optioneel)</label>
-              <Textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Noteer eventuele overwegingen..."
-                rows={3}
-              />
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
