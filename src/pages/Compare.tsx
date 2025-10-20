@@ -25,6 +25,12 @@ const Compare = () => {
     
     // Keyboard shortcuts
     const handleKeyPress = (e: KeyboardEvent) => {
+      // Ignore shortcuts if user is typing in an input or textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return;
+      }
+      
       if (e.key === 'a' || e.key === 'A') {
         handleJudgement('A');
       } else if (e.key === 'b' || e.key === 'B') {
