@@ -11,7 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Download, FileSpreadsheet, FileText } from 'lucide-react';
+import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 import { db, Assignment, Text } from '@/lib/db';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
 import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from '@/lib/export';
@@ -159,6 +160,34 @@ const Results = () => {
     );
   }
 
+  // Calculate overall reliability
+  const reliableCount = results.filter(r => r.reliability === 'Resultaat betrouwbaar').length;
+  const reliabilityPercentage = (reliableCount / results.length) * 100;
+  
+  let reliabilityStatus: 'insufficient' | 'moderate' | 'reliable';
+  let reliabilityText: string;
+  let reliabilityIcon: typeof CheckCircle;
+  let progressColor: string;
+  
+  if (reliabilityPercentage < 60) {
+    reliabilityStatus = 'insufficient';
+    reliabilityText = 'Onvoldoende gegevens';
+    reliabilityIcon = XCircle;
+    progressColor = 'bg-destructive';
+  } else if (reliabilityPercentage < 80) {
+    reliabilityStatus = 'moderate';
+    reliabilityText = 'Nog enkele vergelijkingen nodig';
+    reliabilityIcon = AlertCircle;
+    progressColor = 'bg-primary';
+  } else {
+    reliabilityStatus = 'reliable';
+    reliabilityText = 'Resultaat betrouwbaar';
+    reliabilityIcon = CheckCircle;
+    progressColor = 'bg-secondary';
+  }
+  
+  const ReliabilityIcon = reliabilityIcon;
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto">
@@ -197,6 +226,41 @@ const Results = () => {
             </div>
           </div>
         </div>
+
+        {/* Overall Reliability Bar */}
+        <Card className="mb-6">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <ReliabilityIcon className={`w-5 h-5 ${
+                reliabilityStatus === 'reliable' ? 'text-secondary' :
+                reliabilityStatus === 'moderate' ? 'text-primary' :
+                'text-destructive'
+              }`} />
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg">{reliabilityText}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {Math.round(reliabilityPercentage)}% van de teksten heeft voldoende vergelijkingen
+                </p>
+              </div>
+            </div>
+            <div className="relative">
+              <Progress 
+                value={reliabilityPercentage} 
+                className="h-3"
+              />
+              <style>{`
+                [role="progressbar"] > div {
+                  background: ${
+                    reliabilityStatus === 'reliable' ? 'hsl(var(--secondary))' :
+                    reliabilityStatus === 'moderate' ? 'hsl(var(--primary))' :
+                    'hsl(var(--destructive))'
+                  };
+                  transition: background-color 0.3s ease;
+                }
+              `}</style>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Results Table */}
         <Card>
