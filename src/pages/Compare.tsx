@@ -66,7 +66,7 @@ const Compare = () => {
       const texts = await db.texts.where('assignmentId').equals(id).toArray();
       const judgements = await db.judgements.where('assignmentId').equals(id).toArray();
 
-      const newPairs = generatePairs(texts, judgements, assign.numComparisons);
+      const newPairs = generatePairs(texts, judgements, { targetComparisonsPerText: assign.numComparisons });
 
       if (newPairs.length === 0) {
         // All comparisons done
