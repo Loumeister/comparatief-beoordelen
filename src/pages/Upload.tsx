@@ -182,7 +182,14 @@ const Upload = () => {
                   min={3}
                   max={20}
                   value={numComparisons}
-                  onChange={(e) => setNumComparisons(Math.max(3, parseInt(e.target.value) || 10))}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    if (!isNaN(val)) {
+                      setNumComparisons(Math.max(3, val));
+                    } else if (e.target.value === '') {
+                      setNumComparisons(3);
+                    }
+                  }}
                 />
                 <p className="text-sm text-muted-foreground">
                   Minimaal 3, aanbevolen: 10 vergelijkingen per tekst
