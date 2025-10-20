@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload as UploadIcon, FileText, X } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { Upload as UploadIcon, FileText, X, ListOrdered } from 'lucide-react';
 import { db } from '@/lib/db';
 import { parseDocument, generateAnonymizedName } from '@/lib/document-parser';
 import { useToast } from '@/hooks/use-toast';
@@ -12,10 +14,12 @@ import { useToast } from '@/hooks/use-toast';
 const Upload = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [mode, setMode] = useState<'upload' | 'names'>('upload');
   const [title, setTitle] = useState('');
   const [genre, setGenre] = useState('');
   const [numComparisons, setNumComparisons] = useState(10);
   const [files, setFiles] = useState<File[]>([]);
+  const [namesText, setNamesText] = useState('');
   const [uploading, setUploading] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,13 +47,29 @@ const Upload = () => {
       return;
     }
 
-    if (files.length < 2) {
+    if (mode === 'upload' && files.length < 2) {
       toast({
         title: 'Minimaal 2 teksten',
         description: 'Upload minimaal 2 tekstbestanden',
         variant: 'destructive'
       });
       return;
+    }
+
+    if (mode === 'names') {
+      const names = namesText
+        .split('\n')
+        .map(n => n.trim())
+        .filter(n => n.length > 0);
+
+      if (names.length < 2) {
+        toast({
+          title: 'Minimaal 2 namen',
+          description: 'Voer minimaal 2 namen in (één per regel)',
+          variant: 'destructive'
+        });
+        return;
+      }
     }
 
     setUploading(true);
@@ -64,30 +84,53 @@ const Upload = () => {
         updatedAt: new Date()
       });
 
-      // Parse and store texts
-      for (let i = 0; i < files.length; i++) {
-        const content = await parseDocument(files[i]);
-        
-        await db.texts.add({
-          assignmentId,
-          content,
-          originalFilename: files[i].name,
-          anonymizedName: generateAnonymizedName(i),
-          createdAt: new Date()
+      if (mode === 'upload') {
+        // Parse and store texts from files
+        for (let i = 0; i < files.length; i++) {
+          const content = await parseDocument(files[i]);
+          
+          await db.texts.add({
+            assignmentId,
+            content,
+            originalFilename: files[i].name,
+            anonymizedName: generateAnonymizedName(i),
+            createdAt: new Date()
+          });
+        }
+
+        toast({
+          title: 'Opdracht aangemaakt',
+          description: `${files.length} teksten succesvol geüpload`
+        });
+      } else {
+        // Store names only (no file content)
+        const names = namesText
+          .split('\n')
+          .map(n => n.trim())
+          .filter(n => n.length > 0);
+
+        for (let i = 0; i < names.length; i++) {
+          await db.texts.add({
+            assignmentId,
+            content: '', // Empty content for name-only mode
+            originalFilename: names[i],
+            anonymizedName: names[i],
+            createdAt: new Date()
+          });
+        }
+
+        toast({
+          title: 'Opdracht aangemaakt',
+          description: `${names.length} namen toegevoegd`
         });
       }
-
-      toast({
-        title: 'Opdracht aangemaakt',
-        description: `${files.length} teksten succesvol geüpload`
-      });
 
       navigate(`/compare/${assignmentId}`);
     } catch (error) {
       console.error('Upload error:', error);
       toast({
-        title: 'Upload mislukt',
-        description: 'Er is een fout opgetreden bij het uploaden',
+        title: 'Fout bij aanmaken',
+        description: 'Er is een fout opgetreden',
         variant: 'destructive'
       });
     } finally {
@@ -150,59 +193,102 @@ const Upload = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Teksten Uploaden</CardTitle>
-              <CardDescription>Upload DOCX of TXT bestanden (minimaal 2)</CardDescription>
+              <CardTitle>Invoermethode</CardTitle>
+              <CardDescription>Kies hoe je de teksten wilt toevoegen</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
-                <input
-                  type="file"
-                  multiple
-                  accept=".docx,.doc,.txt"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <label htmlFor="file-upload" className="cursor-pointer">
-                  <UploadIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-lg font-medium mb-1">Klik om bestanden te selecteren</p>
-                  <p className="text-sm text-muted-foreground">
-                    of sleep bestanden hierheen
-                  </p>
-                </label>
-              </div>
+            <CardContent>
+              <Tabs value={mode} onValueChange={(v) => setMode(v as 'upload' | 'names')}>
+                <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsTrigger value="upload" className="flex items-center gap-2">
+                    <UploadIcon className="w-4 h-4" />
+                    Bestanden uploaden
+                  </TabsTrigger>
+                  <TabsTrigger value="names" className="flex items-center gap-2">
+                    <ListOrdered className="w-4 h-4" />
+                    Namen invoeren
+                  </TabsTrigger>
+                </TabsList>
 
-              {files.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Geselecteerde bestanden ({files.length})</p>
-                  <div className="space-y-2">
-                    {files.map((file, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <FileText className="w-5 h-5 text-primary" />
-                          <div>
-                            <p className="text-sm font-medium">{file.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {(file.size / 1024).toFixed(1)} KB
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeFile(index)}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
+                <TabsContent value="upload" className="space-y-4">
+                  <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
+                    <input
+                      type="file"
+                      multiple
+                      accept=".docx,.doc,.txt"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      id="file-upload"
+                    />
+                    <label htmlFor="file-upload" className="cursor-pointer">
+                      <UploadIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                      <p className="text-lg font-medium mb-1">Klik om bestanden te selecteren</p>
+                      <p className="text-sm text-muted-foreground">
+                        Upload DOCX of TXT bestanden (minimaal 2)
+                      </p>
+                    </label>
                   </div>
-                </div>
-              )}
+
+                  {files.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Geselecteerde bestanden ({files.length})</p>
+                      <div className="space-y-2">
+                        {files.map((file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                          >
+                            <div className="flex items-center gap-3">
+                              <FileText className="w-5 h-5 text-primary" />
+                              <div>
+                                <p className="text-sm font-medium">{file.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {(file.size / 1024).toFixed(1)} KB
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFile(index)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="names" className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="names">Namen lijst</Label>
+                    <Textarea
+                      id="names"
+                      value={namesText}
+                      onChange={(e) => setNamesText(e.target.value)}
+                      placeholder="Voer namen in, één per regel:&#10;&#10;Leerling 1&#10;Leerling 2&#10;Leerling 3&#10;..."
+                      rows={12}
+                      className="font-mono"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      💡 Voor teksten op papier: typ de namen hier en vergelijk tijdens het beoordelen
+                    </p>
+                  </div>
+
+                  {namesText.trim() && (
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-sm font-medium mb-1">
+                        Aantal namen: {namesText.split('\n').filter(n => n.trim()).length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Minimaal 2 namen vereist
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
 
@@ -215,8 +301,15 @@ const Upload = () => {
             >
               Annuleren
             </Button>
-            <Button type="submit" disabled={uploading || files.length < 2}>
-              {uploading ? 'Uploaden...' : 'Start Beoordeling'}
+            <Button 
+              type="submit" 
+              disabled={
+                uploading || 
+                (mode === 'upload' && files.length < 2) ||
+                (mode === 'names' && namesText.split('\n').filter(n => n.trim()).length < 2)
+              }
+            >
+              {uploading ? 'Bezig...' : 'Start Beoordeling'}
             </Button>
           </div>
         </form>

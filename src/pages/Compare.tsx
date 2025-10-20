@@ -166,11 +166,20 @@ const Compare = () => {
                   {currentPair.textA.anonymizedName}
                 </span>
               </div>
-              <div className="prose prose-sm max-w-none">
-                <div className="whitespace-pre-wrap text-foreground leading-relaxed">
-                  {currentPair.textA.content}
+              {currentPair.textA.content ? (
+                <div className="prose prose-sm max-w-none">
+                  <div className="whitespace-pre-wrap text-foreground leading-relaxed">
+                    {currentPair.textA.content}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg">
+                  <p className="text-muted-foreground text-center px-4">
+                    Bekijk de papieren tekst van<br />
+                    <strong className="text-foreground">{currentPair.textA.anonymizedName}</strong>
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -182,11 +191,20 @@ const Compare = () => {
                   {currentPair.textB.anonymizedName}
                 </span>
               </div>
-              <div className="prose prose-sm max-w-none">
-                <div className="whitespace-pre-wrap text-foreground leading-relaxed">
-                  {currentPair.textB.content}
+              {currentPair.textB.content ? (
+                <div className="prose prose-sm max-w-none">
+                  <div className="whitespace-pre-wrap text-foreground leading-relaxed">
+                    {currentPair.textB.content}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg">
+                  <p className="text-muted-foreground text-center px-4">
+                    Bekijk de papieren tekst van<br />
+                    <strong className="text-foreground">{currentPair.textB.anonymizedName}</strong>
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
