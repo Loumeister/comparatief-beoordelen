@@ -26,6 +26,7 @@ const Results = () => {
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [results, setResults] = useState<ExportData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [canCompare, setCanCompare] = useState(false);
 
   useEffect(() => {
     loadResults();
@@ -92,6 +93,14 @@ const Results = () => {
           calculatedAt: new Date()
         });
       }
+
+      // Check if more comparisons are needed
+      const { generatePairs } = await import('@/lib/pairing');
+      const possiblePairs = generatePairs(texts, judgements, {
+        targetComparisonsPerText: assign.numComparisons || 10,
+        batchSize: 12,
+      });
+      setCanCompare(possiblePairs.length > 0);
 
       setLoading(false);
     } catch (error) {
@@ -341,14 +350,16 @@ const Results = () => {
         </Card>
 
         {/* Continue comparing button */}
-        <div className="mt-6">
-          <Button
-            variant="outline"
-            onClick={() => navigate(`/compare/${assignment?.id}`)}
-          >
-            Meer vergelijkingen maken
-          </Button>
-        </div>
+        {canCompare && (
+          <div className="mt-6">
+            <Button
+              variant="outline"
+              onClick={() => navigate(`/compare/${assignment?.id}`)}
+            >
+              Meer vergelijkingen maken
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
