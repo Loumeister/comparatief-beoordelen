@@ -24,6 +24,8 @@ const Compare = () => {
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [totalJudgements, setTotalJudgements] = useState(0);
+  const [expectedTotal, setExpectedTotal] = useState(0);
 
   // ---------- Data laden ----------
   const loadData = useCallback(async () => {
@@ -50,6 +52,12 @@ const Compare = () => {
       }
 
       const judgements = await db.judgements.where('assignmentId').equals(id).toArray();
+      
+      // Bereken verwacht totaal aantal vergelijkingen voor progress
+      const targetPerText = assign.numComparisons || DEFAULT_COMPARISONS_PER_TEXT;
+      const expectedTotal = texts.length * targetPerText;
+      setTotalJudgements(judgements.length);
+      setExpectedTotal(expectedTotal);
 
       const newPairs = generatePairs(texts, judgements, {
         targetComparisonsPerText: assign.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
@@ -127,6 +135,7 @@ const Compare = () => {
         });
 
         setComment('');
+        setTotalJudgements(prev => prev + 1);
 
         // Volgend paar binnen huidige batch…
         if (currentIndex < pairs.length - 1) {
@@ -177,8 +186,8 @@ const Compare = () => {
   }
 
   const currentPair = pairs[currentIndex];
-  // Progress fix: +1 omdat je het huidige paar al in beeld hebt
-  const progress = ((currentIndex + 1) / pairs.length) * 100;
+  // Progress gebaseerd op totaal aantal gemaakte oordelen vs verwacht totaal
+  const progress = expectedTotal > 0 ? Math.min((totalJudgements / expectedTotal) * 100, 100) : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -192,7 +201,7 @@ const Compare = () => {
             </Button>
             <div className="text-right">
               <p className="text-sm text-muted-foreground">
-                {currentIndex + 1} van {pairs.length} vergelijkingen
+                {totalJudgements} van ~{expectedTotal} vergelijkingen
               </p>
             </div>
           </div>
