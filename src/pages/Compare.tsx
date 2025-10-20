@@ -79,10 +79,18 @@ const Compare = () => {
     const texts = await db.texts.where('assignmentId').equals(id).toArray();
     const judgements = await db.judgements.where('assignmentId').equals(id).toArray();
 
+    // Haal bestaande scores op voor betrouwbaarheidsinfo
+    const scores = await db.scores.where('assignmentId').equals(id).toArray();
+    const seMap = new Map<number, number>();
+    scores.forEach(s => {
+      seMap.set(s.textId, s.standardError);
+    });
+
     const nextPairs = generatePairs(texts, judgements, {
       targetComparisonsPerText: assignment.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
       batchSize: DEFAULT_BATCH_SIZE,
-      // bt: { theta: thetaMap, se: seMap } // optioneel als je tussentijds BT draait
+      bt: seMap.size > 0 ? { se: seMap } : undefined,
+      minReliability: 0.3,
     });
 
     if (nextPairs.length === 0) {

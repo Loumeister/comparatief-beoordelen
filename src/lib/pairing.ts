@@ -14,6 +14,7 @@ type Options = {
   targetComparisonsPerText?: number; // default 10
   batchSize?: number; // default: berekend uit target
   bt?: BTInfo; // optioneel: informatief pairen
+  minReliability?: number; // minimum betrouwbaarheid (max SE threshold), default 0.3
 };
 
 function key(a: number, b: number): string {
@@ -83,8 +84,19 @@ export function generatePairs(texts: Text[], existingJudgements: Judgement[], op
   const thetaOf = (id: number) => opts.bt?.theta?.get(id) ?? 0;
   const seOf = (id: number) => opts.bt?.se?.get(id) ?? 1;
 
+  // Betrouwbaarheid threshold: als SE > dit, dan onbetrouwbaar
+  const minReliability = opts.minReliability ?? 0.3;
+
   // exposure target gehaald?
-  const underCap = (i: number) => exposure[i] < target;
+  // MAAR: als SE hoog is (onbetrouwbaar), negeer dan target en blijf pairen
+  const underCap = (i: number) => {
+    if (exposure[i] < target) return true;
+    // Boven target, maar checken of betrouwbaarheid te laag is
+    const id = texts[i].id!;
+    const se = seOf(id);
+    // Als SE > threshold, is het onbetrouwbaar en mag het meer vergelijkingen krijgen
+    return se > minReliability;
+  };
 
   // Scoring van kandidaat tegenstander (informatiewinst + connectiviteit + fairness)
   function scoreOpp(iIdx: number, jIdx: number): number {

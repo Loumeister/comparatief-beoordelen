@@ -96,9 +96,18 @@ const Results = () => {
 
       // Check if more comparisons are needed
       const { generatePairs } = await import('@/lib/pairing');
+      
+      // Maak SE map voor betrouwbaarheidscheck
+      const seMap = new Map<number, number>();
+      btResults.forEach(r => {
+        seMap.set(r.textId, r.standardError);
+      });
+      
       const possiblePairs = generatePairs(texts, judgements, {
         targetComparisonsPerText: assign.numComparisons || 10,
         batchSize: 12,
+        bt: { se: seMap },
+        minReliability: 0.3, // SE threshold voor "onbetrouwbaar"
       });
       setCanCompare(possiblePairs.length > 0);
 
