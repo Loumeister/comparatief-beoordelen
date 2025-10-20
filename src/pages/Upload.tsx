@@ -179,13 +179,13 @@ const Upload = () => {
                 <Input
                   id="comparisons"
                   type="number"
-                  min={5}
+                  min={3}
                   max={20}
                   value={numComparisons}
-                  onChange={(e) => setNumComparisons(parseInt(e.target.value) || 10)}
+                  onChange={(e) => setNumComparisons(Math.max(3, parseInt(e.target.value) || 10))}
                 />
                 <p className="text-sm text-muted-foreground">
-                  Aanbevolen: 10 vergelijkingen per tekst
+                  Minimaal 3, aanbevolen: 10 vergelijkingen per tekst
                 </p>
               </div>
             </CardContent>
