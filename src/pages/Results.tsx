@@ -350,16 +350,23 @@ const Results = () => {
         </Card>
 
         {/* Continue comparing button */}
-        {canCompare && (
-          <div className="mt-6">
-            <Button
-              variant="outline"
-              onClick={() => navigate(`/compare/${assignment?.id}`)}
-            >
-              Meer vergelijkingen maken
-            </Button>
-          </div>
-        )}
+        <div className="mt-6">
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (!canCompare) {
+                toast({
+                  title: 'Alle vergelijkingen voltooid',
+                  description: 'Het doel aantal vergelijkingen is bereikt voor alle teksten.',
+                });
+                return;
+              }
+              navigate(`/compare/${assignment?.id}`);
+            }}
+          >
+            Meer vergelijkingen maken
+          </Button>
+        </div>
       </div>
     </div>
   );
