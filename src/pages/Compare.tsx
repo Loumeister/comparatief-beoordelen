@@ -86,12 +86,21 @@ const Compare = () => {
   };
 
   const handleJudgement = async (winner: 'A' | 'B' | 'EQUAL') => {
-    if (!pairs[currentIndex] || !assignment) return;
+    console.log('handleJudgement called', { winner, currentIndex, pairsLength: pairs.length });
+    if (!pairs[currentIndex] || !assignment) {
+      console.log('No pair or assignment', { hasPair: !!pairs[currentIndex], hasAssignment: !!assignment });
+      return;
+    }
 
     const pair = pairs[currentIndex];
+    console.log('Saving judgement for pair', { 
+      textAId: pair.textA.id, 
+      textBId: pair.textB.id, 
+      winner 
+    });
 
     try {
-      await db.judgements.add({
+      const judgementId = await db.judgements.add({
         assignmentId: assignment.id!,
         textAId: pair.textA.id!,
         textBId: pair.textB.id!,
@@ -99,12 +108,15 @@ const Compare = () => {
         comment: comment.trim() || undefined,
         createdAt: new Date()
       });
+      console.log('Judgement saved with id', judgementId);
 
       setComment('');
 
       if (currentIndex < pairs.length - 1) {
+        console.log('Moving to next pair', currentIndex + 1);
         setCurrentIndex(currentIndex + 1);
       } else {
+        console.log('All pairs done, navigating to results');
         // Done with all pairs
         toast({
           title: 'Alle vergelijkingen voltooid',
