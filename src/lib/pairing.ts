@@ -1,4 +1,5 @@
 import { Text, Judgement } from "./db";
+import { isConnected } from "./graph";
 
 export interface Pair {
   textA: Text;
@@ -125,24 +126,75 @@ export function generatePairs(
     return s;
   }
 
-  // Kandidatenlijst
+  // ===== FASE 1: BRIDGING (cross-component paren om grafiek te verbinden) =====
+  const selected: Pair[] = [];
+  const used = new Set<string>();
+  
+  // Check of grafiek al verbonden is
+  const needsBridging = !isConnected(texts, existingJudgements);
+  
+  if (needsBridging) {
+    // Verzamel alle cross-component kandidaten
+    const bridges: Array<{ iIdx: number; jIdx: number; score: number }> = [];
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        if (dsu.find(i) !== dsu.find(j)) {
+          const idI = texts[i].id!, idJ = texts[j].id!;
+          if (!judgedPairs.has(key(idI, idJ))) {
+            const sc = scoreOpp(i, j);
+            if (sc > -Infinity) {
+              bridges.push({ iIdx: i, jIdx: j, score: sc });
+            }
+          }
+        }
+      }
+    }
+    bridges.sort((a, b) => b.score - a.score);
+    
+    // Selecteer bridging paren totdat grafiek verbonden is (of batch vol)
+    for (const { iIdx, jIdx } of bridges) {
+      if (selected.length >= batchSize) break;
+      
+      const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
+      const kkey = key(idI, idJ);
+      if (used.has(kkey)) continue;
+      
+      // Voeg bridging paar toe
+      const flip = Math.random() < 0.5;
+      selected.push({
+        textA: flip ? texts[jIdx] : texts[iIdx],
+        textB: flip ? texts[iIdx] : texts[jIdx],
+      });
+      used.add(kkey);
+      exposure[iIdx]++; exposure[jIdx]++;
+      dsu.union(iIdx, jIdx);
+      
+      // Check of we nu verbonden zijn
+      // (heuristic: als alle bridges dezelfde root hebben, zijn we verbonden)
+      const roots = new Set<number>();
+      for (let i = 0; i < n; i++) roots.add(dsu.find(i));
+      if (roots.size === 1) break; // Verbonden!
+    }
+  }
+  
+  // ===== FASE 2: INFORMATIEF PAIREN (binnen componenten, of als al verbonden) =====
+  // Bouw kandidatenlijst voor intra-component paren
   const allPairs: Array<{ iIdx: number; jIdx: number; score: number }> = [];
   for (let i = 0; i < n; i++) {
     if (!underCap(i)) continue;
     for (let j = i + 1; j < n; j++) {
       if (!underCap(j)) continue;
-      if (!judgedPairs.has(key(texts[i].id!, texts[j].id!))) {
-        const sc = scoreOpp(i, j);
-        if (sc > -Infinity) allPairs.push({ iIdx: i, jIdx: j, score: sc });
-      }
+      const idI = texts[i].id!, idJ = texts[j].id!;
+      const kkey = key(idI, idJ);
+      if (used.has(kkey) || judgedPairs.has(kkey)) continue;
+      
+      const sc = scoreOpp(i, j);
+      if (sc > -Infinity) allPairs.push({ iIdx: i, jIdx: j, score: sc });
     }
   }
   allPairs.sort((a, b) => b.score - a.score);
 
-  // Selectie (greedy op gesorteerde lijst). Als dit niets oplevert, fallback zonder SE-override.
-  const selected: Pair[] = [];
-  const used = new Set<string>();
-
+  // Vul rest van batch met informatieve paren
   const tryFill = (respectSEOverride: boolean) => {
     for (let k = 0; k < allPairs.length && selected.length < batchSize; k++) {
       const { iIdx, jIdx } = allPairs[k];
@@ -156,13 +208,12 @@ export function generatePairs(
       if (!capI || !capJ) continue;
 
       // voeg toe
-      const flip = Math.random() < 0.5; // links/rechts randomiseren
+      const flip = Math.random() < 0.5;
       selected.push({
         textA: flip ? texts[jIdx] : texts[iIdx],
         textB: flip ? texts[iIdx] : texts[jIdx],
       });
       used.add(kkey);
-      // update state zodat we niet teveel dezelfde inzetten binnen de batch
       exposure[iIdx]++; exposure[jIdx]++;
       dsu.union(iIdx, jIdx);
     }

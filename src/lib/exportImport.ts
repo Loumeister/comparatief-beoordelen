@@ -1,4 +1,5 @@
 import { db, Assignment, Text, Judgement } from './db';
+import { isConnected } from './graph';
 
 export interface DatasetExport {
   assignment: Assignment;
@@ -366,57 +367,3 @@ export async function importCSV(file: File): Promise<{
   });
 }
 
-/**
- * Check of de vergelijkingsgrafiek verbonden is
- * (alle teksten zijn bereikbaar via judgements)
- */
-export function isConnected(texts: Text[], judgements: Judgement[]): boolean {
-  if (texts.length === 0) return true;
-  if (texts.length === 1) return true;
-  if (judgements.length === 0) return false;
-
-  // DSU (Disjoint Set Union) om verbondenheid te checken
-  const parent = new Map<number, number>();
-  const rank = new Map<number, number>();
-
-  function find(x: number): number {
-    if (!parent.has(x)) {
-      parent.set(x, x);
-      rank.set(x, 0);
-    }
-    if (parent.get(x) !== x) {
-      parent.set(x, find(parent.get(x)!));
-    }
-    return parent.get(x)!;
-  }
-
-  function union(x: number, y: number): void {
-    const rootX = find(x);
-    const rootY = find(y);
-    if (rootX === rootY) return;
-
-    const rankX = rank.get(rootX) || 0;
-    const rankY = rank.get(rootY) || 0;
-
-    if (rankX < rankY) {
-      parent.set(rootX, rootY);
-    } else if (rankX > rankY) {
-      parent.set(rootY, rootX);
-    } else {
-      parent.set(rootY, rootX);
-      rank.set(rootX, rankX + 1);
-    }
-  }
-
-  // Initialiseer alle teksten
-  texts.forEach(t => find(t.id!));
-
-  // Union alle gekoppelde teksten
-  judgements.forEach(j => {
-    union(j.textAId, j.textBId);
-  });
-
-  // Check of alle teksten dezelfde root hebben
-  const roots = new Set(texts.map(t => find(t.id!)));
-  return roots.size === 1;
-}

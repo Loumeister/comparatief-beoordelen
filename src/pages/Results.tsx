@@ -17,6 +17,7 @@ import { db, Assignment, Text } from '@/lib/db';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
 import { exportToCSV, exportToXLSX, exportToPDF, exportToJSON, ExportData } from '@/lib/export';
 import { exportDataset } from '@/lib/exportImport';
+import { isConnected } from '@/lib/graph';
 import { useToast } from '@/hooks/use-toast';
 
 const Results = () => {
@@ -28,6 +29,7 @@ const Results = () => {
   const [results, setResults] = useState<ExportData[]>([]);
   const [loading, setLoading] = useState(true);
   const [canCompare, setCanCompare] = useState(false);
+  const [graphDisconnected, setGraphDisconnected] = useState(false);
 
   useEffect(() => {
     loadResults();
@@ -58,6 +60,13 @@ const Results = () => {
           description: 'Begin met vergelijken om resultaten te zien',
         });
         navigate(`/compare/${id}`);
+        return;
+      }
+
+      // Check of grafiek verbonden is
+      if (!isConnected(texts, judgements)) {
+        setGraphDisconnected(true);
+        setLoading(false);
         return;
       }
 
@@ -195,6 +204,46 @@ const Results = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Berekenen van resultaten...</p>
+      </div>
+    );
+  }
+
+  // Disconnected graph warning
+  if (graphDisconnected) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-4xl mx-auto">
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/')}
+            className="mb-4"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Terug naar overzicht
+          </Button>
+
+          <Card className="border-destructive">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="w-5 h-5" />
+                Grafiek niet verbonden
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground">
+                Sommige teksten zijn nog niet met elkaar vergeleken. Het Bradley-Terry model 
+                vereist dat alle teksten via vergelijkingen met elkaar verbonden zijn.
+              </p>
+              <p className="text-muted-foreground">
+                Klik op de knop hieronder om <strong>verbindingsparen</strong> te beoordelen. 
+                Het systeem zal automatisch de ontbrekende vergelijkingen selecteren.
+              </p>
+              <Button onClick={() => navigate(`/compare/${assignment?.id}`)}>
+                Plan verbindingsparen
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
