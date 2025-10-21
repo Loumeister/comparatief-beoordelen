@@ -106,7 +106,7 @@ const Results = () => {
       if (format === "csv") {
         exportToCSV(results, assignment.title);
       } else if (format === "xlsx") {
-        exportToXLSX(results, assignment.title);
+        exportToXLSX(results, assignment.title, assignment.numComparisons);
       } else {
         exportToPDF(results, assignment.title);
       }

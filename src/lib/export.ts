@@ -38,7 +38,7 @@ export function exportToCSV(data: ExportData[], assignmentTitle: string) {
 /**
  * Export results to Excel
  */
-export function exportToXLSX(data: ExportData[], assignmentTitle: string) {
+export function exportToXLSX(data: ExportData[], assignmentTitle: string, numComparisons?: number) {
   const worksheet = XLSX.utils.json_to_sheet(
     data.map(d => ({
       'Tekst': d.anonymizedName,
@@ -47,7 +47,8 @@ export function exportToXLSX(data: ExportData[], assignmentTitle: string) {
       'Cijfer': d.grade.toFixed(1),
       'Theta': d.theta.toFixed(3),
       'SE': d.standardError.toFixed(3),
-      'Betrouwbaarheid': d.reliability
+      'Betrouwbaarheid': d.reliability,
+      'Aantal vergelijkingen': numComparisons || 10
     }))
   );
 

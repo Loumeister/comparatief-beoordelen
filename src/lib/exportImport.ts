@@ -427,6 +427,11 @@ export async function importResultsFromXLSX(file: File): Promise<{
           throw new Error(`Excel mist de volgende kolommen: ${missingColumns.join(', ')}`);
         }
 
+        // Haal aantal vergelijkingen uit eerste rij (indien aanwezig)
+        const numComparisons = firstRow['Aantal vergelijkingen'] 
+          ? parseInt(String(firstRow['Aantal vergelijkingen'])) 
+          : 10;
+
         // Haal titel uit bestandsnaam (verwijder _resultaten.xlsx suffix)
         const assignmentTitle = file.name
           .replace(/_resultaten\.xlsx$/i, '')
@@ -452,7 +457,7 @@ export async function importResultsFromXLSX(file: File): Promise<{
           assignmentId = await db.assignments.add({
             title: assignmentTitle,
             genre: 'Geïmporteerd',
-            numComparisons: 10,
+            numComparisons,
             createdAt: new Date(),
             updatedAt: new Date(),
           });
