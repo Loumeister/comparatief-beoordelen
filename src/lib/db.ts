@@ -41,11 +41,19 @@ export interface Score {
   calculatedAt: Date;
 }
 
+export interface PreviousFit {
+  id?: number;
+  assignmentId: number;
+  results: { textId: number; rank: number; grade: number }[];
+  calculatedAt: Date;
+}
+
 export class AssessmentDB extends Dexie {
   assignments!: Table<Assignment, number>;
   texts!: Table<Text, number>;
   judgements!: Table<Judgement, number>;
   scores!: Table<Score, number>;
+  previousFits!: Table<PreviousFit, number>;
 
   constructor() {
     super('AssessmentDB');
@@ -55,6 +63,14 @@ export class AssessmentDB extends Dexie {
       texts: '++id, assignmentId, anonymizedName',
       judgements: '++id, assignmentId, textAId, textBId',
       scores: '++id, assignmentId, textId, rank'
+    });
+    
+    this.version(2).stores({
+      assignments: '++id, title, createdAt',
+      texts: '++id, assignmentId, anonymizedName',
+      judgements: '++id, assignmentId, textAId, textBId',
+      scores: '++id, assignmentId, textId, rank',
+      previousFits: '++id, assignmentId, calculatedAt'
     });
   }
 }

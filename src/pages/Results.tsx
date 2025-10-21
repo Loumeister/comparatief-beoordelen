@@ -12,6 +12,7 @@ import { calculateBradleyTerry } from "@/lib/bradley-terry";
 import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from "@/lib/export";
 import { useToast } from "@/hooks/use-toast";
 import { isConnected } from "@/lib/graph";
+import { assessReliability, ReliabilityAssessment } from "@/lib/reliability";
 
 const Results = () => {
   const { assignmentId } = useParams();
@@ -22,6 +23,7 @@ const Results = () => {
   const [results, setResults] = useState<ExportData[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [reliabilityData, setReliabilityData] = useState<ReliabilityAssessment | null>(null);
 
   useEffect(() => {
     loadResults();
@@ -61,6 +63,22 @@ const Results = () => {
       // --- BT-fit ---
       const btResults = calculateBradleyTerry(texts, judgements);
 
+      // Haal vorige fit op voor convergentie-check
+      const previousFits = await db.previousFits
+        .where("assignmentId")
+        .equals(id)
+        .sortBy("calculatedAt");
+      const previousFit = previousFits.length > 0 ? previousFits[previousFits.length - 1] : null;
+
+      // Robuuste betrouwbaarheidscheck
+      const reliability = assessReliability(
+        btResults,
+        texts,
+        judgements,
+        previousFit?.results
+      );
+      setReliabilityData(reliability);
+
       // Map naar exportformaat
       const exportData: ExportData[] = btResults.map((r) => {
         const text = texts.find((t) => t.id === r.textId)!;
@@ -92,6 +110,17 @@ const Results = () => {
           calculatedAt: new Date(),
         });
       }
+
+      // Sla huidige fit op voor volgende convergentie-check
+      await db.previousFits.add({
+        assignmentId: id,
+        results: btResults.map((r) => ({
+          textId: r.textId,
+          rank: r.rank,
+          grade: r.grade,
+        })),
+        calculatedAt: new Date(),
+      });
 
       setLoading(false);
     } catch (error) {
@@ -182,29 +211,21 @@ const Results = () => {
     );
   }
 
-  // Bereken overall reliability
-  const reliableCount = results.filter((r) => r.reliability === "Resultaat betrouwbaar").length;
-  const reliabilityPercentage = (reliableCount / results.length) * 100;
+  // Gebruik robuuste betrouwbaarheidscheck
+  const reliabilityStatus: "insufficient" | "moderate" | "reliable" = reliabilityData?.isReliable
+    ? "reliable"
+    : reliabilityData?.coreReliable
+      ? "moderate"
+      : "insufficient";
 
-  let reliabilityStatus: "insufficient" | "moderate" | "reliable";
-  let reliabilityText: string;
-  let reliabilityIcon: typeof CheckCircle;
-
-  if (reliabilityPercentage < 60) {
-    reliabilityStatus = "insufficient";
-    reliabilityText = "Onvoldoende gegevens";
-    reliabilityIcon = XCircle;
-  } else if (reliabilityPercentage < 80) {
-    reliabilityStatus = "moderate";
-    reliabilityText = "Nog enkele vergelijkingen nodig";
-    reliabilityIcon = AlertCircle;
-  } else {
-    reliabilityStatus = "reliable";
-    reliabilityText = "Resultaat betrouwbaar";
-    reliabilityIcon = CheckCircle;
-  }
+  const reliabilityText = reliabilityData?.message || "Berekenen...";
+  
+  const reliabilityIcon = 
+    reliabilityStatus === "reliable" ? CheckCircle :
+    reliabilityStatus === "moderate" ? AlertCircle : XCircle;
 
   const ReliabilityIcon = reliabilityIcon;
+  const reliabilityPercentage = reliabilityData?.corePercentage || 0;
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -254,9 +275,22 @@ const Results = () => {
               />
               <div className="flex-1">
                 <h3 className="font-semibold text-lg">{reliabilityText}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {Math.round(reliabilityPercentage)}% van de teksten heeft voldoende vergelijkingen
-                </p>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p>Kernset: {Math.round(reliabilityPercentage)}% betrouwbaar</p>
+                  {reliabilityData && (
+                    <>
+                      {reliabilityData.kendallTau !== null && (
+                        <p>Rangstabiliteit: τ = {reliabilityData.kendallTau.toFixed(3)}</p>
+                      )}
+                      {!reliabilityData.topHasLadder && (
+                        <p className="text-destructive">⚠ Top mist ladder-bewijs</p>
+                      )}
+                      {!reliabilityData.bottomHasLadder && (
+                        <p className="text-destructive">⚠ Bodem mist ladder-bewijs</p>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
             <div className="relative">
