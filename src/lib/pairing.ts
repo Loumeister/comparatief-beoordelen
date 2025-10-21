@@ -45,12 +45,11 @@ class DSU {
 }
 
 /**
- * Verbeterde pairing:
- * - Balanced exposure
- * - Forceert cross-component paren om grafiek te verbinden
- * - Informatiewinst: kleine |Δθ| en hoge (SE_t + SE_u) krijgen voorrang (als bt-info beschikbaar)
- * - Fallbacks wanneer bijna vol of SE-override niets oplevert
- * - Links/rechts randomiseren per paar
+ * Verbeterde pairing met hard bridging en SE-override:
+ * - FASE 1: Cross-component paren (bridging) krijgen absolute prioriteit
+ * - FASE 2: Informatieve paren binnen componenten
+ * - SE-override: blijft pairen als SE > threshold (0.30), ook na target exposure
+ * - Links/rechts randomisatie per paar om kant-bias te voorkomen
  */
 export function generatePairs(
   texts: Text[],
@@ -59,169 +58,117 @@ export function generatePairs(
 ): Pair[] {
   const target = opts.targetComparisonsPerText ?? 10;
   const rawBatch = opts.batchSize ?? Math.ceil((target * texts.length) / 4);
-  const batchSize = Math.max(4, Math.min(rawBatch, Math.ceil((texts.length * (texts.length-1))/4)));
-  const seThreshold = opts.seThreshold ?? 0.30;
+  const batchSize = Math.max(4, rawBatch);
   if (texts.length < 2) return [];
 
-  // index mapping
   const id2idx = new Map<number, number>(texts.map((t, i) => [t.id!, i]));
   const n = texts.length;
 
-  // judged pairs + exposure
   const judgedPairs = new Set<string>();
   const exposure = new Array(n).fill(0);
   for (const j of existingJudgements) {
-    const ia = id2idx.get(j.textAId);
-    const ib = id2idx.get(j.textBId);
+    const ia = id2idx.get(j.textAId), ib = id2idx.get(j.textBId);
     if (ia == null || ib == null || ia === ib) continue;
     judgedPairs.add(key(j.textAId, j.textBId));
     exposure[ia]++; exposure[ib]++;
   }
 
-  // connectiviteit
   const dsu = new DSU(n);
   for (const j of existingJudgements) {
-    const ia = id2idx.get(j.textAId);
-    const ib = id2idx.get(j.textBId);
+    const ia = id2idx.get(j.textAId), ib = id2idx.get(j.textBId);
     if (ia == null || ib == null || ia === ib) continue;
     dsu.union(ia, ib);
   }
 
-  // BT helpers
   const hasBT = Boolean(opts.bt?.theta && opts.bt?.se);
   const thetaOf = (id: number) => (hasBT ? (opts.bt!.theta!.get(id) ?? 0) : 0);
   const seOf    = (id: number) => (hasBT ? (opts.bt!.se!.get(id)    ?? 1) : 1);
+  const seThreshold = 0.30;
 
-  // Onder cap als: exposure < target, of (alleen mét BT) SE > drempel
   const underCap = (i: number) => {
     if (exposure[i] < target) return true;
-    if (!hasBT) return false; // zonder BT-info geen SE-override
+    if (!hasBT) return false;
     const id = texts[i].id!;
-    return seOf(id) > seThreshold;
+    return seOf(id) > seThreshold; // doorpairen als SE te hoog
   };
 
-  // Score voor kandidaat
   function scoreOpp(iIdx: number, jIdx: number): number {
     const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
     if (judgedPairs.has(key(idI, idJ))) return -Infinity;
     if (!underCap(iIdx) || !underCap(jIdx)) return -Infinity;
 
-    // base: lagere gezamenlijke exposure → beter
     let s = -(exposure[iIdx] + exposure[jIdx]);
+    if (dsu.find(iIdx) !== dsu.find(jIdx)) s += 1000; // bridging bonus
 
-    // connectiviteit bonus
-    if (dsu.find(iIdx) !== dsu.find(jIdx)) s += 1000;
-
-    // informatiewinst
     if (hasBT) {
-      const dtheta = Math.abs(thetaOf(idI) - thetaOf(idJ));
-      if (dtheta > 3) s -= 20; // hard penalty voor bijna-zeker uitslag
-      const sumSE  = seOf(idI) + seOf(idJ);
-      s += (10 - 10 * Math.min(dtheta, 1)); // kleine Δθ is beter
-      s += 5 * Math.min(sumSE, 2);          // hoge onzekerheid → informatief
+      const dθ = Math.abs(thetaOf(idI) - thetaOf(idJ));
+      const sumSE = seOf(idI) + seOf(idJ);
+      s += (10 - 10 * Math.min(dθ, 1));   // kleine Δθ beter
+      s += 5 * Math.min(sumSE, 2);        // hoge onzekerheid→informatief
+      if (dθ > 3) s -= 20;                // penalty op bijna-zekere uitslag
     }
 
-    // breek ties
     s += Math.random() * 0.01;
     return s;
   }
 
-  // ===== FASE 1: BRIDGING (cross-component paren om grafiek te verbinden) =====
+  // ----- FASE 1: BRIDGING -----
   const selected: Pair[] = [];
   const used = new Set<string>();
-  
-  // Check of grafiek al verbonden is
-  const needsBridging = !isConnected(texts, existingJudgements);
-  
-  if (needsBridging) {
-    // Verzamel alle cross-component kandidaten
-    const bridges: Array<{ iIdx: number; jIdx: number; score: number }> = [];
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        if (dsu.find(i) !== dsu.find(j)) {
-          const idI = texts[i].id!, idJ = texts[j].id!;
-          if (!judgedPairs.has(key(idI, idJ))) {
-            const sc = scoreOpp(i, j);
-            if (sc > -Infinity) {
-              bridges.push({ iIdx: i, jIdx: j, score: sc });
-            }
-          }
-        }
-      }
-    }
-    bridges.sort((a, b) => b.score - a.score);
-    
-    // Selecteer bridging paren totdat grafiek verbonden is (of batch vol)
-    for (const { iIdx, jIdx } of bridges) {
-      if (selected.length >= batchSize) break;
-      
-      const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
-      const kkey = key(idI, idJ);
-      if (used.has(kkey)) continue;
-      
-      // Voeg bridging paar toe
-      const flip = Math.random() < 0.5;
-      selected.push({
-        textA: flip ? texts[jIdx] : texts[iIdx],
-        textB: flip ? texts[iIdx] : texts[jIdx],
-      });
-      used.add(kkey);
-      exposure[iIdx]++; exposure[jIdx]++;
-      dsu.union(iIdx, jIdx);
-      
-      // Check of we nu verbonden zijn
-      // (heuristic: als alle bridges dezelfde root hebben, zijn we verbonden)
-      const roots = new Set<number>();
-      for (let i = 0; i < n; i++) roots.add(dsu.find(i));
-      if (roots.size === 1) break; // Verbonden!
-    }
+
+  function selectPair(iIdx: number, jIdx: number) {
+    const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
+    const kkey = key(idI, idJ);
+    if (used.has(kkey) || judgedPairs.has(kkey)) return false;
+    if (!underCap(iIdx) || !underCap(jIdx)) return false;
+    const flip = Math.random() < 0.5;
+    selected.push({ textA: flip ? texts[jIdx] : texts[iIdx], textB: flip ? texts[iIdx] : texts[jIdx] });
+    used.add(kkey);
+    judgedPairs.add(kkey);
+    exposure[iIdx]++; exposure[jIdx]++;
+    dsu.union(iIdx, jIdx);
+    return true;
   }
-  
-  // ===== FASE 2: INFORMATIEF PAIREN (binnen componenten, of als al verbonden) =====
-  // Bouw kandidatenlijst voor intra-component paren
-  const allPairs: Array<{ iIdx: number; jIdx: number; score: number }> = [];
+
+  // verzamel mogelijke brugparen
+  const bridges: Array<{iIdx:number;jIdx:number;score:number}> = [];
   for (let i = 0; i < n; i++) {
     if (!underCap(i)) continue;
     for (let j = i + 1; j < n; j++) {
       if (!underCap(j)) continue;
-      const idI = texts[i].id!, idJ = texts[j].id!;
-      const kkey = key(idI, idJ);
-      if (used.has(kkey) || judgedPairs.has(kkey)) continue;
-      
-      const sc = scoreOpp(i, j);
-      if (sc > -Infinity) allPairs.push({ iIdx: i, jIdx: j, score: sc });
+      if (dsu.find(i) !== dsu.find(j) && !judgedPairs.has(key(texts[i].id!, texts[j].id!))) {
+        const sc = scoreOpp(i, j);
+        if (sc > -Infinity) bridges.push({ iIdx: i, jIdx: j, score: sc });
+      }
     }
   }
-  allPairs.sort((a, b) => b.score - a.score);
+  bridges.sort((a, b) => b.score - a.score);
 
-  // Vul rest van batch met informatieve paren
-  const tryFill = (respectSEOverride: boolean) => {
-    for (let k = 0; k < allPairs.length && selected.length < batchSize; k++) {
-      const { iIdx, jIdx } = allPairs[k];
-      const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
-      const kkey = key(idI, idJ);
-      if (used.has(kkey)) continue;
+  // kies bridges totdat verbonden of batch vol
+  for (const b of bridges) {
+    if (selected.length >= batchSize) break;
+    selectPair(b.iIdx, b.jIdx);
+  }
 
-      // respecteer cap (met of zonder SE-override)
-      const capI = respectSEOverride ? underCap(iIdx) : (exposure[iIdx] < target);
-      const capJ = respectSEOverride ? underCap(jIdx) : (exposure[jIdx] < target);
-      if (!capI || !capJ) continue;
-
-      // voeg toe
-      const flip = Math.random() < 0.5;
-      selected.push({
-        textA: flip ? texts[jIdx] : texts[iIdx],
-        textB: flip ? texts[iIdx] : texts[jIdx],
-      });
-      used.add(kkey);
-      exposure[iIdx]++; exposure[jIdx]++;
-      dsu.union(iIdx, jIdx);
+  // ----- FASE 2: INTRA-COMPONENT (informatief) -----
+  // alle resterende kandidaten
+  const candidates: Array<{iIdx:number;jIdx:number;score:number}> = [];
+  for (let i = 0; i < n; i++) {
+    if (!underCap(i)) continue;
+    for (let j = i + 1; j < n; j++) {
+      if (!underCap(j)) continue;
+      if (!judgedPairs.has(key(texts[i].id!, texts[j].id!))) {
+        const sc = scoreOpp(i, j);
+        if (sc > -Infinity) candidates.push({ iIdx: i, jIdx: j, score: sc });
+      }
     }
-  };
+  }
+  candidates.sort((a, b) => b.score - a.score);
 
-  // Eerst met SE-override (informatief doorpairen), dan zoniet gelukt: fallback zonder override
-  tryFill(true);
-  if (selected.length === 0) tryFill(false);
+  for (const c of candidates) {
+    if (selected.length >= batchSize) break;
+    selectPair(c.iIdx, c.jIdx);
+  }
 
   return selected;
 }
