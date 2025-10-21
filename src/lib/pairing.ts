@@ -57,7 +57,8 @@ export function generatePairs(
   opts: Options = {}
 ): Pair[] {
   const target = opts.targetComparisonsPerText ?? 10;
-  const batchSize = opts.batchSize ?? Math.ceil((target * texts.length) / 4);
+  const rawBatch = opts.batchSize ?? Math.ceil((target * texts.length) / 4);
+  const batchSize = Math.max(4, Math.min(rawBatch, Math.ceil((texts.length * (texts.length-1))/4)));
   const seThreshold = opts.seThreshold ?? 0.30;
   if (texts.length < 2) return [];
 
@@ -113,6 +114,7 @@ export function generatePairs(
     // informatiewinst
     if (hasBT) {
       const dtheta = Math.abs(thetaOf(idI) - thetaOf(idJ));
+      if (dtheta > 3) s -= 20; // hard penalty voor bijna-zeker uitslag
       const sumSE  = seOf(idI) + seOf(idJ);
       s += (10 - 10 * Math.min(dtheta, 1)); // kleine Δθ is beter
       s += 5 * Math.min(sumSE, 2);          // hoge onzekerheid → informatief
