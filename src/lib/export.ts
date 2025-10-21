@@ -88,6 +88,14 @@ export function exportToPDF(data: ExportData[], assignmentTitle: string) {
   doc.save(`${assignmentTitle}_resultaten.pdf`);
 }
 
+/**
+ * Export results to JSON
+ */
+export function exportToJSON(data: ExportData[], assignmentTitle: string) {
+  const json = JSON.stringify(data, null, 2);
+  downloadFile(json, `${assignmentTitle}_resultaten.json`, 'application/json');
+}
+
 function downloadFile(content: string, filename: string, type: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);

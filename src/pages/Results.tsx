@@ -15,7 +15,7 @@ import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircl
 import { Progress } from '@/components/ui/progress';
 import { db, Assignment, Text } from '@/lib/db';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
-import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from '@/lib/export';
+import { exportToCSV, exportToXLSX, exportToPDF, exportToJSON, ExportData } from '@/lib/export';
 import { exportDataset } from '@/lib/exportImport';
 import { useToast } from '@/hooks/use-toast';
 
@@ -122,7 +122,7 @@ const Results = () => {
     }
   };
 
-  const handleExport = (format: 'csv' | 'xlsx' | 'pdf') => {
+  const handleExport = (format: 'csv' | 'xlsx' | 'pdf' | 'json') => {
     if (!assignment) return;
 
     try {
@@ -130,6 +130,8 @@ const Results = () => {
         exportToCSV(results, assignment.title);
       } else if (format === 'xlsx') {
         exportToXLSX(results, assignment.title);
+      } else if (format === 'json') {
+        exportToJSON(results, assignment.title);
       } else {
         exportToPDF(results, assignment.title);
       }
@@ -256,6 +258,10 @@ const Results = () => {
                 <Button variant="outline" onClick={() => handleExport('xlsx')}>
                   <FileSpreadsheet className="w-4 h-4 mr-2" />
                   Excel
+                </Button>
+                <Button variant="outline" onClick={() => handleExport('json')}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  JSON
                 </Button>
                 <Button onClick={() => handleExport('pdf')}>
                   <FileText className="w-4 h-4 mr-2" />

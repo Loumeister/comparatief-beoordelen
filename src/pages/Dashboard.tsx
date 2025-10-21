@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, FileText, BarChart3, Trash2, Upload } from 'lucide-react';
 import { db, Assignment } from '@/lib/db';
-import { importDataset } from '@/lib/exportImport';
+import { importDataset, importCSV } from '@/lib/exportImport';
 import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
@@ -65,7 +65,9 @@ const Dashboard = () => {
 
     setImporting(true);
     try {
-      const result = await importDataset(file);
+      // Determine file type
+      const isCSV = file.name.toLowerCase().endsWith('.csv');
+      const result = isCSV ? await importCSV(file) : await importDataset(file);
       
       toast({
         title: 'Dataset succesvol geïmporteerd',
@@ -124,7 +126,7 @@ const Dashboard = () => {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".json"
+              accept=".json,.csv"
               className="hidden"
               onChange={handleImport}
             />

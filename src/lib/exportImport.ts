@@ -179,6 +179,194 @@ export async function importDataset(file: File): Promise<{
 }
 
 /**
+ * Importeer beoordelingsdata uit een CSV-bestand
+ * CSV moet de volgende kolommen hebben: title, genre, originalFilename, anonymizedName, textAAnonymizedName, textBAnonymizedName, winner
+ */
+export async function importCSV(file: File): Promise<{
+  newTexts: number;
+  newJudgements: number;
+  assignmentTitle: string;
+  isConnected: boolean;
+}> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = async (e) => {
+      try {
+        const csv = e.target?.result as string;
+        const lines = csv.split('\n').filter(line => line.trim());
+        
+        if (lines.length < 2) {
+          throw new Error('CSV bestand is leeg of heeft geen data');
+        }
+
+        // Parse header
+        const header = lines[0].split(',').map(h => h.trim());
+        const requiredColumns = ['title', 'genre', 'originalFilename', 'anonymizedName'];
+        const hasRequired = requiredColumns.every(col => header.includes(col));
+        
+        if (!hasRequired) {
+          throw new Error(`CSV moet de volgende kolommen bevatten: ${requiredColumns.join(', ')}`);
+        }
+
+        // Parse rows
+        const rows = lines.slice(1).map(line => {
+          const values = line.split(',').map(v => v.trim());
+          const row: Record<string, string> = {};
+          header.forEach((col, i) => {
+            row[col] = values[i] || '';
+          });
+          return row;
+        });
+
+        if (rows.length === 0) {
+          throw new Error('Geen data gevonden in CSV');
+        }
+
+        // Extract assignment info from first row
+        const firstRow = rows[0];
+        const assignmentTitle = firstRow.title;
+        const genre = firstRow.genre || 'Algemeen';
+
+        // Check if assignment exists
+        const existing = await db.assignments
+          .where('title')
+          .equals(assignmentTitle)
+          .filter(a => a.genre === genre)
+          .first();
+
+        let assignmentId: number;
+        let numComparisons = 10; // default
+
+        if (existing) {
+          assignmentId = existing.id!;
+          numComparisons = existing.numComparisons;
+        } else {
+          // Create new assignment
+          assignmentId = await db.assignments.add({
+            title: assignmentTitle,
+            genre,
+            numComparisons,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+
+        // Import texts
+        let newTextsCount = 0;
+        const textMap = new Map<string, number>(); // anonymizedName -> id
+
+        // Get unique texts from rows
+        const uniqueTexts = new Map<string, { originalFilename: string; anonymizedName: string }>();
+        rows.forEach(row => {
+          if (row.originalFilename && row.anonymizedName) {
+            uniqueTexts.set(row.anonymizedName, {
+              originalFilename: row.originalFilename,
+              anonymizedName: row.anonymizedName,
+            });
+          }
+        });
+
+        for (const [anonymizedName, textData] of uniqueTexts) {
+          const existingText = await db.texts
+            .where('assignmentId')
+            .equals(assignmentId)
+            .filter(t => t.anonymizedName === anonymizedName)
+            .first();
+
+          if (existingText) {
+            textMap.set(anonymizedName, existingText.id!);
+          } else {
+            const newId = await db.texts.add({
+              assignmentId,
+              originalFilename: textData.originalFilename,
+              anonymizedName: textData.anonymizedName,
+              content: '', // CSV doesn't contain content
+              createdAt: new Date(),
+            });
+            textMap.set(anonymizedName, newId);
+            newTextsCount++;
+          }
+        }
+
+        // Import judgements if columns exist
+        let newJudgementsCount = 0;
+        const judgedPairs = new Set<string>();
+
+        // Get existing judgements
+        const existingJudgements = await db.judgements
+          .where('assignmentId')
+          .equals(assignmentId)
+          .toArray();
+
+        existingJudgements.forEach(j => {
+          const pairKey = [j.textAId, j.textBId].sort().join('-');
+          judgedPairs.add(pairKey);
+        });
+
+        // Check if judgement columns exist
+        const hasJudgements = header.includes('textAAnonymizedName') && 
+                              header.includes('textBAnonymizedName') && 
+                              header.includes('winner');
+
+        if (hasJudgements) {
+          for (const row of rows) {
+            const textAName = row.textAAnonymizedName;
+            const textBName = row.textBAnonymizedName;
+            const winner = row.winner;
+
+            if (!textAName || !textBName || !winner) continue;
+
+            const textAId = textMap.get(textAName);
+            const textBId = textMap.get(textBName);
+
+            if (!textAId || !textBId) {
+              console.warn('Judgement overgeslagen: tekst niet gevonden', { textAName, textBName });
+              continue;
+            }
+
+            // Check duplicate
+            const pairKey = [textAId, textBId].sort().join('-');
+            if (judgedPairs.has(pairKey)) {
+              continue;
+            }
+
+            // Add judgement
+            await db.judgements.add({
+              assignmentId,
+              textAId,
+              textBId,
+              winner: winner === 'tie' || winner === 'EQUAL' ? 'EQUAL' : (winner === textAName ? 'A' : 'B'),
+              createdAt: new Date(),
+            });
+
+            judgedPairs.add(pairKey);
+            newJudgementsCount++;
+          }
+        }
+
+        // Check connectivity
+        const allTexts = await db.texts.where('assignmentId').equals(assignmentId).toArray();
+        const allJudgements = await db.judgements.where('assignmentId').equals(assignmentId).toArray();
+        const connected = isConnected(allTexts, allJudgements);
+
+        resolve({
+          newTexts: newTextsCount,
+          newJudgements: newJudgementsCount,
+          assignmentTitle,
+          isConnected: connected,
+        });
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Fout bij lezen bestand'));
+    reader.readAsText(file);
+  });
+}
+
+/**
  * Check of de vergelijkingsgrafiek verbonden is
  * (alle teksten zijn bereikbaar via judgements)
  */
