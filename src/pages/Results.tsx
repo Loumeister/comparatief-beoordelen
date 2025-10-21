@@ -11,11 +11,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle, Database } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { db, Assignment, Text } from '@/lib/db';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
 import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from '@/lib/export';
+import { exportDataset } from '@/lib/exportImport';
 import { useToast } from '@/hooks/use-toast';
 
 const Results = () => {
@@ -146,6 +147,24 @@ const Results = () => {
     }
   };
 
+  const handleExportDataset = async () => {
+    if (!assignment) return;
+
+    try {
+      await exportDataset(assignment.id!);
+      toast({
+        title: 'Dataset geëxporteerd',
+        description: 'Beoordelingsdata succesvol geëxporteerd als JSON'
+      });
+    } catch (error) {
+      console.error('Export dataset error:', error);
+      toast({
+        title: 'Export mislukt',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const getLabelColor = (label: string) => {
     switch (label) {
       case 'Topgroep':
@@ -228,18 +247,24 @@ const Results = () => {
               </p>
             </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => handleExport('csv')}>
-                <Download className="w-4 h-4 mr-2" />
-                CSV
-              </Button>
-              <Button variant="outline" onClick={() => handleExport('xlsx')}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Excel
-              </Button>
-              <Button onClick={() => handleExport('pdf')}>
-                <FileText className="w-4 h-4 mr-2" />
-                PDF
+            <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => handleExport('csv')}>
+                  <Download className="w-4 h-4 mr-2" />
+                  CSV
+                </Button>
+                <Button variant="outline" onClick={() => handleExport('xlsx')}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Excel
+                </Button>
+                <Button onClick={() => handleExport('pdf')}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  PDF
+                </Button>
+              </div>
+              <Button variant="secondary" onClick={handleExportDataset}>
+                <Database className="w-4 h-4 mr-2" />
+                Exporteer Dataset
               </Button>
             </div>
           </div>

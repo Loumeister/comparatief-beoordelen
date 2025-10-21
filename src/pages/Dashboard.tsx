@@ -1,16 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, BarChart3, Trash2 } from 'lucide-react';
+import { Plus, FileText, BarChart3, Trash2, Upload } from 'lucide-react';
 import { db, Assignment } from '@/lib/db';
+import { importDataset } from '@/lib/exportImport';
 import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [stats, setStats] = useState<Map<number, { texts: number; judgements: number }>>(new Map());
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     loadAssignments();
@@ -56,6 +59,45 @@ const Dashboard = () => {
     }
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const result = await importDataset(file);
+      
+      toast({
+        title: 'Dataset succesvol geïmporteerd',
+        description: `${result.assignmentTitle}: ${result.newTexts} nieuwe teksten, ${result.newJudgements} nieuwe oordelen`,
+      });
+
+      if (!result.isConnected) {
+        toast({
+          title: 'Let op: grafiek niet verbonden',
+          description: 'Sommige teksten zijn nog niet gekoppeld – voer extra vergelijkingen uit.',
+          variant: 'default',
+        });
+      }
+
+      // Reload assignments
+      await loadAssignments();
+    } catch (error) {
+      console.error('Import error:', error);
+      toast({
+        title: 'Import mislukt',
+        description: error instanceof Error ? error.message : 'Ongeldig bestandsformaat',
+        variant: 'destructive',
+      });
+    } finally {
+      setImporting(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
@@ -65,10 +107,28 @@ const Dashboard = () => {
           <p className="text-xl text-muted-foreground mb-6">
             Beoordeel leerlingteksten objectief door ze paarsgewijs te vergelijken
           </p>
-          <Button size="lg" onClick={() => navigate('/upload')}>
-            <Plus className="w-5 h-5 mr-2" />
-            Nieuwe Opdracht
-          </Button>
+          <div className="flex gap-3">
+            <Button size="lg" onClick={() => navigate('/upload')}>
+              <Plus className="w-5 h-5 mr-2" />
+              Nieuwe Opdracht
+            </Button>
+            <Button 
+              size="lg" 
+              variant="secondary" 
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+            >
+              <Upload className="w-5 h-5 mr-2" />
+              {importing ? 'Importeren...' : 'Importeer Dataset'}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={handleImport}
+            />
+          </div>
         </div>
       </div>
 
