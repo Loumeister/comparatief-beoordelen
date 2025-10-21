@@ -31,7 +31,9 @@ export async function exportDataset(assignmentId: number): Promise<void> {
   const link = document.createElement('a');
   link.href = url;
   link.download = `${assignment.title}_data.json`;
+  document.body.appendChild(link);
   link.click();
+  document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
@@ -77,7 +79,7 @@ export async function importDataset(file: File): Promise<{
           const { id, ...assignmentData } = assignment;
           assignmentId = await db.assignments.add({
             ...assignmentData,
-            createdAt: new Date(assignmentData.createdAt),
+            createdAt: assignmentData.createdAt ? new Date(assignmentData.createdAt) : new Date(),
             updatedAt: new Date(),
           });
         }
@@ -91,8 +93,8 @@ export async function importDataset(file: File): Promise<{
             .where('assignmentId')
             .equals(assignmentId)
             .filter(t => 
-              t.originalFilename === text.originalFilename && 
-              t.anonymizedName === text.anonymizedName
+              t.anonymizedName === text.anonymizedName &&
+              (!text.originalFilename || t.originalFilename === text.originalFilename)
             )
             .first();
 
@@ -106,7 +108,7 @@ export async function importDataset(file: File): Promise<{
             const newId = await db.texts.add({
               ...textData,
               assignmentId,
-              createdAt: new Date(textData.createdAt),
+              createdAt: textData.createdAt ? new Date(textData.createdAt) : new Date(),
             });
             textIdMap.set(oldId, newId);
             newTextsCount++;
@@ -151,7 +153,7 @@ export async function importDataset(file: File): Promise<{
             assignmentId,
             textAId: newTextAId,
             textBId: newTextBId,
-            createdAt: new Date(judgementData.createdAt),
+            createdAt: judgementData.createdAt ? new Date(judgementData.createdAt) : new Date(),
           });
           
           judgedPairs.add(pairKey);
@@ -180,6 +182,18 @@ export async function importDataset(file: File): Promise<{
 }
 
 /**
+ * Helper: map winner value (tolerant voor 'A'|'B'|'EQUAL'|'TIE' of namen)
+ */
+function mapWinner(raw: string, textAName: string, textBName: string): 'A' | 'B' | 'EQUAL' | null {
+  const w = (raw || '').trim().toUpperCase();
+  if (w === 'A' || w === 'B' || w === 'EQUAL') return w as 'A' | 'B' | 'EQUAL';
+  if (w === 'TIE') return 'EQUAL';
+  if (raw === textAName) return 'A';
+  if (raw === textBName) return 'B';
+  return null; // onbekend -> overslaan
+}
+
+/**
  * Importeer beoordelingsdata uit een CSV-bestand
  * CSV moet de volgende kolommen hebben: title, genre, originalFilename, anonymizedName, textAAnonymizedName, textBAnonymizedName, winner
  */
@@ -201,8 +215,12 @@ export async function importCSV(file: File): Promise<{
           throw new Error('CSV bestand is leeg of heeft geen data');
         }
 
+        // Detect delimiter (comma vs semicolon)
+        const rawHeader = lines[0];
+        const delimiter = rawHeader.includes(';') && !rawHeader.includes(',') ? ';' : ',';
+        
         // Parse header
-        const header = lines[0].split(',').map(h => h.trim());
+        const header = rawHeader.split(delimiter).map(h => h.trim());
         const requiredColumns = ['title', 'genre', 'originalFilename', 'anonymizedName'];
         const hasRequired = requiredColumns.every(col => header.includes(col));
         
@@ -212,7 +230,7 @@ export async function importCSV(file: File): Promise<{
 
         // Parse rows
         const rows = lines.slice(1).map(line => {
-          const values = line.split(',').map(v => v.trim());
+          const values = line.split(delimiter).map(v => v.trim());
           const row: Record<string, string> = {};
           header.forEach((col, i) => {
             row[col] = values[i] || '';
@@ -332,12 +350,19 @@ export async function importCSV(file: File): Promise<{
               continue;
             }
 
+            // Map winner
+            const mapped = mapWinner(winner, textAName, textBName);
+            if (!mapped) {
+              console.warn('Judgement overgeslagen: ongeldige winner waarde', { winner, textAName, textBName });
+              continue;
+            }
+
             // Add judgement
             await db.judgements.add({
               assignmentId,
               textAId,
               textBId,
-              winner: winner === 'tie' || winner === 'EQUAL' ? 'EQUAL' : (winner === textAName ? 'A' : 'B'),
+              winner: mapped,
               createdAt: new Date(),
             });
 
