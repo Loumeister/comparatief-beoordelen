@@ -12,7 +12,6 @@ import { calculateBradleyTerry } from "@/lib/bradley-terry";
 import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from "@/lib/export";
 import { useToast } from "@/hooks/use-toast";
 import { isConnected } from "@/lib/graph";
-import { assessReliability, ReliabilityAssessment } from "@/lib/reliability";
 
 const Results = () => {
   const { assignmentId } = useParams();
@@ -23,7 +22,6 @@ const Results = () => {
   const [results, setResults] = useState<ExportData[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState<boolean | null>(null);
-  const [reliabilityData, setReliabilityData] = useState<ReliabilityAssessment | null>(null);
 
   useEffect(() => {
     loadResults();
@@ -51,33 +49,16 @@ const Results = () => {
         return;
       }
 
-      // --- NIEUW: connectedness check vóór BT ---
+      // Connectedness check vóór BT
       const ok = isConnected(texts, judgements);
       setConnected(ok);
       if (!ok) {
-        // Niet verbonden → géén BT-fit; toon banner + CTA
         setLoading(false);
-        return;
+        return; // geen BT-fit zolang de grafiek niet verbonden is
       }
 
-      // --- BT-fit ---
+      // BT-fit
       const btResults = calculateBradleyTerry(texts, judgements);
-
-      // Haal vorige fit op voor convergentie-check
-      const previousFits = await db.previousFits
-        .where("assignmentId")
-        .equals(id)
-        .sortBy("calculatedAt");
-      const previousFit = previousFits.length > 0 ? previousFits[previousFits.length - 1] : null;
-
-      // Robuuste betrouwbaarheidscheck
-      const reliability = assessReliability(
-        btResults,
-        texts,
-        judgements,
-        previousFit?.results
-      );
-      setReliabilityData(reliability);
 
       // Map naar exportformaat
       const exportData: ExportData[] = btResults.map((r) => {
@@ -111,33 +92,29 @@ const Results = () => {
         });
       }
 
-      // Sla huidige fit op voor volgende convergentie-check
-      await db.previousFits.add({
-        assignmentId: id,
-        results: btResults.map((r) => ({
-          textId: r.textId,
-          rank: r.rank,
-          grade: r.grade,
-        })),
-        calculatedAt: new Date(),
-      });
-
       setLoading(false);
     } catch (error) {
       console.error("Results error:", error);
       toast({ title: "Fout bij laden resultaten", variant: "destructive" });
-      setLoading(false);
     }
   };
 
   const handleExport = (format: "csv" | "xlsx" | "pdf") => {
     if (!assignment) return;
-    try {
-      if (format === "csv") exportToCSV(results, assignment.title);
-      else if (format === "xlsx") exportToXLSX(results, assignment.title);
-      else exportToPDF(results, assignment.title);
 
-      toast({ title: "Export geslaagd", description: `Resultaten geëxporteerd als ${format.toUpperCase()}` });
+    try {
+      if (format === "csv") {
+        exportToCSV(results, assignment.title);
+      } else if (format === "xlsx") {
+        exportToXLSX(results, assignment.title);
+      } else {
+        exportToPDF(results, assignment.title);
+      }
+
+      toast({
+        title: "Export geslaagd",
+        description: `Resultaten geëxporteerd als ${format.toUpperCase()}`,
+      });
     } catch (error) {
       console.error("Export error:", error);
       toast({ title: "Export mislukt", variant: "destructive" });
@@ -173,7 +150,7 @@ const Results = () => {
     );
   }
 
-  // Niet-verbonden banner (blokkeert weergave BT-resultaten)
+  // Niet-verbonden banner (blokkeert BT-resultaten)
   if (connected === false) {
     return (
       <div className="min-h-screen bg-background p-6">
@@ -211,21 +188,29 @@ const Results = () => {
     );
   }
 
-  // Gebruik robuuste betrouwbaarheidscheck
-  const reliabilityStatus: "insufficient" | "moderate" | "reliable" = reliabilityData?.isReliable
-    ? "reliable"
-    : reliabilityData?.coreReliable
-      ? "moderate"
-      : "insufficient";
+  // Overall reliability
+  const reliableCount = results.filter((r) => r.reliability === "Resultaat betrouwbaar").length;
+  const reliabilityPercentage = (reliableCount / results.length) * 100;
 
-  const reliabilityText = reliabilityData?.message || "Berekenen...";
-  
-  const reliabilityIcon = 
-    reliabilityStatus === "reliable" ? CheckCircle :
-    reliabilityStatus === "moderate" ? AlertCircle : XCircle;
+  let reliabilityStatus: "insufficient" | "moderate" | "reliable";
+  let reliabilityText: string;
+  let reliabilityIcon: typeof CheckCircle;
+
+  if (reliabilityPercentage < 60) {
+    reliabilityStatus = "insufficient";
+    reliabilityText = "Onvoldoende gegevens";
+    reliabilityIcon = XCircle;
+  } else if (reliabilityPercentage < 80) {
+    reliabilityStatus = "moderate";
+    reliabilityText = "Nog enkele vergelijkingen nodig";
+    reliabilityIcon = AlertCircle;
+  } else {
+    reliabilityStatus = "reliable";
+    reliabilityText = "Resultaat betrouwbaar";
+    reliabilityIcon = CheckCircle;
+  }
 
   const ReliabilityIcon = reliabilityIcon;
-  const reliabilityPercentage = reliabilityData?.corePercentage || 0;
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -275,22 +260,9 @@ const Results = () => {
               />
               <div className="flex-1">
                 <h3 className="font-semibold text-lg">{reliabilityText}</h3>
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <p>Kernset: {Math.round(reliabilityPercentage)}% betrouwbaar</p>
-                  {reliabilityData && (
-                    <>
-                      {reliabilityData.kendallTau !== null && (
-                        <p>Rangstabiliteit: τ = {reliabilityData.kendallTau.toFixed(3)}</p>
-                      )}
-                      {!reliabilityData.topHasLadder && (
-                        <p className="text-destructive">⚠ Top mist ladder-bewijs</p>
-                      )}
-                      {!reliabilityData.bottomHasLadder && (
-                        <p className="text-destructive">⚠ Bodem mist ladder-bewijs</p>
-                      )}
-                    </>
-                  )}
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  {Math.round(reliabilityPercentage)}% van de teksten heeft voldoende vergelijkingen
+                </p>
               </div>
             </div>
             <div className="relative">
