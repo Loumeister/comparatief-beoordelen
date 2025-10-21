@@ -103,7 +103,7 @@ const Compare = () => {
       targetComparisonsPerText: assignment.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
       batchSize: DEFAULT_BATCH_SIZE,
       bt: { theta, se },
-      minReliability: 0.3,
+      seThreshold: 0.3,
     });
 
     if (nextPairs.length === 0) {

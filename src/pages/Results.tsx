@@ -107,8 +107,8 @@ const Results = () => {
       const possiblePairs = generatePairs(texts, judgements, {
         targetComparisonsPerText: assign.numComparisons || 10,
         batchSize: 12,
-        bt: { se: seMap },
-        minReliability: 0.3, // SE threshold voor "onbetrouwbaar"
+        bt: { theta: new Map(), se: seMap },
+        seThreshold: 0.3, // SE threshold voor "onbetrouwbaar"
       });
       setCanCompare(possiblePairs.length > 0);
 
