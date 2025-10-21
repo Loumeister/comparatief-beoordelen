@@ -97,6 +97,7 @@ const Results = () => {
     } catch (error) {
       console.error("Results error:", error);
       toast({ title: "Fout bij laden resultaten", variant: "destructive" });
+      setLoading(false);
     }
   };
 
