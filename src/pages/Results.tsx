@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle, Link2 } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle, Link2, Eye, EyeOff } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { db, Assignment } from "@/lib/db";
 import { calculateBradleyTerry } from "@/lib/bradley-terry";
@@ -22,6 +22,7 @@ const Results = () => {
   const [results, setResults] = useState<ExportData[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
     loadResults();
@@ -285,8 +286,25 @@ const Results = () => {
 
         {/* Results Table */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Rangorde</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDetails(!showDetails)}
+            >
+              {showDetails ? (
+                <>
+                  <EyeOff className="w-4 h-4 mr-2" />
+                  Verberg details
+                </>
+              ) : (
+                <>
+                  <Eye className="w-4 h-4 mr-2" />
+                  Toon achtergrondscores
+                </>
+              )}
+            </Button>
           </CardHeader>
           <CardContent>
             <Table>
@@ -296,6 +314,12 @@ const Results = () => {
                   <TableHead>Tekst</TableHead>
                   <TableHead>Label</TableHead>
                   <TableHead className="text-right">Cijfer</TableHead>
+                  {showDetails && (
+                    <>
+                      <TableHead className="text-right">Theta (θ)</TableHead>
+                      <TableHead className="text-right">SE</TableHead>
+                    </>
+                  )}
                   <TableHead>Betrouwbaarheid</TableHead>
                 </TableRow>
               </TableHeader>
@@ -308,6 +332,12 @@ const Results = () => {
                       <Badge className={getLabelColor(r.label)}>{r.label}</Badge>
                     </TableCell>
                     <TableCell className="text-right font-bold text-lg">{r.grade.toFixed(1)}</TableCell>
+                    {showDetails && (
+                      <>
+                        <TableCell className="text-right font-mono text-sm">{r.theta.toFixed(3)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{r.standardError.toFixed(3)}</TableCell>
+                      </>
+                    )}
                     <TableCell>
                       <span className={getReliabilityColor(r.reliability)}>{r.reliability}</span>
                     </TableCell>
