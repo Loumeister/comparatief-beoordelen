@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle, Link2, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle, Link2, Eye, EyeOff, Database } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { db, Assignment } from "@/lib/db";
 import { calculateBradleyTerry } from "@/lib/bradley-terry";
 import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from "@/lib/export";
+import { exportDataset } from "@/lib/exportImport";
 import { useToast } from "@/hooks/use-toast";
 import { isConnected } from "@/lib/graph";
 
@@ -118,6 +119,21 @@ const Results = () => {
       });
     } catch (error) {
       console.error("Export error:", error);
+      toast({ title: "Export mislukt", variant: "destructive" });
+    }
+  };
+
+  const handleExportDataset = async () => {
+    if (!assignment?.id) return;
+
+    try {
+      await exportDataset(assignment.id);
+      toast({
+        title: "Dataset geëxporteerd",
+        description: "Volledige dataset geëxporteerd als JSON (met alle vergelijkingen)",
+      });
+    } catch (error) {
+      console.error("Export dataset error:", error);
       toast({ title: "Export mislukt", variant: "destructive" });
     }
   };
@@ -238,9 +254,13 @@ const Results = () => {
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
                 Excel
               </Button>
-              <Button onClick={() => handleExport("pdf")}>
+              <Button variant="outline" onClick={() => handleExport("pdf")}>
                 <FileText className="w-4 h-4 mr-2" />
                 PDF
+              </Button>
+              <Button variant="outline" onClick={handleExportDataset}>
+                <Database className="w-4 h-4 mr-2" />
+                JSON Dataset
               </Button>
             </div>
           </div>
