@@ -19,7 +19,7 @@ interface BTResult {
 export function calculateBradleyTerry(
   texts: Text[],
   judgements: Judgement[],
-  lambda: number = 0.1,
+  lambda: number = 0.25,
   topPct: number = 0.1, // voor labels: Topgroep = top 10%
 ): BTResult[] {
   const n = texts.length;
@@ -157,7 +157,7 @@ function gradeFromTheta(thetaCentered: number, stdTheta: number): number {
 }
 
 function reliabilityFromSE(se: number): string {
-  if (se <= 0.15) return "Resultaat betrouwbaar";
-  if (se <= 0.25) return "Nog enkele vergelijkingen nodig";
+  if (se <= 0.30) return "Resultaat betrouwbaar";
+  if (se <= 0.50) return "Nog enkele vergelijkingen nodig";
   return "Onvoldoende gegevens";
 }
