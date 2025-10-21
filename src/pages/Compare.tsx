@@ -8,10 +8,22 @@ import { Progress } from '@/components/ui/progress';
 import { ArrowLeft } from 'lucide-react';
 import { db, Assignment } from '@/lib/db';
 import { generatePairs, Pair } from '@/lib/pairing';
+import { calculateBradleyTerry } from '@/lib/bradley-terry';
 import { useToast } from '@/hooks/use-toast';
 
 const DEFAULT_COMPARISONS_PER_TEXT = 10;
-const DEFAULT_BATCH_SIZE = 12; // klein & iteratief voor adaptief pairen
+const DEFAULT_BATCH_SIZE = 8; // kleinere batches voor sneller adaptief pairen
+
+// Helper: bereken BT-scores tussendoor voor slimmere pairing
+async function buildBTMaps(assignmentId: number) {
+  const texts = await db.texts.where('assignmentId').equals(assignmentId).toArray();
+  const judgements = await db.judgements.where('assignmentId').equals(assignmentId).toArray();
+  // Hogere ridge (0.3) om extreme θ-uitschieters te temmen
+  const res = calculateBradleyTerry(texts, judgements, 0.3);
+  const theta = new Map(res.map(r => [r.textId, r.theta]));
+  const se = new Map(res.map(r => [r.textId, r.standardError]));
+  return { texts, judgements, theta, se };
+}
 
 const Compare = () => {
   const { assignmentId } = useParams();
@@ -40,7 +52,8 @@ const Compare = () => {
       }
       setAssignment(assign);
 
-      const texts = await db.texts.where('assignmentId').equals(id).toArray();
+      const { texts, judgements, theta, se } = await buildBTMaps(id);
+      
       if (!texts || texts.length < 2) {
         toast({
           title: 'Onvoldoende teksten',
@@ -50,8 +63,6 @@ const Compare = () => {
         navigate('/');
         return;
       }
-
-      const judgements = await db.judgements.where('assignmentId').equals(id).toArray();
       
       // Bereken verwacht totaal aantal vergelijkingen voor progress
       const targetPerText = assign.numComparisons || DEFAULT_COMPARISONS_PER_TEXT;
@@ -62,6 +73,7 @@ const Compare = () => {
       const newPairs = generatePairs(texts, judgements, {
         targetComparisonsPerText: assign.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
         batchSize: DEFAULT_BATCH_SIZE,
+        bt: { theta, se },
       });
 
       if (newPairs.length === 0) {
@@ -84,20 +96,13 @@ const Compare = () => {
   const reloadPairs = useCallback(async () => {
     if (!assignment) return;
     const id = assignment.id!;
-    const texts = await db.texts.where('assignmentId').equals(id).toArray();
-    const judgements = await db.judgements.where('assignmentId').equals(id).toArray();
-
-    // Haal bestaande scores op voor betrouwbaarheidsinfo
-    const scores = await db.scores.where('assignmentId').equals(id).toArray();
-    const seMap = new Map<number, number>();
-    scores.forEach(s => {
-      seMap.set(s.textId, s.standardError);
-    });
+    
+    const { texts, judgements, theta, se } = await buildBTMaps(id);
 
     const nextPairs = generatePairs(texts, judgements, {
       targetComparisonsPerText: assignment.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
       batchSize: DEFAULT_BATCH_SIZE,
-      bt: seMap.size > 0 ? { se: seMap } : undefined,
+      bt: { theta, se },
       minReliability: 0.3,
     });
 
