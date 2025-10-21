@@ -128,65 +128,44 @@ export function generatePairs(texts: Text[], existingJudgements: Judgement[], op
     return s;
   }
 
-  // Iteratief batch selecteren:
-  const selected: Pair[] = [];
-  let safety = texts.length * texts.length; // guard
-
-  while (selected.length < batchSize && safety-- > 0) {
-    // kies “uitdunningskandidaat” t met laagste exposure en nog onder target
-    let tIdx = -1;
-    let bestExp = Infinity;
-    for (let i = 0; i < n; i++) {
-      if (underCap(i) && exposure[i] < bestExp) {
-        bestExp = exposure[i];
-        tIdx = i;
-      }
-    }
-    if (tIdx === -1) break; // iedereen vol of geen kandidaten
-
-    // zoek beste tegenstander u
-    let uIdx = -1;
-    let bestScore = -Infinity;
-    for (let j = 0; j < n; j++) {
-      if (j === tIdx) continue;
-      const sc = scoreOpp(tIdx, j);
-      if (sc > bestScore) {
-        bestScore = sc;
-        uIdx = j;
-      }
-    }
-
-    // fallback: als niks geldig (bestScore == -Infinity), probeer hard cross-component te forceren of breek af
-    if (uIdx === -1 || bestScore === -Infinity) {
-      // forceer kruis als mogelijk (i in comp A, zoek j in comp B onder cap & niet judged)
-      let forced = false;
-      outer: for (let i = 0; i < n; i++) {
-        if (!underCap(i)) continue;
-        for (let j = 0; j < n; j++) {
-          if (i === j || !underCap(j)) continue;
-          if (dsu.find(i) !== dsu.find(j) && !judgedPairs.has(key(texts[i].id!, texts[j].id!))) {
-            selected.push({ textA: texts[i], textB: texts[j] });
-            judgedPairs.add(key(texts[i].id!, texts[j].id!));
-            exposure[i]++;
-            exposure[j]++;
-            dsu.union(i, j);
-            forced = true;
-            break outer;
-          }
+  // Genereer ALLE mogelijke paren (niet-judged, under cap)
+  const allPairs: Array<{ textA: Text; textB: Text; iIdx: number; jIdx: number; score: number }> = [];
+  
+  for (let i = 0; i < n; i++) {
+    if (!underCap(i)) continue;
+    for (let j = i + 1; j < n; j++) {
+      if (!underCap(j)) continue;
+      const pairKey = key(texts[i].id!, texts[j].id!);
+      if (!judgedPairs.has(pairKey)) {
+        const score = scoreOpp(i, j);
+        if (score > -Infinity) {
+          allPairs.push({
+            textA: texts[i],
+            textB: texts[j],
+            iIdx: i,
+            jIdx: j,
+            score,
+          });
         }
       }
-      if (!forced) break; // niets meer te doen
-      continue;
     }
+  }
 
-    // voeg paar toe & update staat
-    const a = texts[tIdx],
-      b = texts[uIdx];
-    selected.push({ textA: a, textB: b });
-    judgedPairs.add(key(a.id!, b.id!));
-    exposure[tIdx]++;
-    exposure[uIdx]++;
-    dsu.union(tIdx, uIdx);
+  // Sorteer op score (hogere score = betere keuze)
+  // Dit prioriteert automatisch lage gezamenlijke exposure door de scoreOpp logica
+  allPairs.sort((a, b) => b.score - a.score);
+
+  // Selecteer top N voor batch
+  const selected: Pair[] = [];
+  for (let i = 0; i < Math.min(batchSize, allPairs.length); i++) {
+    const pair = allPairs[i];
+    selected.push({ textA: pair.textA, textB: pair.textB });
+    
+    // Update state voor volgende iteraties (indien nodig)
+    judgedPairs.add(key(pair.textA.id!, pair.textB.id!));
+    exposure[pair.iIdx]++;
+    exposure[pair.jIdx]++;
+    dsu.union(pair.iIdx, pair.jIdx);
   }
 
   // lichte shuffle voor variatie in UI
