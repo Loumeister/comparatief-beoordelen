@@ -1,5 +1,6 @@
 import { db, Assignment, Text, Judgement } from './db';
 import { isConnected } from './graph';
+import * as XLSX from 'xlsx';
 
 export interface DatasetExport {
   assignment: Assignment;
@@ -389,6 +390,139 @@ export async function importCSV(file: File): Promise<{
 
     reader.onerror = () => reject(new Error('Fout bij lezen bestand'));
     reader.readAsText(file);
+  });
+}
+
+/**
+ * Importeer resultaten uit een Excel-bestand (geëxporteerd via Results.tsx)
+ * Excel moet de volgende kolommen hebben: Tekst, Rang, Label, Cijfer, Theta, SE, Betrouwbaarheid
+ */
+export async function importResultsFromXLSX(file: File): Promise<{
+  newTexts: number;
+  assignmentTitle: string;
+}> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        
+        // Lees eerste sheet
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false }) as any[];
+        
+        if (jsonData.length === 0) {
+          throw new Error('Excel bestand bevat geen data');
+        }
+
+        // Valideer kolommen
+        const firstRow = jsonData[0];
+        const requiredColumns = ['Tekst', 'Rang', 'Label', 'Cijfer', 'Theta', 'SE', 'Betrouwbaarheid'];
+        const missingColumns = requiredColumns.filter(col => !(col in firstRow));
+        
+        if (missingColumns.length > 0) {
+          throw new Error(`Excel mist de volgende kolommen: ${missingColumns.join(', ')}`);
+        }
+
+        // Haal titel uit bestandsnaam (verwijder _resultaten.xlsx suffix)
+        const assignmentTitle = file.name
+          .replace(/_resultaten\.xlsx$/i, '')
+          .replace(/\.xlsx$/i, '')
+          .trim() || 'Geïmporteerde opdracht';
+
+        // Check of assignment al bestaat
+        const existing = await db.assignments
+          .where('title')
+          .equals(assignmentTitle)
+          .first();
+
+        let assignmentId: number;
+
+        if (existing) {
+          // Gebruik bestaande opdracht
+          assignmentId = existing.id!;
+          
+          // Verwijder oude scores
+          await db.scores.where('assignmentId').equals(assignmentId).delete();
+        } else {
+          // Maak nieuwe opdracht aan
+          assignmentId = await db.assignments.add({
+            title: assignmentTitle,
+            genre: 'Geïmporteerd',
+            numComparisons: 10,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+
+        // Import teksten en scores
+        let newTextsCount = 0;
+        
+        for (const row of jsonData) {
+          const anonymizedName = String(row['Tekst'] || '').trim();
+          const rank = parseInt(String(row['Rang'] || '0'));
+          const label = String(row['Label'] || 'Gemiddeld').trim();
+          const grade = parseFloat(String(row['Cijfer'] || '7').replace(',', '.'));
+          const theta = parseFloat(String(row['Theta'] || '0').replace(',', '.'));
+          const se = parseFloat(String(row['SE'] || '1').replace(',', '.'));
+          const reliability = String(row['Betrouwbaarheid'] || 'Onvoldoende gegevens').trim();
+
+          if (!anonymizedName) {
+            console.warn('Rij overgeslagen: geen tekst naam', row);
+            continue;
+          }
+
+          // Check of tekst al bestaat
+          const existingText = await db.texts
+            .where('assignmentId')
+            .equals(assignmentId)
+            .filter(t => t.anonymizedName === anonymizedName)
+            .first();
+
+          let textId: number;
+
+          if (existingText) {
+            textId = existingText.id!;
+          } else {
+            // Maak nieuwe tekst aan (zonder content)
+            textId = await db.texts.add({
+              assignmentId,
+              originalFilename: anonymizedName,
+              anonymizedName: anonymizedName,
+              content: '',
+              createdAt: new Date(),
+            });
+            newTextsCount++;
+          }
+
+          // Voeg score toe
+          await db.scores.add({
+            assignmentId,
+            textId,
+            theta,
+            standardError: se,
+            rank,
+            label,
+            grade,
+            reliability,
+            calculatedAt: new Date(),
+          });
+        }
+
+        resolve({
+          newTexts: newTextsCount,
+          assignmentTitle,
+        });
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Fout bij lezen bestand'));
+    reader.readAsBinaryString(file);
   });
 }
 

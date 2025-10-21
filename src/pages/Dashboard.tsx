@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, FileText, BarChart3, Trash2, Upload } from 'lucide-react';
 import { db, Assignment } from '@/lib/db';
-import { importDataset, importCSV } from '@/lib/exportImport';
+import { importDataset, importCSV, importResultsFromXLSX } from '@/lib/exportImport';
 import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
@@ -65,21 +65,51 @@ const Dashboard = () => {
 
     setImporting(true);
     try {
-      // Determine file type
-      const isCSV = file.name.toLowerCase().endsWith('.csv');
-      const result = isCSV ? await importCSV(file) : await importDataset(file);
+      const fileName = file.name.toLowerCase();
       
-      toast({
-        title: 'Dataset succesvol geïmporteerd',
-        description: `${result.assignmentTitle}: ${result.newTexts} nieuwe teksten, ${result.newJudgements} nieuwe oordelen`,
-      });
-
-      if (!result.isConnected) {
+      // Determine file type and import accordingly
+      if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        // Excel resultaten import
+        const result = await importResultsFromXLSX(file);
+        
         toast({
-          title: 'Let op: grafiek niet verbonden',
-          description: 'Sommige teksten zijn nog niet gekoppeld – voer extra vergelijkingen uit.',
-          variant: 'default',
+          title: 'Excel resultaten geïmporteerd',
+          description: `${result.assignmentTitle}: ${result.newTexts} teksten toegevoegd`,
         });
+      } else if (fileName.endsWith('.csv')) {
+        // CSV dataset import
+        const result = await importCSV(file);
+        
+        toast({
+          title: 'CSV dataset geïmporteerd',
+          description: `${result.assignmentTitle}: ${result.newTexts} nieuwe teksten, ${result.newJudgements} nieuwe oordelen`,
+        });
+
+        if (!result.isConnected) {
+          toast({
+            title: 'Let op: grafiek niet verbonden',
+            description: 'Sommige teksten zijn nog niet gekoppeld – voer extra vergelijkingen uit.',
+            variant: 'default',
+          });
+        }
+      } else if (fileName.endsWith('.json')) {
+        // JSON dataset import
+        const result = await importDataset(file);
+        
+        toast({
+          title: 'JSON dataset geïmporteerd',
+          description: `${result.assignmentTitle}: ${result.newTexts} nieuwe teksten, ${result.newJudgements} nieuwe oordelen`,
+        });
+
+        if (!result.isConnected) {
+          toast({
+            title: 'Let op: grafiek niet verbonden',
+            description: 'Sommige teksten zijn nog niet gekoppeld – voer extra vergelijkingen uit.',
+            variant: 'default',
+          });
+        }
+      } else {
+        throw new Error('Ongeldig bestandsformaat. Gebruik .xlsx, .csv of .json');
       }
 
       // Reload assignments
@@ -126,7 +156,7 @@ const Dashboard = () => {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".json,.csv"
+              accept=".json,.csv,.xlsx,.xls"
               className="hidden"
               onChange={handleImport}
             />
