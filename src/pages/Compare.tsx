@@ -284,6 +284,14 @@ const Compare = () => {
   const pairCount = pairCounts.get(pairKey) ?? 0;
   const mode = assignmentMeta?.judgementMode || 'accumulate';
   
+  // Sorteer alfabetisch: links = eerder in alfabet
+  const sortedAlphabetically = [currentPair.textA, currentPair.textB].sort((a, b) => 
+    a.anonymizedName.localeCompare(b.anonymizedName)
+  );
+  const leftText = sortedAlphabetically[0];
+  const rightText = sortedAlphabetically[1];
+  const leftIsA = leftText.id === currentPair.textA.id;
+  
   // Progress gebaseerd op totaal aantal gemaakte oordelen vs verwacht totaal
   const progress = expectedTotal > 0 ? Math.min((totalJudgements / expectedTotal) * 100, 100) : 0;
 
@@ -332,12 +340,12 @@ const Compare = () => {
             <div className="grid grid-cols-3 gap-4 mb-6">
               <Button
                 size="lg"
-                onClick={() => handleJudgement('A')}
+                onClick={() => handleJudgement(leftIsA ? 'A' : 'B')}
                 disabled={saving}
                 className="h-20 text-lg bg-primary hover:bg-primary/90"
               >
                 <div>
-                  <div className="font-bold">{currentPair.textA.anonymizedName}</div>
+                  <div className="font-bold">{leftText.anonymizedName}</div>
                   <div className="text-xs opacity-80">Sneltoets: A</div>
                 </div>
               </Button>
@@ -357,12 +365,12 @@ const Compare = () => {
 
               <Button
                 size="lg"
-                onClick={() => handleJudgement('B')}
+                onClick={() => handleJudgement(leftIsA ? 'B' : 'A')}
                 disabled={saving}
                 className="h-20 text-lg bg-secondary hover:bg-secondary/90 text-secondary-foreground"
               >
                 <div>
-                  <div className="font-bold">{currentPair.textB.anonymizedName}</div>
+                  <div className="font-bold">{rightText.anonymizedName}</div>
                   <div className="text-xs opacity-80">Sneltoets: B</div>
                 </div>
               </Button>
@@ -409,56 +417,56 @@ const Compare = () => {
         </Card>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Text A */}
+          {/* Left Text (alfabetisch eerste) */}
           <Card className="shadow-lg">
             <CardContent className="p-6">
               <div className="mb-4">
                 <span className="inline-block px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
-                  {currentPair.textA.anonymizedName}
+                  {leftText.anonymizedName}
                 </span>
               </div>
-              {currentPair.textA.content ? (
+              {leftText.content ? (
                 <div className="prose prose-sm max-w-none">
                   <div className="whitespace-pre-wrap text-foreground leading-relaxed">
-                    {currentPair.textA.content}
+                    {leftText.content}
                   </div>
                 </div>
               ) : (
                 <div
                   className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg"
-                  aria-label="Papieren tekst A"
+                  aria-label={`Papieren tekst ${leftText.anonymizedName}`}
                 >
                   <p className="text-muted-foreground text-center px-4">
                     Bekijk de papieren tekst van<br />
-                    <strong className="text-foreground">{currentPair.textA.anonymizedName}</strong>
+                    <strong className="text-foreground">{leftText.anonymizedName}</strong>
                   </p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Text B */}
+          {/* Right Text (alfabetisch tweede) */}
           <Card className="shadow-lg">
             <CardContent className="p-6">
               <div className="mb-4">
                 <span className="inline-block px-3 py-1 bg-secondary/10 text-secondary-foreground rounded-full text-sm font-medium">
-                  {currentPair.textB.anonymizedName}
+                  {rightText.anonymizedName}
                 </span>
               </div>
-              {currentPair.textB.content ? (
+              {rightText.content ? (
                 <div className="prose prose-sm max-w-none">
                   <div className="whitespace-pre-wrap text-foreground leading-relaxed">
-                    {currentPair.textB.content}
+                    {rightText.content}
                   </div>
                 </div>
               ) : (
                 <div
                   className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg"
-                  aria-label="Papieren tekst B"
+                  aria-label={`Papieren tekst ${rightText.anonymizedName}`}
                 >
                   <p className="text-muted-foreground text-center px-4">
                     Bekijk de papieren tekst van<br />
-                    <strong className="text-foreground">{currentPair.textB.anonymizedName}</strong>
+                    <strong className="text-foreground">{rightText.anonymizedName}</strong>
                   </p>
                 </div>
               )}
@@ -470,15 +478,15 @@ const Compare = () => {
         <div className="mt-6 p-4 bg-muted rounded-lg">
           <div className="grid md:grid-cols-2 gap-4 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{currentPair.textA.anonymizedName}:</span>
+              <span className="text-muted-foreground">{leftText.anonymizedName}:</span>
               <span className="font-medium">
-                {textCounts.get(currentPair.textA.id!) ?? 0} beoordelingen
+                {textCounts.get(leftText.id!) ?? 0} beoordelingen
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{currentPair.textB.anonymizedName}:</span>
+              <span className="text-muted-foreground">{rightText.anonymizedName}:</span>
               <span className="font-medium">
-                {textCounts.get(currentPair.textB.id!) ?? 0} beoordelingen
+                {textCounts.get(rightText.id!) ?? 0} beoordelingen
               </span>
             </div>
           </div>
