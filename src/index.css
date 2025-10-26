@@ -44,6 +44,18 @@ All colors MUST be HSL.
     --choice-equal: 215 16% 47%;
     --text-bg: 0 0% 100%;
     
+    /* Label colors - Controlled Chaos palette */
+    --label-topgroep: 159 42% 50%;        /* Veridian Mist #4AA37C */
+    --label-topgroep-fg: 0 0% 100%;
+    --label-bovengemiddeld: 227 84% 65%;  /* Cobalt Glow #597CF2 */
+    --label-bovengemiddeld-fg: 0 0% 100%;
+    --label-gemiddeld: 32 7% 40%;         /* Ash Taupe #6A665F */
+    --label-gemiddeld-fg: 210 40% 98%;
+    --label-ondergemiddeld: 13 100% 66%;  /* Tangerine Mist #FF7755 */
+    --label-ondergemiddeld-fg: 222 47% 11%;
+    --label-onvoldoende: 8 42% 51%;       /* Rust Clay #B45E4D */
+    --label-onvoldoende-fg: 210 40% 98%;
+    
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(262 83% 58%));
     
@@ -97,6 +109,18 @@ All colors MUST be HSL.
     --choice-b: 262 83% 58%;
     --choice-equal: 215 20% 65%;
     --text-bg: 222 47% 15%;
+    
+    /* Label colors - dark mode (slightly tempered) */
+    --label-topgroep: 159 42% 50%;
+    --label-topgroep-fg: 0 0% 100%;
+    --label-bovengemiddeld: 227 84% 65%;
+    --label-bovengemiddeld-fg: 0 0% 100%;
+    --label-gemiddeld: 32 7% 40%;
+    --label-gemiddeld-fg: 210 40% 98%;
+    --label-ondergemiddeld: 13 100% 66%;
+    --label-ondergemiddeld-fg: 222 47% 11%;
+    --label-onvoldoende: 8 42% 51%;
+    --label-onvoldoende-fg: 210 40% 98%;
     
     --shadow-soft: 0 2px 8px -2px hsl(0 0% 0% / 0.3);
     --shadow-medium: 0 4px 16px -4px hsl(0 0% 0% / 0.4);
@@ -329,4 +353,9 @@ body.design-mode.dark button:not(.fixed):hover {
   background-color: var(--accent-color);
   border-color: var(--accent-color);
   color: #111111;
+}
+
+/* Temper label colors in dark mode with slight transparency */
+body.design-mode.dark [class*="bg-label"] {
+  opacity: 0.85;
 }

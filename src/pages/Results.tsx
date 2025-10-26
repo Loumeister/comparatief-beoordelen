@@ -157,15 +157,17 @@ const Results = () => {
   const getLabelColor = (label: string) => {
     switch (label) {
       case "Topgroep":
-        return "bg-secondary text-secondary-foreground";
+        return "bg-label-topgroep text-label-topgroep-foreground";
       case "Bovengemiddeld":
-        return "bg-primary text-primary-foreground";
+        return "bg-label-bovengemiddeld text-label-bovengemiddeld-foreground";
       case "Gemiddeld":
-        return "bg-muted text-muted-foreground";
+        return "bg-label-gemiddeld text-label-gemiddeld-foreground";
       case "Onder gemiddeld":
-        return "bg-destructive/20 text-destructive";
+        return "bg-label-ondergemiddeld text-label-ondergemiddeld-foreground";
+      case "Onvoldoende":
+        return "bg-label-onvoldoende text-label-onvoldoende-foreground";
       default:
-        return "bg-muted text-muted-foreground";
+        return "bg-label-gemiddeld text-label-gemiddeld-foreground";
     }
   };
 

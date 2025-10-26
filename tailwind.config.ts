@@ -57,6 +57,18 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        label: {
+          topgroep: "hsl(var(--label-topgroep))",
+          "topgroep-foreground": "hsl(var(--label-topgroep-fg))",
+          bovengemiddeld: "hsl(var(--label-bovengemiddeld))",
+          "bovengemiddeld-foreground": "hsl(var(--label-bovengemiddeld-fg))",
+          gemiddeld: "hsl(var(--label-gemiddeld))",
+          "gemiddeld-foreground": "hsl(var(--label-gemiddeld-fg))",
+          ondergemiddeld: "hsl(var(--label-ondergemiddeld))",
+          "ondergemiddeld-foreground": "hsl(var(--label-ondergemiddeld-fg))",
+          onvoldoende: "hsl(var(--label-onvoldoende))",
+          "onvoldoende-foreground": "hsl(var(--label-onvoldoende-fg))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
