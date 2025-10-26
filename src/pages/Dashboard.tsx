@@ -2,13 +2,14 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download } from 'lucide-react';
+import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users } from 'lucide-react';
 import { db, Assignment } from '@/lib/db';
 import { importDataset, importCSV, importResultsFromXLSX, exportDataset } from '@/lib/exportImport';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ManageStudentsDialog } from '@/components/ManageStudentsDialog';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ const Dashboard = () => {
   const [importing, setImporting] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [managingStudents, setManagingStudents] = useState<{ id: number; title: string } | null>(null);
 
   useEffect(() => {
     loadAssignments();
@@ -301,6 +303,13 @@ const Dashboard = () => {
                         )}
                         <Button
                           variant="outline"
+                          onClick={() => setManagingStudents({ id: assignment.id!, title: assignment.title })}
+                        >
+                          <Users className="w-4 h-4 mr-2" />
+                          Beheer leerlingen
+                        </Button>
+                        <Button
+                          variant="outline"
                           onClick={() => handleExport(assignment.id!, assignment.title)}
                         >
                           <Download className="w-4 h-4 mr-2" />
@@ -392,6 +401,15 @@ const Dashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Manage Students Dialog */}
+      <ManageStudentsDialog
+        assignmentId={managingStudents?.id ?? null}
+        assignmentTitle={managingStudents?.title ?? ''}
+        open={!!managingStudents}
+        onOpenChange={(open) => !open && setManagingStudents(null)}
+        onUpdate={loadAssignments}
+      />
     </div>
   );
 };
