@@ -119,5 +119,177 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
+}
+
+/* Design Mode - High-end Art Direction Overlay */
+body.design-mode {
+  --font-primary: 'Space Grotesk', -apple-system, sans-serif;
+  --font-secondary: 'Inter', system-ui, sans-serif;
+  --bg-color: #f7f6f2;
+  --text-color: #1a1a1a;
+  --accent-color: #0066ff;
+  --muted-color: #717171;
+  --border-color: #e0e0e0;
+  
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: var(--font-secondary);
+}
+
+/* Typography Transformations */
+body.design-mode h1,
+body.design-mode h2,
+body.design-mode h3,
+body.design-mode h4,
+body.design-mode h5,
+body.design-mode h6 {
+  font-family: var(--font-primary);
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-color);
+}
+
+body.design-mode h1 {
+  font-size: clamp(2rem, 5vw, 4rem);
+  line-height: 0.95;
+  margin-bottom: 1.5rem;
+}
+
+body.design-mode h2 {
+  font-size: clamp(1.5rem, 3.5vw, 2.5rem);
+  line-height: 1.1;
+}
+
+body.design-mode p,
+body.design-mode span,
+body.design-mode div {
+  font-family: var(--font-secondary);
+  letter-spacing: -0.01em;
+  line-height: 1.6;
+}
+
+/* Button Transformations */
+body.design-mode button:not(.fixed) {
+  font-family: var(--font-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: transparent;
+  color: var(--text-color);
+  padding: 0.75rem 1.5rem;
+}
+
+body.design-mode button:not(.fixed):hover {
+  background-color: var(--text-color);
+  color: var(--bg-color);
+  border-color: var(--text-color);
+  transform: translateY(-1px);
+}
+
+/* Card Transformations */
+body.design-mode [class*="card"],
+body.design-mode [class*="Card"] {
+  background-color: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(10px);
+  transition: all 0.25s ease;
+}
+
+body.design-mode [class*="card"]:hover,
+body.design-mode [class*="Card"]:hover {
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* Input Transformations */
+body.design-mode input,
+body.design-mode textarea,
+body.design-mode select {
+  font-family: var(--font-secondary);
+  background-color: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  transition: all 0.2s ease;
+}
+
+body.design-mode input:focus,
+body.design-mode textarea:focus,
+body.design-mode select:focus {
+  border-color: var(--accent-color);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+}
+
+/* Link Transformations */
+body.design-mode a {
+  color: var(--accent-color);
+  text-decoration: none;
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+body.design-mode a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background-color: var(--accent-color);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.25s ease;
+}
+
+body.design-mode a:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+/* Whitespace & Rhythm */
+body.design-mode section,
+body.design-mode main {
+  padding: clamp(2rem, 5vw, 6rem) clamp(1rem, 3vw, 3rem);
+}
+
+body.design-mode > div {
+  max-width: 1400px;
+}
+
+/* Accent Color Highlights */
+body.design-mode [class*="primary"],
+body.design-mode [class*="accent"] {
+  color: var(--accent-color);
+}
+
+/* Subtle Animations */
+body.design-mode * {
+  transition-duration: 0.2s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dark Mode Adjustments for Design Mode */
+body.design-mode.dark {
+  --bg-color: #1a1a1a;
+  --text-color: #f7f6f2;
+  --accent-color: #4d94ff;
+  --border-color: #333333;
+}
+
+body.design-mode.dark [class*="card"],
+body.design-mode.dark [class*="Card"] {
+  background-color: rgba(26, 26, 26, 0.8);
+}
+
+body.design-mode.dark input,
+body.design-mode.dark textarea,
+body.design-mode.dark select {
+  background-color: rgba(40, 40, 40, 0.9);
 }
