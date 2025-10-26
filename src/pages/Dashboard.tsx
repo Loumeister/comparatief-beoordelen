@@ -2,10 +2,13 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, BarChart3, Trash2, Upload } from 'lucide-react';
+import { Plus, FileText, BarChart3, Trash2, Upload, Pencil } from 'lucide-react';
 import { db, Assignment } from '@/lib/db';
 import { importDataset, importCSV, importResultsFromXLSX } from '@/lib/exportImport';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -14,6 +17,8 @@ const Dashboard = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [stats, setStats] = useState<Map<number, { texts: number; judgements: number }>>(new Map());
   const [importing, setImporting] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
+  const [editTitle, setEditTitle] = useState('');
 
   useEffect(() => {
     loadAssignments();
@@ -31,6 +36,37 @@ const Dashboard = () => {
       statsMap.set(assign.id, { texts, judgements });
     }
     setStats(statsMap);
+  };
+
+  const handleEdit = (assignment: Assignment) => {
+    setEditingAssignment(assignment);
+    setEditTitle(assignment.title);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingAssignment || !editTitle.trim()) return;
+
+    try {
+      await db.assignments.update(editingAssignment.id!, {
+        title: editTitle.trim(),
+        updatedAt: new Date()
+      });
+
+      toast({
+        title: 'Titel aangepast',
+        description: `Titel is bijgewerkt naar "${editTitle.trim()}"`
+      });
+
+      setEditingAssignment(null);
+      setEditTitle('');
+      loadAssignments();
+    } catch (error) {
+      console.error('Update error:', error);
+      toast({
+        title: 'Fout bij opslaan',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleDelete = async (id: number, title: string) => {
@@ -182,7 +218,7 @@ const Dashboard = () => {
           </Card>
         ) : (
           <div>
-            <h2 className="text-2xl font-bold mb-6">Je Opdrachten</h2>
+            <h2 className="text-2xl font-bold mb-6">Je beoordelingen</h2>
             <div className="grid gap-4">
               {assignments.map((assignment) => {
                 const assignStats = stats.get(assignment.id!) || { texts: 0, judgements: 0 };
@@ -199,13 +235,22 @@ const Dashboard = () => {
                           <CardTitle className="text-xl">{assignment.title}</CardTitle>
                           <CardDescription>{assignment.genre}</CardDescription>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(assignment.id!, assignment.title)}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(assignment)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(assignment.id!, assignment.title)}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -291,6 +336,39 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingAssignment} onOpenChange={(open) => !open && setEditingAssignment(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Titel aanpassen</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Nieuwe titel</Label>
+              <Input
+                id="title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Voer een nieuwe titel in"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSaveEdit();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingAssignment(null)}>
+              Annuleren
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={!editTitle.trim()}>
+              Opslaan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
