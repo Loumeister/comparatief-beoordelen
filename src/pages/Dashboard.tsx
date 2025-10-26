@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users, Settings } from 'lucide-react';
+import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users, Settings, BookOpen } from 'lucide-react';
 import { db, Assignment } from '@/lib/db';
 import { importDataset, importCSV, importResultsFromXLSX, exportDataset } from '@/lib/exportImport';
 import { useToast } from '@/hooks/use-toast';
@@ -376,6 +376,18 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* README Link */}
+        <div className="mt-8 text-center">
+          <Button 
+            variant="link" 
+            onClick={() => navigate('/readme')}
+            className="text-muted-foreground"
+          >
+            <BookOpen className="w-4 h-4 mr-2" />
+            Bekijk de volledige handleiding
+          </Button>
+        </div>
       </div>
 
       {/* Edit Dialog */}

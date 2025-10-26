@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
 import Compare from "./pages/Compare";
 import Results from "./pages/Results";
+import ReadMe from "./pages/ReadMe";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/upload" element={<Upload />} />
           <Route path="/compare/:assignmentId" element={<Compare />} />
           <Route path="/results/:assignmentId" element={<Results />} />
+          <Route path="/readme" element={<ReadMe />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
