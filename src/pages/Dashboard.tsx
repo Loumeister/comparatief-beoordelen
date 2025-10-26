@@ -2,9 +2,9 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, BarChart3, Trash2, Upload, Pencil } from 'lucide-react';
+import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download } from 'lucide-react';
 import { db, Assignment } from '@/lib/db';
-import { importDataset, importCSV, importResultsFromXLSX } from '@/lib/exportImport';
+import { importDataset, importCSV, importResultsFromXLSX, exportDataset } from '@/lib/exportImport';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -64,6 +64,22 @@ const Dashboard = () => {
       console.error('Update error:', error);
       toast({
         title: 'Fout bij opslaan',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleExport = async (assignmentId: number, title: string) => {
+    try {
+      await exportDataset(assignmentId);
+      toast({
+        title: 'Export gelukt',
+        description: `"${title}" is geëxporteerd als JSON`
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: 'Fout bij exporteren',
         variant: 'destructive'
       });
     }
@@ -283,6 +299,13 @@ const Dashboard = () => {
                             Resultaten
                           </Button>
                         )}
+                        <Button
+                          variant="outline"
+                          onClick={() => handleExport(assignment.id!, assignment.title)}
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Export
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
