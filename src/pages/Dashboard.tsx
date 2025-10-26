@@ -308,7 +308,7 @@ const Dashboard = () => {
                           onClick={() => setManagingStudents({ id: assignment.id!, title: assignment.title })}
                         >
                           <Users className="w-4 h-4 mr-2" />
-                          Beheer leerlingen
+                          Leerlingbeheer
                         </Button>
                         <Button
                           variant="outline"

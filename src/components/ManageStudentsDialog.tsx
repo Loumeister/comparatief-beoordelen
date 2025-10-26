@@ -120,7 +120,7 @@ export function ManageStudentsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Beheer leerlingen - {assignmentTitle}</DialogTitle>
+          <DialogTitle>Leerlingbeheer - {assignmentTitle}</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4">
