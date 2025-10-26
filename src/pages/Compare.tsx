@@ -222,6 +222,14 @@ const Compare = () => {
         setReplaceMode(false);
         setIsFinal(false);
         setTotalJudgements(prev => prev + 1);
+        
+        // Update textCounts direct
+        setTextCounts(prev => {
+          const updated = new Map(prev);
+          updated.set(pair.textA.id!, (updated.get(pair.textA.id!) ?? 0) + 1);
+          updated.set(pair.textB.id!, (updated.get(pair.textB.id!) ?? 0) + 1);
+          return updated;
+        });
 
         // Volgend paar binnen huidige batch…
         if (currentIndex < pairs.length - 1) {

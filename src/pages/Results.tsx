@@ -51,15 +51,11 @@ const Results = () => {
         return;
       }
 
-      // Connectedness check vóór BT
+      // Connectedness check (niet-blokkerend)
       const ok = isConnected(texts, judgements);
       setConnected(ok);
-      if (!ok) {
-        setLoading(false);
-        return; // geen BT-fit zolang de grafiek niet verbonden is
-      }
 
-      // BT-fit
+      // BT-fit (ook bij niet-verbonden graaf)
       const btResults = calculateBradleyTerry(texts, judgements);
 
       // Map naar exportformaat
@@ -167,43 +163,6 @@ const Results = () => {
     );
   }
 
-  // Niet-verbonden banner (blokkeert BT-resultaten)
-  if (connected === false) {
-    return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-6xl mx-auto">
-          <Button variant="ghost" onClick={() => navigate("/")} className="mb-4">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Terug naar overzicht
-          </Button>
-
-          <Card className="border-destructive">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-destructive" />
-                Vergelijkingsgrafiek is niet verbonden
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Sommige teksten vormen nog losse eilanden. Maak eerst één of meer <em>verbindingsparen</em> om alle
-                teksten met elkaar te verbinden. Daarna kun je betrouwbare resultaten berekenen.
-              </p>
-              <div className="flex gap-3">
-                <Button onClick={() => navigate(`/compare/${assignment?.id}`)}>
-                  <Link2 className="w-4 h-4 mr-2" />
-                  Plan verbindingsparen
-                </Button>
-                <Button variant="outline" onClick={() => navigate("/")}>
-                  Terug
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
 
   // Overall reliability
   const reliableCount = results.filter((r) => r.reliability === "Resultaat betrouwbaar").length;
@@ -265,6 +224,27 @@ const Results = () => {
             </div>
           </div>
         </div>
+
+        {/* Waarschuwing als graaf niet verbonden is */}
+        {connected === false && (
+          <Card className="mb-6 border-destructive bg-destructive/5">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-destructive mb-2">Voorlopige resultaten</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Sommige leerlingen vormen nog losse groepen die niet met elkaar zijn vergeleken. De weergegeven rangorde is daarom onvolledig en mogelijk onbetrouwbaar.
+                  </p>
+                  <Button size="sm" onClick={() => navigate(`/compare/${assignment?.id}`)}>
+                    <Link2 className="w-4 h-4 mr-2" />
+                    Meer vergelijkingen maken
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Overall Reliability Bar */}
         <Card className="mb-6">
