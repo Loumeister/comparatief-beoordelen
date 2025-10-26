@@ -19,9 +19,14 @@ interface BTResult {
 export function calculateBradleyTerry(
   texts: Text[],
   judgements: Judgement[],
-  lambda: number = 0.25,
-  topPct: number = 0.1, // voor labels: Topgroep = top 10%
+  lambda: number = 0.1,
+  topPct: number = 0.1,
+  grading: { base?: number; scale?: number; min?: number; max?: number } = {}
 ): BTResult[] {
+  const base = grading.base ?? 7;
+  const scale = grading.scale ?? 1.2;
+  const gmin = grading.min ?? 1;
+  const gmax = grading.max ?? 10;
   const n = texts.length;
   if (n === 0) return [];
 
@@ -128,6 +133,27 @@ export function calculateBradleyTerry(
   }));
   out.sort((a, b) => b.theta - a.theta);
 
+  // Helper functies binnen calculateBradleyTerry scope
+  function labelFromRank(zeroBasedRank: number, total: number, topPct: number): string {
+    const pct = (zeroBasedRank + 1) / total;
+    if (pct <= topPct) return "Topgroep";
+    if (pct <= 0.5) return "Bovengemiddeld";
+    if (pct <= 0.9) return "Gemiddeld";
+    return "Onder gemiddeld";
+  }
+
+  function gradeFromTheta(thetaCentered: number, stdTheta: number): number {
+    const z = stdTheta > 1e-12 ? thetaCentered / stdTheta : 0;
+    const raw = base + scale * z;
+    return Math.max(gmin, Math.min(gmax, Math.round(raw * 10) / 10));
+  }
+
+  function reliabilityFromSE(se: number): string {
+    if (se <= 0.30) return "Resultaat betrouwbaar";
+    if (se <= 0.50) return "Nog enkele vergelijkingen nodig";
+    return "Onvoldoende gegevens";
+  }
+
   return out.map((r, i) => ({
     textId: r.textId,
     theta: r.theta,
@@ -137,27 +163,4 @@ export function calculateBradleyTerry(
     grade: gradeFromTheta(r.theta, sigma),
     reliability: reliabilityFromSE(r.standardError),
   }));
-}
-
-// ---- Mapping helpers (conform “docentvriendelijke” UI) ----
-
-function labelFromRank(zeroBasedRank: number, total: number, topPct: number): string {
-  const pct = (zeroBasedRank + 1) / total;
-  if (pct <= topPct) return "Topgroep";
-  if (pct <= 0.5) return "Bovengemiddeld";
-  if (pct <= 0.9) return "Gemiddeld";
-  return "Onder gemiddeld";
-}
-
-function gradeFromTheta(thetaCentered: number, stdTheta: number): number {
-  // z-score, dan 7 + 1.2*z, clamp 1..10, 1 decimal
-  const z = stdTheta > 1e-12 ? thetaCentered / stdTheta : 0;
-  const raw = 7 + 1.2 * z;
-  return Math.max(1, Math.min(10, Math.round(raw * 10) / 10));
-}
-
-function reliabilityFromSE(se: number): string {
-  if (se <= 0.30) return "Resultaat betrouwbaar";
-  if (se <= 0.50) return "Nog enkele vergelijkingen nodig";
-  return "Onvoldoende gegevens";
 }

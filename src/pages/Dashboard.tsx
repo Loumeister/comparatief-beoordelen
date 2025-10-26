@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users } from 'lucide-react';
+import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users, Settings } from 'lucide-react';
 import { db, Assignment } from '@/lib/db';
 import { importDataset, importCSV, importResultsFromXLSX, exportDataset } from '@/lib/exportImport';
 import { useToast } from '@/hooks/use-toast';
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ManageStudentsDialog } from '@/components/ManageStudentsDialog';
+import { GradingSettingsDialog } from '@/components/GradingSettingsDialog';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ const Dashboard = () => {
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [managingStudents, setManagingStudents] = useState<{ id: number; title: string } | null>(null);
+  const [managingGrading, setManagingGrading] = useState<{ id: number; title: string } | null>(null);
 
   useEffect(() => {
     loadAssignments();
@@ -310,6 +312,13 @@ const Dashboard = () => {
                         </Button>
                         <Button
                           variant="outline"
+                          onClick={() => setManagingGrading({ id: assignment.id!, title: assignment.title })}
+                        >
+                          <Settings className="w-4 h-4 mr-2" />
+                          Cijferinstellingen
+                        </Button>
+                        <Button
+                          variant="outline"
                           onClick={() => handleExport(assignment.id!, assignment.title)}
                         >
                           <Download className="w-4 h-4 mr-2" />
@@ -409,6 +418,14 @@ const Dashboard = () => {
         open={!!managingStudents}
         onOpenChange={(open) => !open && setManagingStudents(null)}
         onUpdate={loadAssignments}
+      />
+
+      {/* Grading Settings Dialog */}
+      <GradingSettingsDialog
+        assignmentId={managingGrading?.id ?? 0}
+        assignmentTitle={managingGrading?.title ?? ''}
+        open={!!managingGrading}
+        onOpenChange={(open) => !open && setManagingGrading(null)}
       />
     </div>
   );

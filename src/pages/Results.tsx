@@ -55,8 +55,17 @@ const Results = () => {
       const ok = isConnected(texts, judgements);
       setConnected(ok);
 
+      // Meta inladen voor grading
+      const meta = await db.assignmentMeta.get(id);
+      const grading = {
+        base: meta?.gradeBase ?? 7,
+        scale: meta?.gradeScale ?? 1.2,
+        min: meta?.gradeMin ?? 1,
+        max: meta?.gradeMax ?? 10,
+      };
+
       // BT-fit (ook bij niet-verbonden graaf)
-      const btResults = calculateBradleyTerry(texts, judgements);
+      const btResults = calculateBradleyTerry(texts, judgements, 0.1, 0.1, grading);
 
       // Map naar exportformaat
       const exportData: ExportData[] = btResults.map((r) => {

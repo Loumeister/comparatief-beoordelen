@@ -58,6 +58,10 @@ export interface AssignmentMeta {
   assignmentId: number;
   judgementMode?: 'accumulate' | 'replace' | 'moderate';
   seRepeatThreshold?: number;
+  gradeBase?: number;   // default 7
+  gradeScale?: number;  // default 1.2
+  gradeMin?: number;    // default 1
+  gradeMax?: number;    // default 10
 }
 
 export class AssessmentDB extends Dexie {
@@ -97,6 +101,23 @@ export class AssessmentDB extends Dexie {
           await meta.put({ assignmentId: a.id!, judgementMode: 'accumulate', seRepeatThreshold: 0.8 });
         }
       }
+    });
+
+    // Version 5: backfill grading defaults
+    this.version(5).stores({
+      assignments: '++id, title, createdAt',
+      texts: '++id, assignmentId, anonymizedName',
+      judgements: '++id, assignmentId, pairKey, textAId, textBId, raterId, supersedesJudgementId, createdAt',
+      scores: '++id, assignmentId, textId, rank',
+      previousFits: '++id, assignmentId, calculatedAt',
+      assignmentMeta: 'assignmentId'
+    }).upgrade(async tx => {
+      await tx.table('assignmentMeta').toCollection().modify((meta: any) => {
+        if (meta.gradeBase === undefined) meta.gradeBase = 7;
+        if (meta.gradeScale === undefined) meta.gradeScale = 1.2;
+        if (meta.gradeMin === undefined) meta.gradeMin = 1;
+        if (meta.gradeMax === undefined) meta.gradeMax = 10;
+      });
     });
   }
 }
