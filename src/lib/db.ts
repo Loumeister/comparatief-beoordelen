@@ -117,6 +117,37 @@ export class AssessmentDB extends Dexie {
         }
       }
     });
+
+    this.version(4).stores({
+      assignments: '++id, title, createdAt',
+      texts: '++id, assignmentId, anonymizedName',
+      // voeg pairKey en createdAt toe voor snelle lookups/sort
+      judgements: '++id, assignmentId, pairKey, textAId, textBId, raterId, supersedesJudgementId, createdAt',
+      scores: '++id, assignmentId, textId, rank',
+      previousFits: '++id, assignmentId, calculatedAt',
+      assignmentMeta: 'assignmentId'
+    }).upgrade(async tx => {
+      // backfill pairKey en defaults
+      await tx.table('judgements').toCollection().modify((j: any) => {
+        if (!j.pairKey) {
+          const a = Math.min(j.textAId, j.textBId);
+          const b = Math.max(j.textAId, j.textBId);
+          j.pairKey = `${a}-${b}`;
+        }
+        if (j.source === undefined) j.source = 'human';
+        if (j.isFinal === undefined) j.isFinal = false;
+      });
+
+      // assignmentMeta idempotent aanmaken
+      const assignments = await tx.table('assignments').toArray();
+      const meta = tx.table('assignmentMeta');
+      for (const a of assignments) {
+        const exists = await meta.get(a.id!);
+        if (!exists) {
+          await meta.put({ assignmentId: a.id!, judgementMode: 'accumulate', seRepeatThreshold: 0.8 });
+        }
+      }
+    });
   }
 }
 
