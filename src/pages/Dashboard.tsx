@@ -293,7 +293,7 @@ const Dashboard = () => {
                           variant="default"
                           onClick={() => navigate(`/compare/${assignment.id}`)}
                         >
-                          Vergelijken
+                          Vergelijk
                         </Button>
                         {assignStats.judgements > 0 && (
                           <Button
