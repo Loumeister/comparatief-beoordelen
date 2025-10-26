@@ -13,6 +13,7 @@ import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from "@/lib/export
 import { exportDataset } from "@/lib/exportImport";
 import { useToast } from "@/hooks/use-toast";
 import { isConnected } from "@/lib/graph";
+import { SE_RELIABLE, SE_MAX_EDGE, COHORT_PCT_RELIABLE, COHORT_MEDIAN_OK } from "@/lib/reliability-thresholds";
 
 const Results = () => {
   const { assignmentId } = useParams();
@@ -188,14 +189,14 @@ const Results = () => {
   const n = seList.length;
   const medianSE = n === 0 ? NaN : (n % 2 === 1 ? seList[(n - 1) / 2] : (seList[n / 2 - 1] + seList[n / 2]) / 2);
   const maxSE = n === 0 ? NaN : Math.max(...seList);
-  const pctReliable = n === 0 ? 0 : (results.filter(r => r.standardError <= 0.75).length / n) * 100;
+  const pctReliable = n === 0 ? 0 : (results.filter(r => r.standardError <= SE_RELIABLE).length / n) * 100;
 
   // Determine cohort status text + icon class via thresholds
   let reliabilityText: string;
   let reliabilityStatus: 'insufficient' | 'moderate' | 'reliable';
   let reliabilityIcon: typeof CheckCircle;
 
-  const stopAdvice = (pctReliable >= 70) || ((medianSE <= 0.80) && (maxSE <= 1.40));
+  const stopAdvice = (pctReliable >= COHORT_PCT_RELIABLE) || ((medianSE <= COHORT_MEDIAN_OK) && (maxSE <= SE_MAX_EDGE));
 
   if (stopAdvice) {
     reliabilityStatus = 'reliable';
@@ -288,7 +289,7 @@ const Results = () => {
               <div className="flex-1">
                 <h3 className="font-semibold text-lg">{reliabilityText}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {Math.round(reliabilityPercentage)}% ≤ 0.75 • mediaan(SE) = {Number.isFinite(medianSE) ? medianSE.toFixed(2) : '—'} • max(SE) = {Number.isFinite(maxSE) ? maxSE.toFixed(2) : '—'}
+                  {Math.round(reliabilityPercentage)}% ≤ {SE_RELIABLE} • mediaan(SE) = {Number.isFinite(medianSE) ? medianSE.toFixed(2) : '—'} • max(SE) = {Number.isFinite(maxSE) ? maxSE.toFixed(2) : '—'}
                 </p>
               </div>
             </div>

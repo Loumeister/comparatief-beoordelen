@@ -1,4 +1,5 @@
 import { Judgement, Text } from "./db";
+import { SE_RELIABLE, SE_SOME_MORE } from "./reliability-thresholds";
 
 interface BTResult {
   textId: number;
@@ -149,8 +150,8 @@ export function calculateBradleyTerry(
   }
 
   function reliabilityFromSE(se: number): string {
-    if (se <= 0.75) return "Resultaat betrouwbaar";
-    if (se <= 1.00) return "Nog enkele vergelijkingen nodig";
+    if (se <= SE_RELIABLE) return "Resultaat betrouwbaar";
+    if (se <= SE_SOME_MORE) return "Nog enkele vergelijkingen nodig";
     return "Onvoldoende gegevens";
   }
 
