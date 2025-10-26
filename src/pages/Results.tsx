@@ -14,6 +14,7 @@ import { exportDataset } from "@/lib/exportImport";
 import { useToast } from "@/hooks/use-toast";
 import { isConnected } from "@/lib/graph";
 import { SE_RELIABLE, SE_MAX_EDGE, COHORT_PCT_RELIABLE, COHORT_MEDIAN_OK } from "@/lib/reliability-thresholds";
+import { StudentDetailsDialog } from "@/components/StudentDetailsDialog";
 
 const Results = () => {
   const { assignmentId } = useParams();
@@ -25,6 +26,7 @@ const Results = () => {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState<boolean | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
 
   useEffect(() => {
     loadResults();
@@ -355,9 +357,9 @@ const Results = () => {
               </TableHeader>
               <TableBody>
                 {results.map((r) => (
-                  <TableRow key={`${r.rank}-${r.anonymizedName}`}>
+                  <TableRow key={`${r.rank}-${r.anonymizedName}`} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedStudent(r.anonymizedName)}>
                     <TableCell className="font-bold text-lg">{r.rank}</TableCell>
-                    <TableCell className="font-medium">{r.anonymizedName}</TableCell>
+                    <TableCell className="font-medium text-primary hover:underline">{r.anonymizedName}</TableCell>
                     <TableCell>
                       <Badge className={getLabelColor(r.label)}>{r.label}</Badge>
                     </TableCell>
@@ -386,6 +388,14 @@ const Results = () => {
           </Button>
         </div>
       </div>
+
+      {/* Student Details Dialog */}
+      <StudentDetailsDialog
+        studentName={selectedStudent || ''}
+        assignmentId={assignment?.id || 0}
+        open={!!selectedStudent}
+        onOpenChange={(open) => !open && setSelectedStudent(null)}
+      />
     </div>
   );
 };
