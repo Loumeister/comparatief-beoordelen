@@ -319,7 +319,7 @@ const Upload = () => {
               disabled={
                 uploading || 
                 (mode === 'upload' && files.length < 2) ||
-                (mode === 'names' && namesText.split('\n').filter(n => n.trim()).length < 2)
+                (mode === 'names' && namesText.split(/[\n\s]+/).filter(n => n.trim()).length < 2)
               }
             >
               {uploading ? 'Bezig...' : 'Start Beoordeling'}
