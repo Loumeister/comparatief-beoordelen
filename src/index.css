@@ -302,25 +302,6 @@ body.design-mode > div {
   max-width: 1400px;
 }
 
-/* Ensure cards and containers don't overflow */
-body.design-mode * {
-  box-sizing: border-box;
-}
-
-body.design-mode [class*="card"],
-body.design-mode [class*="Card"] {
-  max-width: 100%;
-  overflow: hidden;
-}
-
-body.design-mode .flex {
-  flex-wrap: wrap;
-}
-
-body.design-mode [class*="mx-auto"] {
-  overflow-x: hidden;
-}
-
 /* Accent Color Highlights */
 body.design-mode [class*="primary"],
 body.design-mode [class*="accent"] {
