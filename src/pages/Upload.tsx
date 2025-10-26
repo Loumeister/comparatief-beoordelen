@@ -185,9 +185,15 @@ const Upload = () => {
                   onChange={(e) => {
                     const val = parseInt(e.target.value);
                     if (!isNaN(val)) {
-                      setNumComparisons(Math.max(3, val));
-                    } else if (e.target.value === '') {
+                      setNumComparisons(val);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const val = parseInt(e.target.value);
+                    if (isNaN(val) || val < 3) {
                       setNumComparisons(3);
+                    } else if (val > 20) {
+                      setNumComparisons(20);
                     }
                   }}
                 />
