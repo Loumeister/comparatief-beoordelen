@@ -54,6 +54,7 @@ const Compare = () => {
   const [totalJudgements, setTotalJudgements] = useState(0);
   const [expectedTotal, setExpectedTotal] = useState(0);
   const [pairCounts, setPairCounts] = useState<Map<string, number>>(new Map());
+  const [textCounts, setTextCounts] = useState<Map<number, number>>(new Map());
   const [replaceMode, setReplaceMode] = useState(false);
   const [isFinal, setIsFinal] = useState(false);
   const [raterId] = useState(() => `rater-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
@@ -85,6 +86,14 @@ const Compare = () => {
 
       const { texts, judgements, theta, se, judgedPairsCounts } = await buildBTMaps(id);
       setPairCounts(judgedPairsCounts);
+      
+      // Tel hoe vaak elke tekst is beoordeeld
+      const textCountsMap = new Map<number, number>();
+      for (const j of judgements) {
+        textCountsMap.set(j.textAId, (textCountsMap.get(j.textAId) ?? 0) + 1);
+        textCountsMap.set(j.textBId, (textCountsMap.get(j.textBId) ?? 0) + 1);
+      }
+      setTextCounts(textCountsMap);
       
       if (!texts || texts.length < 2) {
         toast({
@@ -133,6 +142,14 @@ const Compare = () => {
     
     const { texts, judgements, theta, se, judgedPairsCounts } = await buildBTMaps(id);
     setPairCounts(judgedPairsCounts);
+    
+    // Tel hoe vaak elke tekst is beoordeeld
+    const textCountsMap = new Map<number, number>();
+    for (const j of judgements) {
+      textCountsMap.set(j.textAId, (textCountsMap.get(j.textAId) ?? 0) + 1);
+      textCountsMap.set(j.textBId, (textCountsMap.get(j.textBId) ?? 0) + 1);
+    }
+    setTextCounts(textCountsMap);
 
     const nextPairs = generatePairs(texts, judgements, {
       targetComparisonsPerText: assignment.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
@@ -439,6 +456,24 @@ const Compare = () => {
               )}
             </CardContent>
           </Card>
+        </div>
+        
+        {/* Beoordelingen per leerling */}
+        <div className="mt-6 p-4 bg-muted rounded-lg">
+          <div className="grid md:grid-cols-2 gap-4 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">{currentPair.textA.anonymizedName}:</span>
+              <span className="font-medium">
+                {textCounts.get(currentPair.textA.id!) ?? 0} beoordelingen
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">{currentPair.textB.anonymizedName}:</span>
+              <span className="font-medium">
+                {textCounts.get(currentPair.textB.id!) ?? 0} beoordelingen
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
