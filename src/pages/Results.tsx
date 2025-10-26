@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isConnected } from "@/lib/graph";
 import { SE_RELIABLE, SE_MAX_EDGE, COHORT_PCT_RELIABLE, COHORT_MEDIAN_OK } from "@/lib/reliability-thresholds";
 import { StudentDetailsDialog } from "@/components/StudentDetailsDialog";
+import { HeaderNav } from "@/components/HeaderNav";
 
 const Results = () => {
   const { assignmentId } = useParams();
@@ -235,24 +236,26 @@ const Results = () => {
               <p className="text-muted-foreground">Resultaten van vergelijkende beoordeling</p>
             </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => handleExport("csv")}>
-                <Download className="w-4 h-4 mr-2" />
-                CSV
-              </Button>
-              <Button variant="outline" onClick={() => handleExport("xlsx")}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Excel
-              </Button>
-              <Button variant="outline" onClick={() => handleExport("pdf")}>
-                <FileText className="w-4 h-4 mr-2" />
-                PDF
-              </Button>
-              <Button variant="outline" onClick={handleExportDataset}>
-                <Database className="w-4 h-4 mr-2" />
-                JSON Dataset
-              </Button>
-            </div>
+            <HeaderNav />
+          </div>
+
+          <div className="flex gap-2 mt-4">
+            <Button variant="outline" onClick={() => handleExport("csv")}>
+              <Download className="w-4 h-4 mr-2" />
+              CSV
+            </Button>
+            <Button variant="outline" onClick={() => handleExport("xlsx")}>
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Excel
+            </Button>
+            <Button variant="outline" onClick={() => handleExport("pdf")}>
+              <FileText className="w-4 h-4 mr-2" />
+              PDF
+            </Button>
+            <Button variant="outline" onClick={handleExportDataset}>
+              <Database className="w-4 h-4 mr-2" />
+              JSON Dataset
+            </Button>
           </div>
         </div>
 

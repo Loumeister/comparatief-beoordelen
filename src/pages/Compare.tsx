@@ -12,6 +12,7 @@ import { calculateBradleyTerry } from '@/lib/bradley-terry';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { HeaderNav } from '@/components/HeaderNav';
 
 const DEFAULT_COMPARISONS_PER_TEXT = 10;
 const DEFAULT_BATCH_SIZE = 8; // kleinere batches voor sneller adaptief pairen
@@ -305,15 +306,14 @@ const Compare = () => {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Terug
             </Button>
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">
-                {totalJudgements} van ~{expectedTotal} vergelijkingen
-              </p>
-            </div>
+            <HeaderNav />
           </div>
 
           <div className="mb-2">
             <h1 className="text-2xl font-bold">{assignment?.title}</h1>
+            <p className="text-sm text-muted-foreground">
+              {totalJudgements} van ~{expectedTotal} vergelijkingen
+            </p>
           </div>
 
           <Progress value={progress} className="h-2" />

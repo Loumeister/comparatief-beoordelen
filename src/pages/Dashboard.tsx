@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ManageStudentsDialog } from '@/components/ManageStudentsDialog';
 import { GradingSettingsDialog } from '@/components/GradingSettingsDialog';
+import { HeaderNav } from '@/components/HeaderNav';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -191,7 +192,10 @@ const Dashboard = () => {
       {/* Hero Section */}
       <div className="bg-gradient-to-br from-primary/10 to-[hsl(var(--choice-b))]/10 border-b">
         <div className="max-w-6xl mx-auto p-8">
-          <h1 className="text-5xl font-bold mb-4">Vergelijkende Beoordeling</h1>
+          <div className="flex items-start justify-between mb-4">
+            <h1 className="text-5xl font-bold">Vergelijkende Beoordeling</h1>
+            <HeaderNav />
+          </div>
           <p className="text-xl text-muted-foreground mb-6">
             Beoordeel leerlingteksten objectief door ze paarsgewijs te vergelijken
           </p>

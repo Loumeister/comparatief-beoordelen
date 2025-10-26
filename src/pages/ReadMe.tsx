@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { HeaderNav } from '@/components/HeaderNav';
 
 const ReadMe = () => {
   const navigate = useNavigate();
@@ -11,14 +12,16 @@ const ReadMe = () => {
       {/* Header */}
       <div className="bg-gradient-to-br from-primary/10 to-[hsl(var(--choice-b))]/10 border-b">
         <div className="max-w-4xl mx-auto p-8">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/')}
-            className="mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Terug naar Dashboard
-          </Button>
+          <div className="flex items-start justify-between mb-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate('/')}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Terug naar Dashboard
+            </Button>
+            <HeaderNav />
+          </div>
           <h1 className="text-4xl font-bold mb-4">Handleiding</h1>
           <p className="text-xl text-muted-foreground">
             Alles wat je moet weten over vergelijkende beoordeling

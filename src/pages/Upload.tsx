@@ -10,6 +10,7 @@ import { Upload as UploadIcon, FileText, X, ListOrdered } from 'lucide-react';
 import { db } from '@/lib/db';
 import { parseDocument, generateAnonymizedName } from '@/lib/document-parser';
 import { useToast } from '@/hooks/use-toast';
+import { HeaderNav } from '@/components/HeaderNav';
 
 const Upload = () => {
   const navigate = useNavigate();
@@ -142,8 +143,13 @@ const Upload = () => {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-3xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Nieuwe Opdracht</h1>
-          <p className="text-muted-foreground">Upload leerlingteksten voor vergelijkende beoordeling</p>
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">Nieuwe Opdracht</h1>
+              <p className="text-muted-foreground">Upload leerlingteksten voor vergelijkende beoordeling</p>
+            </div>
+            <HeaderNav />
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
