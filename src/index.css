@@ -127,13 +127,15 @@ All colors MUST be HSL.
 body.design-mode {
   --font-primary: 'Space Grotesk', -apple-system, sans-serif;
   --font-secondary: 'Inter', system-ui, sans-serif;
-  --bg-color: #f7f6f2;
-  --text-color: #1a1a1a;
-  --accent-color: #0066ff;
-  --muted-color: #717171;
-  --border-color: #e0e0e0;
+  --bg-color: #faf9f6;
+  --text-color: #0a0a0a;
+  --accent-color: #00f0ff;
+  --accent-secondary: #ff3366;
+  --accent-tertiary: #b4ff39;
+  --muted-color: #555555;
+  --border-color: #d4d4d4;
   
-  background-color: var(--bg-color);
+  background: linear-gradient(135deg, #faf9f6 0%, #f0f0f5 100%);
   color: var(--text-color);
   font-family: var(--font-secondary);
 }
@@ -149,7 +151,10 @@ body.design-mode h6 {
   letter-spacing: -0.03em;
   font-weight: 600;
   text-transform: uppercase;
-  color: var(--text-color);
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 body.design-mode h1 {
@@ -178,18 +183,36 @@ body.design-mode button:not(.fixed) {
   letter-spacing: 0.05em;
   font-size: 0.75rem;
   font-weight: 500;
-  border: 1px solid var(--border-color);
+  border: 2px solid var(--accent-color);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  background-color: transparent;
+  background: linear-gradient(135deg, transparent 0%, rgba(0, 240, 255, 0.1) 100%);
   color: var(--text-color);
   padding: 0.75rem 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+body.design-mode button:not(.fixed)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+  transition: left 0.5s ease;
+}
+
+body.design-mode button:not(.fixed):hover::before {
+  left: 100%;
 }
 
 body.design-mode button:not(.fixed):hover {
-  background-color: var(--text-color);
-  color: var(--bg-color);
-  border-color: var(--text-color);
-  transform: translateY(-1px);
+  background: var(--accent-color);
+  color: #000;
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 240, 255, 0.4);
 }
 
 /* Card Transformations */
@@ -205,7 +228,7 @@ body.design-mode [class*="card"]:hover,
 body.design-mode [class*="Card"]:hover {
   border-color: var(--accent-color);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 12px 32px rgba(0, 240, 255, 0.25), 0 0 0 1px var(--accent-color);
 }
 
 /* Input Transformations */
@@ -224,7 +247,7 @@ body.design-mode textarea:focus,
 body.design-mode select:focus {
   border-color: var(--accent-color);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.2), 0 4px 12px rgba(0, 240, 255, 0.15);
 }
 
 /* Link Transformations */
@@ -277,10 +300,13 @@ body.design-mode * {
 
 /* Dark Mode Adjustments for Design Mode */
 body.design-mode.dark {
-  --bg-color: #1a1a1a;
-  --text-color: #f7f6f2;
-  --accent-color: #4d94ff;
-  --border-color: #333333;
+  --bg-color: #0a0a0a;
+  --text-color: #fafafa;
+  --accent-color: #00f0ff;
+  --accent-secondary: #ff3366;
+  --accent-tertiary: #b4ff39;
+  --border-color: #2a2a2a;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1520 100%);
 }
 
 body.design-mode.dark [class*="card"],
