@@ -16,6 +16,8 @@ type Options = {
   batchSize?: number; // default: berekend uit target
   bt?: BTInfo; // optioneel: informatief pairen
   seThreshold?: number; // max SE voor "voldoende"; boven deze drempel doorpairen (default 0.30)
+  seRepeatThreshold?: number; // herhaling toestaan als SE > deze drempel (default 0.8)
+  judgedPairsCounts?: Map<string, number>; // hoeveel keer elk paar al beoordeeld is
 };
 
 function key(a: number, b: number): string {
@@ -62,6 +64,7 @@ export function generatePairs(texts: Text[], existingJudgements: Judgement[], op
   const rawBatch = opts.batchSize ?? Math.ceil((target * texts.length) / 4);
   const batchSize = Math.max(4, rawBatch);
   const seThreshold = opts.seThreshold ?? 0.3;
+  const seRepeatThreshold = opts.seRepeatThreshold ?? 0.8;
 
   if (texts.length < 2) return [];
 
@@ -69,14 +72,17 @@ export function generatePairs(texts: Text[], existingJudgements: Judgement[], op
   const id2idx = new Map<number, number>(texts.map((t, i) => [t.id!, i]));
   const n = texts.length;
 
-  // judged pairs + exposure
+  // judged pairs + exposure + counts
   const judgedPairs = new Set<string>();
+  const judgedPairsCounts = opts.judgedPairsCounts ?? new Map<string, number>();
   const exposure = new Array(n).fill(0);
   for (const j of existingJudgements) {
     const ia = id2idx.get(j.textAId);
     const ib = id2idx.get(j.textBId);
     if (ia == null || ib == null || ia === ib) continue;
-    judgedPairs.add(key(j.textAId, j.textBId));
+    const kkey = key(j.textAId, j.textBId);
+    judgedPairs.add(kkey);
+    judgedPairsCounts.set(kkey, (judgedPairsCounts.get(kkey) ?? 0) + 1);
     exposure[ia]++;
     exposure[ib]++;
   }
@@ -108,14 +114,25 @@ export function generatePairs(texts: Text[], existingJudgements: Judgement[], op
     const idI = texts[iIdx].id!,
       idJ = texts[jIdx].id!;
     const kkey = key(idI, idJ);
-    if (judgedPairs.has(kkey)) return -Infinity;
+    
+    // Check of herhaling informatief is
+    const count = judgedPairsCounts.get(kkey) ?? 0;
+    const highSE = hasBT && (seOf(idI) > seRepeatThreshold || seOf(idJ) > seRepeatThreshold);
+    const isBridging = dsu.find(iIdx) !== dsu.find(jIdx);
+    
+    // Blokkeer herhalingen tenzij informatief
+    if (count > 0 && !highSE && !isBridging) return -Infinity;
+    
     if (!underCap(iIdx) || !underCap(jIdx)) return -Infinity;
 
     // basis: lage gezamenlijke exposure prefereren
     let s = -(exposure[iIdx] + exposure[jIdx]);
+    
+    // Lichte penalty voor herhalingen (tenzij informatief, dan is dit al gecontroleerd)
+    if (count > 0) s -= 5;
 
     // bridging bonus (in fase 2 nog steeds nuttig)
-    if (dsu.find(iIdx) !== dsu.find(jIdx)) s += 1000;
+    if (isBridging) s += 1000;
 
     if (hasBT) {
       const dθ = Math.abs(thetaOf(idI) - thetaOf(idJ));

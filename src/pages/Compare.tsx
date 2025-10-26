@@ -6,13 +6,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft } from 'lucide-react';
-import { db, Assignment } from '@/lib/db';
+import { db, Assignment, AssignmentMeta } from '@/lib/db';
 import { generatePairs, Pair } from '@/lib/pairing';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
 import { useToast } from '@/hooks/use-toast';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 const DEFAULT_COMPARISONS_PER_TEXT = 10;
 const DEFAULT_BATCH_SIZE = 8; // kleinere batches voor sneller adaptief pairen
+
+function key(a: number, b: number): string {
+  return `${Math.min(a, b)}-${Math.max(a, b)}`;
+}
 
 // Helper: bereken BT-scores tussendoor voor slimmere pairing
 async function buildBTMaps(assignmentId: number) {
@@ -22,7 +28,15 @@ async function buildBTMaps(assignmentId: number) {
   const res = calculateBradleyTerry(texts, judgements, 0.3);
   const theta = new Map(res.map(r => [r.textId, r.theta]));
   const se = new Map(res.map(r => [r.textId, r.standardError]));
-  return { texts, judgements, theta, se };
+  
+  // Bouw judgedPairsCounts
+  const judgedPairsCounts = new Map<string, number>();
+  for (const j of judgements) {
+    const k = key(j.textAId, j.textBId);
+    judgedPairsCounts.set(k, (judgedPairsCounts.get(k) ?? 0) + 1);
+  }
+  
+  return { texts, judgements, theta, se, judgedPairsCounts };
 }
 
 const Compare = () => {
@@ -31,6 +45,7 @@ const Compare = () => {
   const { toast } = useToast();
 
   const [assignment, setAssignment] = useState<Assignment | null>(null);
+  const [assignmentMeta, setAssignmentMeta] = useState<AssignmentMeta | null>(null);
   const [pairs, setPairs] = useState<Pair[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [comment, setComment] = useState('');
@@ -38,6 +53,10 @@ const Compare = () => {
   const [saving, setSaving] = useState(false);
   const [totalJudgements, setTotalJudgements] = useState(0);
   const [expectedTotal, setExpectedTotal] = useState(0);
+  const [pairCounts, setPairCounts] = useState<Map<string, number>>(new Map());
+  const [replaceMode, setReplaceMode] = useState(false);
+  const [isFinal, setIsFinal] = useState(false);
+  const [raterId] = useState(() => `rater-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
 
   // ---------- Data laden ----------
   const loadData = useCallback(async () => {
@@ -51,8 +70,21 @@ const Compare = () => {
         return;
       }
       setAssignment(assign);
+      
+      // Haal of maak assignmentMeta
+      let meta = await db.assignmentMeta.get(id);
+      if (!meta) {
+        meta = {
+          assignmentId: id,
+          judgementMode: 'accumulate',
+          seRepeatThreshold: 0.8
+        };
+        await db.assignmentMeta.put(meta);
+      }
+      setAssignmentMeta(meta);
 
-      const { texts, judgements, theta, se } = await buildBTMaps(id);
+      const { texts, judgements, theta, se, judgedPairsCounts } = await buildBTMaps(id);
+      setPairCounts(judgedPairsCounts);
       
       if (!texts || texts.length < 2) {
         toast({
@@ -74,6 +106,8 @@ const Compare = () => {
         targetComparisonsPerText: assign.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
         batchSize: DEFAULT_BATCH_SIZE,
         bt: { theta, se },
+        seRepeatThreshold: meta.seRepeatThreshold,
+        judgedPairsCounts
       });
 
       if (newPairs.length === 0) {
@@ -94,16 +128,19 @@ const Compare = () => {
 
   // Herlaad adaptief een nieuwe batch na oordelen
   const reloadPairs = useCallback(async () => {
-    if (!assignment) return;
+    if (!assignment || !assignmentMeta) return;
     const id = assignment.id!;
     
-    const { texts, judgements, theta, se } = await buildBTMaps(id);
+    const { texts, judgements, theta, se, judgedPairsCounts } = await buildBTMaps(id);
+    setPairCounts(judgedPairsCounts);
 
     const nextPairs = generatePairs(texts, judgements, {
       targetComparisonsPerText: assignment.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
       batchSize: DEFAULT_BATCH_SIZE,
       bt: { theta, se },
       seThreshold: 0.3,
+      seRepeatThreshold: assignmentMeta.seRepeatThreshold,
+      judgedPairsCounts
     });
 
     if (nextPairs.length === 0) {
@@ -113,7 +150,9 @@ const Compare = () => {
 
     setPairs(nextPairs);
     setCurrentIndex(0);
-  }, [assignment, navigate]);
+    setReplaceMode(false);
+    setIsFinal(false);
+  }, [assignment, assignmentMeta, navigate]);
 
   // Init load
   useEffect(() => {
@@ -123,12 +162,33 @@ const Compare = () => {
   // ---------- Oordeel opslaan (useCallback i.v.m. keyboard effect) ----------
   const handleJudgement = useCallback(
     async (winner: 'A' | 'B' | 'EQUAL') => {
-      if (!pairs[currentIndex] || !assignment || saving) return;
+      if (!pairs[currentIndex] || !assignment || !assignmentMeta || saving) return;
 
       const pair = pairs[currentIndex];
+      const mode = assignmentMeta.judgementMode || 'accumulate';
 
       try {
         setSaving(true);
+        
+        let supersedesId: number | undefined;
+        
+        // Replace mode: zoek eventuele eerdere beoordeling van dit paar door deze rater
+        if (mode === 'replace' && replaceMode) {
+          const existingJudgements = await db.judgements
+            .where('assignmentId').equals(assignment.id!)
+            .filter(j => 
+              j.raterId === raterId &&
+              ((j.textAId === pair.textA.id! && j.textBId === pair.textB.id!) ||
+               (j.textAId === pair.textB.id! && j.textBId === pair.textA.id!))
+            )
+            .toArray();
+          
+          if (existingJudgements.length > 0) {
+            // Pak de meest recente
+            existingJudgements.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+            supersedesId = existingJudgements[0].id;
+          }
+        }
 
         await db.judgements.add({
           assignmentId: assignment.id!,
@@ -137,9 +197,15 @@ const Compare = () => {
           winner,
           comment: comment.trim() || undefined,
           createdAt: new Date(),
+          raterId,
+          source: 'human',
+          isFinal: mode === 'moderate' ? isFinal : false,
+          supersedesJudgementId: supersedesId
         });
 
         setComment('');
+        setReplaceMode(false);
+        setIsFinal(false);
         setTotalJudgements(prev => prev + 1);
 
         // Volgend paar binnen huidige batch…
@@ -156,7 +222,7 @@ const Compare = () => {
         setSaving(false);
       }
     },
-    [assignment, comment, currentIndex, pairs, reloadPairs, saving, toast]
+    [assignment, assignmentMeta, comment, currentIndex, pairs, reloadPairs, saving, toast, raterId, replaceMode, isFinal]
   );
 
   // ---------- Keyboard shortcuts (stabiel & up-to-date via handleJudgement dep) ----------
@@ -191,6 +257,10 @@ const Compare = () => {
   }
 
   const currentPair = pairs[currentIndex];
+  const pairKey = key(currentPair.textA.id!, currentPair.textB.id!);
+  const pairCount = pairCounts.get(pairKey) ?? 0;
+  const mode = assignmentMeta?.judgementMode || 'accumulate';
+  
   // Progress gebaseerd op totaal aantal gemaakte oordelen vs verwacht totaal
   const progress = expectedTotal > 0 ? Math.min((totalJudgements / expectedTotal) * 100, 100) : 0;
 
@@ -224,7 +294,14 @@ const Compare = () => {
         {/* Judgement Controls */}
         <Card className="shadow-lg mb-6">
           <CardContent className="p-6">
-            <p className="text-lg font-medium mb-2">Welke tekst is beter?</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-lg font-medium">Welke tekst is beter?</p>
+              {pairCount > 0 && (
+                <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
+                  Eerder beoordeeld: {pairCount}×
+                </span>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground mb-4">
               Kies de <strong>sterkere</strong> tekst. Bij twijfel: <em>Gelijkwaardig</em> (sneltoets T).
             </p>
@@ -268,14 +345,42 @@ const Compare = () => {
               </Button>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Opmerking (optioneel)</label>
-              <Textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Noteer eventuele overwegingen..."
-                rows={3}
-              />
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Opmerking (optioneel)</label>
+                <Textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Noteer eventuele overwegingen..."
+                  rows={3}
+                />
+              </div>
+              
+              {mode === 'replace' && pairCount > 0 && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="replace-mode" 
+                    checked={replaceMode}
+                    onCheckedChange={(checked) => setReplaceMode(checked === true)}
+                  />
+                  <Label htmlFor="replace-mode" className="text-sm cursor-pointer">
+                    Vorige beoordeling vervangen
+                  </Label>
+                </div>
+              )}
+              
+              {mode === 'moderate' && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="is-final" 
+                    checked={isFinal}
+                    onCheckedChange={(checked) => setIsFinal(checked === true)}
+                  />
+                  <Label htmlFor="is-final" className="text-sm cursor-pointer">
+                    Markeer als definitief
+                  </Label>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
