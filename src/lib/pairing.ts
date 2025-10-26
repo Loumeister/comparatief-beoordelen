@@ -8,16 +8,16 @@ export interface Pair {
 
 type BTInfo = {
   theta?: Map<number, number>; // textId -> theta (gecentreerd)
-  se?: Map<number, number>; // textId -> standaardfout
+  se?: Map<number, number>;    // textId -> standaardfout
 };
 
 type Options = {
   targetComparisonsPerText?: number; // default 10
-  batchSize?: number; // default: berekend uit target
-  bt?: BTInfo; // optioneel: informatief pairen
-  seThreshold?: number; // max SE voor "voldoende"; boven deze drempel doorpairen (default 0.30)
-  seRepeatThreshold?: number; // herhaling toestaan als SE > deze drempel (default 0.8)
-  judgedPairsCounts?: Map<string, number>; // hoeveel keer elk paar al beoordeeld is
+  batchSize?: number;                // default: berekend uit target
+  bt?: BTInfo;                       // optioneel: informatief pairen
+  seThreshold?: number;              // max SE voor "voldoende"; boven deze drempel doorpairen (default 0.30)
+  seRepeatThreshold?: number;        // herhaling toestaan als SE > deze drempel (default 0.8)
+  judgedPairsCounts?: Map<string, number>; // aantal eerdere beoordelingen per paar (historisch)
 };
 
 function key(a: number, b: number): string {
@@ -58,8 +58,13 @@ function allInOneComponent(dsu: DSU, n: number): boolean {
  * - SE-override: boven target blijven pairen als SE te hoog is (alleen als BT-info aanwezig)
  * - Δθ-penalty voor bijna-zekere uitslagen
  * - Links/rechts randomisatie voor bias-reductie
+ * - Herhaling vermijden, behalve wanneer informatief (SE-gedreven) of bridging
  */
-export function generatePairs(texts: Text[], existingJudgements: Judgement[], opts: Options = {}): Pair[] {
+export function generatePairs(
+  texts: Text[],
+  existingJudgements: Judgement[],
+  opts: Options = {}
+): Pair[] {
   const target = opts.targetComparisonsPerText ?? 10;
   const rawBatch = opts.batchSize ?? Math.ceil((target * texts.length) / 4);
   const batchSize = Math.max(4, rawBatch);
@@ -72,22 +77,21 @@ export function generatePairs(texts: Text[], existingJudgements: Judgement[], op
   const id2idx = new Map<number, number>(texts.map((t, i) => [t.id!, i]));
   const n = texts.length;
 
-  // judged pairs + exposure + counts
-  const judgedPairs = new Set<string>();
+  // Historische counts en exposure
   const judgedPairsCounts = opts.judgedPairsCounts ?? new Map<string, number>();
   const exposure = new Array(n).fill(0);
+
   for (const j of existingJudgements) {
     const ia = id2idx.get(j.textAId);
     const ib = id2idx.get(j.textBId);
     if (ia == null || ib == null || ia === ib) continue;
     const kkey = key(j.textAId, j.textBId);
-    judgedPairs.add(kkey);
     judgedPairsCounts.set(kkey, (judgedPairsCounts.get(kkey) ?? 0) + 1);
     exposure[ia]++;
     exposure[ib]++;
   }
 
-  // connectiviteit
+  // connectiviteit (op basis van historische oordelen)
   const dsu = new DSU(n);
   for (const j of existingJudgements) {
     const ia = id2idx.get(j.textAId);
@@ -99,7 +103,7 @@ export function generatePairs(texts: Text[], existingJudgements: Judgement[], op
   // BT helpers
   const hasBT = Boolean(opts.bt?.theta && opts.bt?.se);
   const thetaOf = (id: number) => (hasBT ? (opts.bt!.theta!.get(id) ?? 0) : 0);
-  const seOf = (id: number) => (hasBT ? (opts.bt!.se!.get(id) ?? 1) : 1);
+  const seOf    = (id: number) => (hasBT ? (opts.bt!.se!.get(id)    ?? 1) : 1);
 
   // Onder cap als: exposure < target, of (alleen mét BT) SE > drempel
   const underCap = (i: number) => {
@@ -109,38 +113,36 @@ export function generatePairs(texts: Text[], existingJudgements: Judgement[], op
     return seOf(id) > seThreshold;
   };
 
-  // Score voor kandidaat (informatie + fairness + connectiviteit)
+  // Score (informatie + fairness + connectiviteit) — herhaling alleen als informatief
   function scoreOpp(iIdx: number, jIdx: number): number {
-    const idI = texts[iIdx].id!,
-      idJ = texts[jIdx].id!;
+    const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
     const kkey = key(idI, idJ);
-    
-    // Check of herhaling informatief is
-    const count = judgedPairsCounts.get(kkey) ?? 0;
+
+    const count = judgedPairsCounts.get(kkey) ?? 0;        // historisch # beoordelingen
     const highSE = hasBT && (seOf(idI) > seRepeatThreshold || seOf(idJ) > seRepeatThreshold);
     const isBridging = dsu.find(iIdx) !== dsu.find(jIdx);
-    
-    // Blokkeer herhalingen tenzij informatief
+
+    // Vermijd herhaling tenzij informatief of bridging
     if (count > 0 && !highSE && !isBridging) return -Infinity;
-    
+
     if (!underCap(iIdx) || !underCap(jIdx)) return -Infinity;
 
     // basis: lage gezamenlijke exposure prefereren
     let s = -(exposure[iIdx] + exposure[jIdx]);
-    
-    // Lichte penalty voor herhalingen (tenzij informatief, dan is dit al gecontroleerd)
+
+    // lichte penalty voor herhalingen (weinig, want informatief/bridging is al geëist)
     if (count > 0) s -= 5;
 
-    // bridging bonus (in fase 2 nog steeds nuttig)
+    // bridging bonus
     if (isBridging) s += 1000;
 
     if (hasBT) {
       const dθ = Math.abs(thetaOf(idI) - thetaOf(idJ));
       const sumSE = seOf(idI) + seOf(idJ);
       // kleine Δθ is informatiever
-      s += 10 - 10 * Math.min(dθ, 1); // Δθ in [0,1] → 10..0
+      s += 10 - 10 * Math.min(dθ, 1);
       // hoge onzekerheid (SE) is informatiever
-      s += 5 * Math.min(sumSE, 2); // cap op 2 → max +10
+      s += 5 * Math.min(sumSE, 2);
       // penalty op bijna-zekere uitslagen
       if (dθ > 3) s -= 20;
     }
@@ -150,12 +152,14 @@ export function generatePairs(texts: Text[], existingJudgements: Judgement[], op
     return s;
   }
 
-  // Helper om echt een paar toe te voegen (met left/right flip) en state te updaten
+  // Alleen binnen **deze batch** willen we geen duplicaten:
+  const usedPairsThisBatch = new Set<string>();
+
+  // Helper om paar te selecteren (met left/right flip) en state te updaten
   function selectPair(iIdx: number, jIdx: number, selected: Pair[]): boolean {
-    const idI = texts[iIdx].id!,
-      idJ = texts[jIdx].id!;
+    const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
     const kkey = key(idI, idJ);
-    if (judgedPairs.has(kkey)) return false;
+    if (usedPairsThisBatch.has(kkey)) return false;
     if (!underCap(iIdx) || !underCap(jIdx)) return false;
 
     const flip = Math.random() < 0.5;
@@ -164,9 +168,9 @@ export function generatePairs(texts: Text[], existingJudgements: Judgement[], op
       textB: flip ? texts[iIdx] : texts[jIdx],
     });
 
-    judgedPairs.add(kkey);
-    exposure[iIdx]++;
-    exposure[jIdx]++;
+    usedPairsThisBatch.add(kkey);
+    judgedPairsCounts.set(kkey, (judgedPairsCounts.get(kkey) ?? 0) + 1); // update historisch count voor latere keuzes in batch
+    exposure[iIdx]++; exposure[jIdx]++;
     dsu.union(iIdx, jIdx);
     return true;
   }
@@ -174,19 +178,14 @@ export function generatePairs(texts: Text[], existingJudgements: Judgement[], op
   const selected: Pair[] = [];
 
   // ----- FASE 1: BRIDGING -----
-  // verzamel alle potentiële brugparen
   const bridges: Array<{ iIdx: number; jIdx: number; score: number }> = [];
   for (let i = 0; i < n; i++) {
     if (!underCap(i)) continue;
     for (let j = i + 1; j < n; j++) {
       if (!underCap(j)) continue;
       if (dsu.find(i) !== dsu.find(j)) {
-        const idI = texts[i].id!,
-          idJ = texts[j].id!;
-        if (!judgedPairs.has(key(idI, idJ))) {
-          const sc = scoreOpp(i, j);
-          if (sc > -Infinity) bridges.push({ iIdx: i, jIdx: j, score: sc });
-        }
+        const sc = scoreOpp(i, j);
+        if (sc > -Infinity) bridges.push({ iIdx: i, jIdx: j, score: sc });
       }
     }
   }
@@ -205,12 +204,8 @@ export function generatePairs(texts: Text[], existingJudgements: Judgement[], op
       if (!underCap(i)) continue;
       for (let j = i + 1; j < n; j++) {
         if (!underCap(j)) continue;
-        const idI = texts[i].id!,
-          idJ = texts[j].id!;
-        if (!judgedPairs.has(key(idI, idJ))) {
-          const sc = scoreOpp(i, j);
-          if (sc > -Infinity) candidates.push({ iIdx: i, jIdx: j, score: sc });
-        }
+        const sc = scoreOpp(i, j);
+        if (sc > -Infinity) candidates.push({ iIdx: i, jIdx: j, score: sc });
       }
     }
     candidates.sort((a, b) => b.score - a.score);
