@@ -149,8 +149,8 @@ export function calculateBradleyTerry(
   }
 
   function reliabilityFromSE(se: number): string {
-    if (se <= 0.30) return "Resultaat betrouwbaar";
-    if (se <= 0.50) return "Nog enkele vergelijkingen nodig";
+    if (se <= 0.75) return "Resultaat betrouwbaar";
+    if (se <= 1.00) return "Nog enkele vergelijkingen nodig";
     return "Onvoldoende gegevens";
   }
 

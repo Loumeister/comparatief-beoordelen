@@ -183,29 +183,36 @@ const Results = () => {
   }
 
 
-  // Overall reliability
-  const reliableCount = results.filter((r) => r.reliability === "Resultaat betrouwbaar").length;
-  const reliabilityPercentage = (reliableCount / results.length) * 100;
+  // Calculate overall reliability (cohort-based)
+  const seList = results.map(r => r.standardError).sort((a, b) => a - b);
+  const n = seList.length;
+  const medianSE = n === 0 ? NaN : (n % 2 === 1 ? seList[(n - 1) / 2] : (seList[n / 2 - 1] + seList[n / 2]) / 2);
+  const maxSE = n === 0 ? NaN : Math.max(...seList);
+  const pctReliable = n === 0 ? 0 : (results.filter(r => r.standardError <= 0.75).length / n) * 100;
 
-  let reliabilityStatus: "insufficient" | "moderate" | "reliable";
+  // Determine cohort status text + icon class via thresholds
   let reliabilityText: string;
+  let reliabilityStatus: 'insufficient' | 'moderate' | 'reliable';
   let reliabilityIcon: typeof CheckCircle;
 
-  if (reliabilityPercentage < 60) {
-    reliabilityStatus = "insufficient";
-    reliabilityText = "Onvoldoende gegevens";
-    reliabilityIcon = XCircle;
-  } else if (reliabilityPercentage < 80) {
-    reliabilityStatus = "moderate";
-    reliabilityText = "Nog enkele vergelijkingen nodig";
+  const stopAdvice = (pctReliable >= 70) || ((medianSE <= 0.80) && (maxSE <= 1.40));
+
+  if (stopAdvice) {
+    reliabilityStatus = 'reliable';
+    reliabilityText = 'Resultaat betrouwbaar (stopadvies)';
+    reliabilityIcon = CheckCircle;
+  } else if (medianSE <= 1.00) {
+    reliabilityStatus = 'moderate';
+    reliabilityText = 'Nog enkele vergelijkingen nodig';
     reliabilityIcon = AlertCircle;
   } else {
-    reliabilityStatus = "reliable";
-    reliabilityText = "Resultaat betrouwbaar";
-    reliabilityIcon = CheckCircle;
+    reliabilityStatus = 'insufficient';
+    reliabilityText = 'Onvoldoende gegevens';
+    reliabilityIcon = XCircle;
   }
 
   const ReliabilityIcon = reliabilityIcon;
+  const reliabilityPercentage = pctReliable; // hergebruik voor de progressbar (toont %≤0.75)
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -281,7 +288,7 @@ const Results = () => {
               <div className="flex-1">
                 <h3 className="font-semibold text-lg">{reliabilityText}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {Math.round(reliabilityPercentage)}% van de teksten heeft voldoende vergelijkingen
+                  {Math.round(reliabilityPercentage)}% ≤ 0.75 • mediaan(SE) = {Number.isFinite(medianSE) ? medianSE.toFixed(2) : '—'} • max(SE) = {Number.isFinite(maxSE) ? maxSE.toFixed(2) : '—'}
                 </p>
               </div>
             </div>
