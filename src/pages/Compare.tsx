@@ -171,16 +171,13 @@ const Compare = () => {
         setSaving(true);
         
         let supersedesId: number | undefined;
+        const pairKey = [pair.textA.id!, pair.textB.id!].sort((a, b) => a - b).join('-');
         
         // Replace mode: zoek eventuele eerdere beoordeling van dit paar door deze rater
         if (mode === 'replace' && replaceMode) {
           const existingJudgements = await db.judgements
-            .where('assignmentId').equals(assignment.id!)
-            .filter(j => 
-              j.raterId === raterId &&
-              ((j.textAId === pair.textA.id! && j.textBId === pair.textB.id!) ||
-               (j.textAId === pair.textB.id! && j.textBId === pair.textA.id!))
-            )
+            .where('pairKey').equals(pairKey)
+            .filter(j => j.raterId === raterId && j.assignmentId === assignment.id!)
             .toArray();
           
           if (existingJudgements.length > 0) {
@@ -200,7 +197,8 @@ const Compare = () => {
           raterId,
           source: 'human',
           isFinal: mode === 'moderate' ? isFinal : false,
-          supersedesJudgementId: supersedesId
+          supersedesJudgementId: supersedesId,
+          pairKey
         });
 
         setComment('');

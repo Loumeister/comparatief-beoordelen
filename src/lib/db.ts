@@ -31,6 +31,7 @@ export interface Judgement {
   source?: 'human' | 'ai';
   supersedesJudgementId?: number;
   isFinal?: boolean;
+  pairKey?: string; // "smallId-bigId" voor snellere queries
 }
 
 export interface Score {
@@ -88,25 +89,32 @@ export class AssessmentDB extends Dexie {
     this.version(3).stores({
       assignments: '++id, title, createdAt',
       texts: '++id, assignmentId, anonymizedName',
-      judgements: '++id, assignmentId, textAId, textBId, raterId, supersedesJudgementId',
+      judgements: '++id, assignmentId, pairKey, raterId, supersedesJudgementId, createdAt',
       scores: '++id, assignmentId, textId, rank',
       previousFits: '++id, assignmentId, calculatedAt',
       assignmentMeta: 'assignmentId'
     }).upgrade(async tx => {
-      // Migreer bestaande judgements: zet defaults
+      // Migreer bestaande judgements: zet defaults en pairKey
       await tx.table('judgements').toCollection().modify(j => {
         if (j.source === undefined) j.source = 'human';
         if (j.isFinal === undefined) j.isFinal = false;
+        if (!j.pairKey) {
+          j.pairKey = [j.textAId, j.textBId].sort((a, b) => a - b).join('-');
+        }
       });
       
-      // Maak assignmentMeta entries voor bestaande assignments
+      // Maak assignmentMeta entries voor bestaande assignments (idempotent)
       const assignments = await tx.table('assignments').toArray();
+      const metaTable = tx.table('assignmentMeta');
       for (const a of assignments) {
-        await tx.table('assignmentMeta').put({
-          assignmentId: a.id!,
-          judgementMode: 'accumulate',
-          seRepeatThreshold: 0.8
-        });
+        const exists = await metaTable.get(a.id!);
+        if (!exists) {
+          await metaTable.put({
+            assignmentId: a.id!,
+            judgementMode: 'accumulate',
+            seRepeatThreshold: 0.8
+          });
+        }
       }
     });
   }
