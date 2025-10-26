@@ -123,19 +123,21 @@ All colors MUST be HSL.
   }
 }
 
-/* Design Mode - High-end Art Direction Overlay */
+/* Design Mode - High-end Art Direction Overlay - "Controlled Chaos" */
 body.design-mode {
   --font-primary: 'Space Grotesk', -apple-system, sans-serif;
   --font-secondary: 'Inter', system-ui, sans-serif;
-  --bg-color: #faf9f6;
-  --text-color: #0a0a0a;
-  --accent-color: #00f0ff;
-  --accent-secondary: #ff3366;
-  --accent-tertiary: #b4ff39;
-  --muted-color: #555555;
-  --border-color: #d4d4d4;
+  --bg-color: #F6F4EF;
+  --text-color: #1C1C1C;
+  --text-secondary: #6A665F;
+  --accent-color: #3366FF;
+  --accent-secondary: #D3C9FF;
+  --highlight: #FF7755;
+  --surface-color: #E8E4D9;
+  --divider-color: #C5C1BA;
+  --error-color: #B45E4D;
   
-  background: linear-gradient(135deg, #faf9f6 0%, #f0f0f5 100%);
+  background-color: var(--bg-color);
   color: var(--text-color);
   font-family: var(--font-secondary);
 }
@@ -151,16 +153,18 @@ body.design-mode h6 {
   letter-spacing: -0.03em;
   font-weight: 600;
   text-transform: uppercase;
-  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-secondary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-color);
 }
+
 
 body.design-mode h1 {
   font-size: clamp(2rem, 5vw, 4rem);
   line-height: 0.95;
   margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 body.design-mode h2 {
@@ -174,6 +178,7 @@ body.design-mode div {
   font-family: var(--font-secondary);
   letter-spacing: -0.01em;
   line-height: 1.6;
+  color: var(--text-secondary);
 }
 
 /* Button Transformations */
@@ -183,52 +188,39 @@ body.design-mode button:not(.fixed) {
   letter-spacing: 0.05em;
   font-size: 0.75rem;
   font-weight: 500;
-  border: 2px solid var(--accent-color);
+  border: 1px solid var(--divider-color);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  background: linear-gradient(135deg, transparent 0%, rgba(0, 240, 255, 0.1) 100%);
+  background-color: var(--surface-color);
   color: var(--text-color);
   padding: 0.75rem 1.5rem;
-  position: relative;
-  overflow: hidden;
-}
-
-body.design-mode button:not(.fixed)::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
-  transition: left 0.5s ease;
-}
-
-body.design-mode button:not(.fixed):hover::before {
-  left: 100%;
 }
 
 body.design-mode button:not(.fixed):hover {
-  background: var(--accent-color);
-  color: #000;
+  background-color: var(--accent-color);
+  color: white;
   border-color: var(--accent-color);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 240, 255, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(51, 102, 255, 0.3);
+}
+
+body.design-mode button:not(.fixed):focus {
+  outline: 2px solid var(--highlight);
+  outline-offset: 2px;
 }
 
 /* Card Transformations */
 body.design-mode [class*="card"],
 body.design-mode [class*="Card"] {
-  background-color: rgba(255, 255, 255, 0.6);
-  border: 1px solid var(--border-color);
-  backdrop-filter: blur(10px);
+  background-color: var(--surface-color);
+  border: 1px solid var(--divider-color);
   transition: all 0.25s ease;
 }
 
 body.design-mode [class*="card"]:hover,
 body.design-mode [class*="Card"]:hover {
-  border-color: var(--accent-color);
+  border-color: var(--accent-secondary);
   transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(0, 240, 255, 0.25), 0 0 0 1px var(--accent-color);
+  box-shadow: 0 8px 24px rgba(211, 201, 255, 0.2);
 }
 
 /* Input Transformations */
@@ -236,8 +228,8 @@ body.design-mode input,
 body.design-mode textarea,
 body.design-mode select {
   font-family: var(--font-secondary);
-  background-color: rgba(255, 255, 255, 0.8);
-  border: 1px solid var(--border-color);
+  background-color: white;
+  border: 1px solid var(--divider-color);
   color: var(--text-color);
   transition: all 0.2s ease;
 }
@@ -247,7 +239,7 @@ body.design-mode textarea:focus,
 body.design-mode select:focus {
   border-color: var(--accent-color);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.2), 0 4px 12px rgba(0, 240, 255, 0.15);
+  box-shadow: 0 0 0 3px rgba(51, 102, 255, 0.15);
 }
 
 /* Link Transformations */
@@ -300,22 +292,41 @@ body.design-mode * {
 
 /* Dark Mode Adjustments for Design Mode */
 body.design-mode.dark {
-  --bg-color: #0a0a0a;
-  --text-color: #fafafa;
-  --accent-color: #00f0ff;
-  --accent-secondary: #ff3366;
-  --accent-tertiary: #b4ff39;
-  --border-color: #2a2a2a;
-  background: linear-gradient(135deg, #0a0a0a 0%, #1a1520 100%);
+  --bg-color: #111111;
+  --text-color: #F4F2EE;
+  --text-secondary: #A8A39D;
+  --accent-color: #88A6FF;
+  --accent-secondary: #FFD2C0;
+  --highlight: #FF9977;
+  --surface-color: #1A1A1A;
+  --divider-color: #2A2A2A;
+  --error-color: #D67E6D;
+  
+  background-color: var(--bg-color);
 }
 
 body.design-mode.dark [class*="card"],
 body.design-mode.dark [class*="Card"] {
-  background-color: rgba(26, 26, 26, 0.8);
+  background-color: var(--surface-color);
+  border-color: var(--divider-color);
 }
 
 body.design-mode.dark input,
 body.design-mode.dark textarea,
 body.design-mode.dark select {
-  background-color: rgba(40, 40, 40, 0.9);
+  background-color: var(--surface-color);
+  border-color: var(--divider-color);
+  color: var(--text-color);
+}
+
+body.design-mode.dark button:not(.fixed) {
+  background-color: var(--surface-color);
+  border-color: var(--divider-color);
+  color: var(--text-color);
+}
+
+body.design-mode.dark button:not(.fixed):hover {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: #111111;
 }
