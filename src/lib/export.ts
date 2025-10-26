@@ -11,13 +11,14 @@ export interface ExportData {
   theta: number;
   standardError: number;
   reliability: string;
+  judgementCount: number;
 }
 
 /**
  * Export results to CSV
  */
 export function exportToCSV(data: ExportData[], assignmentTitle: string) {
-  const headers = ['Tekst', 'Rang', 'Label', 'Cijfer', 'Theta', 'SE', 'Betrouwbaarheid'];
+  const headers = ['Tekst', 'Rang', 'Label', 'Cijfer', 'Theta', 'SE', 'Betrouwbaarheid', 'Aantal beoordelingen'];
   const rows = data.map(d => [
     d.anonymizedName,
     d.rank,
@@ -25,7 +26,8 @@ export function exportToCSV(data: ExportData[], assignmentTitle: string) {
     d.grade.toFixed(1),
     d.theta.toFixed(3),
     d.standardError.toFixed(3),
-    d.reliability
+    d.reliability,
+    d.judgementCount
   ]);
 
   const csv = [headers, ...rows]
@@ -48,7 +50,7 @@ export function exportToXLSX(data: ExportData[], assignmentTitle: string, numCom
       'Theta': d.theta.toFixed(3),
       'SE': d.standardError.toFixed(3),
       'Betrouwbaarheid': d.reliability,
-      'Aantal vergelijkingen': numComparisons || 10
+      'Aantal beoordelingen': d.judgementCount
     }))
   );
 

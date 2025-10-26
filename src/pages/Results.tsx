@@ -67,6 +67,15 @@ const Results = () => {
       // BT-fit (ook bij niet-verbonden graaf)
       const btResults = calculateBradleyTerry(texts, judgements, 0.1, 0.1, grading);
 
+      // Bereken aantal beoordelingen per tekst
+      const judgementCounts = new Map<number, number>();
+      for (const text of texts) {
+        const count = judgements.filter(
+          (j) => j.textAId === text.id || j.textBId === text.id
+        ).length;
+        judgementCounts.set(text.id, count);
+      }
+
       // Map naar exportformaat
       const exportData: ExportData[] = btResults.map((r) => {
         const text = texts.find((t) => t.id === r.textId)!;
@@ -78,6 +87,7 @@ const Results = () => {
           theta: r.theta,
           standardError: r.standardError,
           reliability: r.reliability,
+          judgementCount: judgementCounts.get(text.id) ?? 0,
         };
       });
 
@@ -327,6 +337,7 @@ const Results = () => {
                     <>
                       <TableHead className="text-right">Theta (θ)</TableHead>
                       <TableHead className="text-right">SE</TableHead>
+                      <TableHead className="text-right">Aantal beoordelingen</TableHead>
                     </>
                   )}
                   <TableHead>Betrouwbaarheid</TableHead>
@@ -345,6 +356,7 @@ const Results = () => {
                       <>
                         <TableCell className="text-right font-mono text-sm">{r.theta.toFixed(3)}</TableCell>
                         <TableCell className="text-right font-mono text-sm">{r.standardError.toFixed(3)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{r.judgementCount}</TableCell>
                       </>
                     )}
                     <TableCell>
