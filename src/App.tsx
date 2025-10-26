@@ -9,7 +9,6 @@ import Compare from "./pages/Compare";
 import Results from "./pages/Results";
 import ReadMe from "./pages/ReadMe";
 import NotFound from "./pages/NotFound";
-import { DesignOverlay } from "./components/DesignOverlay";
 
 const queryClient = new QueryClient();
 
@@ -18,7 +17,6 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <DesignOverlay />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Dashboard />} />
