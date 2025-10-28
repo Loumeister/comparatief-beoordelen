@@ -1,6 +1,6 @@
 import { db, Assignment, Text, Judgement } from './db';
 import { isConnected } from './graph';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 export interface DatasetExport {
   assignment: Assignment;
@@ -406,13 +406,38 @@ export async function importResultsFromXLSX(file: File): Promise<{
     
     reader.onload = async (e) => {
       try {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
+        const buffer = e.target?.result as ArrayBuffer;
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
         
         // Lees eerste sheet
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false }) as any[];
+        const worksheet = workbook.worksheets[0];
+        
+        if (!worksheet) {
+          throw new Error('Excel bestand bevat geen sheets');
+        }
+
+        const jsonData: any[] = [];
+        const headers: string[] = [];
+        
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) {
+            // Header row
+            row.eachCell((cell) => {
+              headers.push(String(cell.value || ''));
+            });
+          } else {
+            // Data rows
+            const rowData: any = {};
+            row.eachCell((cell, colNumber) => {
+              const header = headers[colNumber - 1];
+              if (header) {
+                rowData[header] = cell.value;
+              }
+            });
+            jsonData.push(rowData);
+          }
+        });
         
         if (jsonData.length === 0) {
           throw new Error('Excel bestand bevat geen data');
@@ -527,7 +552,7 @@ export async function importResultsFromXLSX(file: File): Promise<{
     };
 
     reader.onerror = () => reject(new Error('Fout bij lezen bestand'));
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   });
 }
 

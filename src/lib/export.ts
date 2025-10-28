@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Score, Text } from './db';
@@ -42,25 +42,44 @@ export function exportToCSV(data: ExportData[], assignmentTitle: string) {
 /**
  * Export results to Excel
  */
-export function exportToXLSX(data: ExportData[], assignmentTitle: string, numComparisons?: number) {
-  const worksheet = XLSX.utils.json_to_sheet(
-    data.map(d => ({
-      'Tekst': d.anonymizedName,
-      'Rang': d.rank,
-      'Label': d.label,
-      'Cijfer': d.grade.toFixed(1),
-      'Theta': d.theta.toFixed(3),
-      'SE': d.standardError.toFixed(3),
-      'Betrouwbaarheid': d.reliability,
-      'Aantal beoordelingen': d.judgementCount,
-      'Opmerkingen': d.comments || ''
-    }))
-  );
+export async function exportToXLSX(data: ExportData[], assignmentTitle: string, numComparisons?: number) {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Resultaten');
 
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Resultaten');
+  worksheet.columns = [
+    { header: 'Tekst', key: 'tekst', width: 20 },
+    { header: 'Rang', key: 'rang', width: 10 },
+    { header: 'Label', key: 'label', width: 15 },
+    { header: 'Cijfer', key: 'cijfer', width: 10 },
+    { header: 'Theta', key: 'theta', width: 10 },
+    { header: 'SE', key: 'se', width: 10 },
+    { header: 'Betrouwbaarheid', key: 'betrouwbaarheid', width: 20 },
+    { header: 'Aantal beoordelingen', key: 'aantalBeoordelingen', width: 20 },
+    { header: 'Opmerkingen', key: 'opmerkingen', width: 30 }
+  ];
 
-  XLSX.writeFile(workbook, `${assignmentTitle}_resultaten.xlsx`);
+  data.forEach(d => {
+    worksheet.addRow({
+      tekst: d.anonymizedName,
+      rang: d.rank,
+      label: d.label,
+      cijfer: d.grade.toFixed(1),
+      theta: d.theta.toFixed(3),
+      se: d.standardError.toFixed(3),
+      betrouwbaarheid: d.reliability,
+      aantalBeoordelingen: d.judgementCount,
+      opmerkingen: d.comments || ''
+    });
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${assignmentTitle}_resultaten.xlsx`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 /**

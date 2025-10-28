@@ -133,14 +133,14 @@ const Results = () => {
     }
   };
 
-  const handleExport = (format: "csv" | "xlsx" | "pdf") => {
+  const handleExport = async (format: "csv" | "xlsx" | "pdf") => {
     if (!assignment) return;
 
     try {
       if (format === "csv") {
         exportToCSV(results, assignment.title);
       } else if (format === "xlsx") {
-        exportToXLSX(results, assignment.title, assignment.numComparisons);
+        await exportToXLSX(results, assignment.title, assignment.numComparisons);
       } else {
         exportToPDF(results, assignment.title);
       }
