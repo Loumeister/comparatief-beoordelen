@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users, Settings, BookOpen } from 'lucide-react';
 import { db, Assignment } from '@/lib/db';
 import { importDataset, importCSV, importResultsFromXLSX, exportDataset } from '@/lib/exportImport';
+import { calculateBradleyTerry } from '@/lib/bradley-terry';
+import { SE_RELIABLE } from '@/lib/reliability-thresholds';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -18,7 +20,7 @@ const Dashboard = () => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [stats, setStats] = useState<Map<number, { texts: number; judgements: number }>>(new Map());
+  const [stats, setStats] = useState<Map<number, { texts: number; judgements: number; reliabilityPct: number }>>(new Map());
   const [importing, setImporting] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -38,7 +40,19 @@ const Dashboard = () => {
     for (const assign of allAssignments) {
       const texts = await db.texts.where('assignmentId').equals(assign.id!).count();
       const judgements = await db.judgements.where('assignmentId').equals(assign.id!).count();
-      statsMap.set(assign.id, { texts, judgements });
+      
+      // Calculate reliability percentage if there are judgements
+      let reliabilityPct = 0;
+      if (judgements > 0 && texts > 0) {
+        const textsData = await db.texts.where('assignmentId').equals(assign.id!).toArray();
+        const judgementsData = await db.judgements.where('assignmentId').equals(assign.id!).toArray();
+        
+        const results = calculateBradleyTerry(textsData, judgementsData);
+        const reliableCount = results.filter(r => r.standardError <= SE_RELIABLE).length;
+        reliabilityPct = Math.round((reliableCount / results.length) * 100);
+      }
+      
+      statsMap.set(assign.id, { texts, judgements, reliabilityPct });
     }
     setStats(statsMap);
   };
@@ -245,11 +259,7 @@ const Dashboard = () => {
             <h2 className="text-2xl font-bold mb-6">Je beoordelingen</h2>
             <div className="grid gap-4">
               {assignments.map((assignment) => {
-                const assignStats = stats.get(assignment.id!) || { texts: 0, judgements: 0 };
-                const totalPossible = (assignStats.texts * (assignStats.texts - 1)) / 2;
-                const progress = totalPossible > 0 
-                  ? Math.min(100, (assignStats.judgements / (assignment.numComparisons * assignStats.texts / 2)) * 100)
-                  : 0;
+                const assignStats = stats.get(assignment.id!) || { texts: 0, judgements: 0, reliabilityPct: 0 };
 
                 return (
                   <Card key={assignment.id} className="hover:shadow-md transition-shadow">
@@ -287,9 +297,11 @@ const Dashboard = () => {
                           <BarChart3 className="w-4 h-4" />
                           <span>{assignStats.judgements} vergelijkingen</span>
                         </div>
-                        <div>
-                          <span>{progress.toFixed(0)}% voltooid</span>
-                        </div>
+                        {assignStats.judgements > 0 && (
+                          <div>
+                            <span>{assignStats.reliabilityPct}% betrouwbaar</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex gap-2">
