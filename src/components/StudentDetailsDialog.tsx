@@ -18,6 +18,7 @@ interface JudgementDetail {
   opponent: string;
   winner: 'student' | 'opponent' | 'tie';
   createdAt: Date;
+  comment?: string;
 }
 
 export function StudentDetailsDialog({
@@ -98,7 +99,8 @@ export function StudentDetailsDialog({
           id: j.id!,
           opponent,
           winner,
-          createdAt: j.createdAt
+          createdAt: j.createdAt,
+          comment: j.comment
         });
       }
 
@@ -169,42 +171,46 @@ export function StudentDetailsDialog({
                     </p>
                   ) : (
                     judgements.map((j) => (
-                      <div
-                        key={j.id}
-                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3 flex-1">
-                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted">
-                            {j.winner === 'student' && <CheckCircle className="w-4 h-4 text-secondary" />}
-                            {j.winner === 'opponent' && <XCircle className="w-4 h-4 text-destructive" />}
-                            {j.winner === 'tie' && <Equal className="w-4 h-4 text-muted-foreground" />}
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-medium">vs {j.opponent}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {j.createdAt.toLocaleDateString('nl-NL', { 
-                                day: 'numeric', 
-                                month: 'short', 
-                                hour: '2-digit', 
-                                minute: '2-digit' 
-                              })}
+                      <div key={j.id} className="space-y-2">
+                        <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center gap-3 flex-1">
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted">
+                              {j.winner === 'student' && <CheckCircle className="w-4 h-4 text-secondary" />}
+                              {j.winner === 'opponent' && <XCircle className="w-4 h-4 text-destructive" />}
+                              {j.winner === 'tie' && <Equal className="w-4 h-4 text-muted-foreground" />}
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-medium">vs {j.opponent}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {j.createdAt.toLocaleDateString('nl-NL', { 
+                                  day: 'numeric', 
+                                  month: 'short', 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </div>
                             </div>
                           </div>
+                          <Badge
+                            variant={j.winner === 'student' ? 'default' : j.winner === 'tie' ? 'secondary' : 'outline'}
+                            className={
+                              j.winner === 'student' 
+                                ? 'bg-secondary text-secondary-foreground' 
+                                : j.winner === 'opponent'
+                                  ? 'border-destructive text-destructive'
+                                  : ''
+                            }
+                          >
+                            {j.winner === 'student' && 'Gewonnen'}
+                            {j.winner === 'opponent' && 'Verloren'}
+                            {j.winner === 'tie' && 'Gelijk'}
+                          </Badge>
                         </div>
-                        <Badge
-                          variant={j.winner === 'student' ? 'default' : j.winner === 'tie' ? 'secondary' : 'outline'}
-                          className={
-                            j.winner === 'student' 
-                              ? 'bg-secondary text-secondary-foreground' 
-                              : j.winner === 'opponent'
-                                ? 'border-destructive text-destructive'
-                                : ''
-                          }
-                        >
-                          {j.winner === 'student' && 'Gewonnen'}
-                          {j.winner === 'opponent' && 'Verloren'}
-                          {j.winner === 'tie' && 'Gelijk'}
-                        </Badge>
+                        {j.comment && (
+                          <div className="ml-11 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+                            {j.comment}
+                          </div>
+                        )}
                       </div>
                     ))
                   )}

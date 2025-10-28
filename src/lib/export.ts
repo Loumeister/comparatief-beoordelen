@@ -12,13 +12,14 @@ export interface ExportData {
   standardError: number;
   reliability: string;
   judgementCount: number;
+  comments?: string;
 }
 
 /**
  * Export results to CSV
  */
 export function exportToCSV(data: ExportData[], assignmentTitle: string) {
-  const headers = ['Tekst', 'Rang', 'Label', 'Cijfer', 'Theta', 'SE', 'Betrouwbaarheid', 'Aantal beoordelingen'];
+  const headers = ['Tekst', 'Rang', 'Label', 'Cijfer', 'Theta', 'SE', 'Betrouwbaarheid', 'Aantal beoordelingen', 'Opmerkingen'];
   const rows = data.map(d => [
     d.anonymizedName,
     d.rank,
@@ -27,7 +28,8 @@ export function exportToCSV(data: ExportData[], assignmentTitle: string) {
     d.theta.toFixed(3),
     d.standardError.toFixed(3),
     d.reliability,
-    d.judgementCount
+    d.judgementCount,
+    d.comments ? `"${d.comments.replace(/"/g, '""')}"` : ''
   ]);
 
   const csv = [headers, ...rows]
@@ -50,7 +52,8 @@ export function exportToXLSX(data: ExportData[], assignmentTitle: string, numCom
       'Theta': d.theta.toFixed(3),
       'SE': d.standardError.toFixed(3),
       'Betrouwbaarheid': d.reliability,
-      'Aantal beoordelingen': d.judgementCount
+      'Aantal beoordelingen': d.judgementCount,
+      'Opmerkingen': d.comments || ''
     }))
   );
 
@@ -76,16 +79,19 @@ export function exportToPDF(data: ExportData[], assignmentTitle: string) {
   // Table
   autoTable(doc, {
     startY: 35,
-    head: [['Tekst', 'Rang', 'Label', 'Cijfer', 'Betrouwbaarheid']],
+    head: [['Tekst', 'Rang', 'Label', 'Cijfer', 'Betrouwbaarheid', 'Opmerkingen']],
     body: data.map(d => [
       d.anonymizedName,
       d.rank.toString(),
       d.label,
       d.grade.toFixed(1),
-      d.reliability
+      d.reliability,
+      d.comments || ''
     ]),
     theme: 'striped',
     headStyles: { fillColor: [37, 99, 235] },
+    styles: { fontSize: 8 },
+    columnStyles: { 5: { cellWidth: 50 } }
   });
 
   doc.save(`${assignmentTitle}_resultaten.pdf`);

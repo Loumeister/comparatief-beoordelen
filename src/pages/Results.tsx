@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle, Link2, Eye, EyeOff, Database } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle, Link2, Eye, EyeOff, Database, MessageSquare } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { db, Assignment } from "@/lib/db";
 import { calculateBradleyTerry } from "@/lib/bradley-terry";
@@ -80,9 +80,21 @@ const Results = () => {
         judgementCounts.set(text.id, count);
       }
 
+      // Verzamel opmerkingen per tekst
+      const commentsMap = new Map<number, string[]>();
+      for (const text of texts) {
+        const textComments = judgements
+          .filter((j) => (j.textAId === text.id || j.textBId === text.id) && j.comment?.trim())
+          .map((j) => j.comment!.trim());
+        if (textComments.length > 0) {
+          commentsMap.set(text.id, textComments);
+        }
+      }
+
       // Map naar exportformaat
       const exportData: ExportData[] = btResults.map((r) => {
         const text = texts.find((t) => t.id === r.textId)!;
+        const comments = commentsMap.get(text.id);
         return {
           anonymizedName: text.anonymizedName,
           rank: r.rank,
@@ -92,6 +104,7 @@ const Results = () => {
           standardError: r.standardError,
           reliability: r.reliability,
           judgementCount: judgementCounts.get(text.id) ?? 0,
+          comments: comments ? comments.join(' | ') : undefined,
         };
       });
 
@@ -362,7 +375,12 @@ const Results = () => {
                 {results.map((r) => (
                   <TableRow key={`${r.rank}-${r.anonymizedName}`} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedStudent(r.anonymizedName)}>
                     <TableCell className="font-bold text-lg">{r.rank}</TableCell>
-                    <TableCell className="font-medium text-primary hover:underline">{r.anonymizedName}</TableCell>
+                    <TableCell className="font-medium text-primary hover:underline">
+                      <div className="flex items-center gap-2">
+                        {r.anonymizedName}
+                        {r.comments && <MessageSquare className="w-4 h-4 text-muted-foreground" />}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge className={getLabelColor(r.label)}>{r.label}</Badge>
                     </TableCell>
