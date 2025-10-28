@@ -222,7 +222,10 @@ const Results = () => {
   let reliabilityStatus: 'insufficient' | 'moderate' | 'reliable';
   let reliabilityIcon: typeof CheckCircle;
 
-  const stopAdvice = (pctReliable >= COHORT_PCT_RELIABLE) || ((medianSE <= COHORT_MEDIAN_OK) && (maxSE <= SE_MAX_EDGE));
+  // Check which criterion is met
+  const cohortCriterionMet = (medianSE <= COHORT_MEDIAN_OK) && (maxSE <= SE_MAX_EDGE);
+  const individualCriterionMet = pctReliable >= COHORT_PCT_RELIABLE;
+  const stopAdvice = individualCriterionMet || cohortCriterionMet;
 
   if (stopAdvice) {
     reliabilityStatus = 'reliable';
@@ -321,32 +324,47 @@ const Results = () => {
                 </p>
               </div>
             </div>
-            {/* Segmented progress bar */}
-            <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary/20">
-              <div className="h-full flex">
-                {pctReliable > 0 && (
+            {/* Progress bar - fully green if cohort criterion met, segmented otherwise */}
+            {cohortCriterionMet && !individualCriterionMet ? (
+              <div>
+                <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary/20">
                   <div 
                     className="h-full bg-secondary transition-all" 
-                    style={{ width: `${pctReliable}%` }}
-                    title={`${Math.round(pctReliable)}% betrouwbaar`}
+                    style={{ width: '100%' }}
+                    title="Cohortcriterium voldaan"
                   />
-                )}
-                {pctModerate > 0 && (
-                  <div 
-                    className="h-full bg-primary transition-all" 
-                    style={{ width: `${pctModerate}%` }}
-                    title={`${Math.round(pctModerate)}% middel`}
-                  />
-                )}
-                {pctInsufficient > 0 && (
-                  <div 
-                    className="h-full bg-destructive transition-all" 
-                    style={{ width: `${pctInsufficient}%` }}
-                    title={`${Math.round(pctInsufficient)}% onvoldoende`}
-                  />
-                )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Mediaan en maximum SE voldoen aan de norm
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary/20">
+                <div className="h-full flex">
+                  {pctReliable > 0 && (
+                    <div 
+                      className="h-full bg-secondary transition-all" 
+                      style={{ width: `${pctReliable}%` }}
+                      title={`${Math.round(pctReliable)}% betrouwbaar`}
+                    />
+                  )}
+                  {pctModerate > 0 && (
+                    <div 
+                      className="h-full bg-primary transition-all" 
+                      style={{ width: `${pctModerate}%` }}
+                      title={`${Math.round(pctModerate)}% middel`}
+                    />
+                  )}
+                  {pctInsufficient > 0 && (
+                    <div 
+                      className="h-full bg-destructive transition-all" 
+                      style={{ width: `${pctInsufficient}%` }}
+                      title={`${Math.round(pctInsufficient)}% onvoldoende`}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
