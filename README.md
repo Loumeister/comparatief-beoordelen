@@ -10,16 +10,16 @@ Een applicatie voor het beoordelen van leerlingteksten via **comparative judgmen
 
 ### Waarom comparative judgment?
 
-- **Betrouwbaarder**: Mensen zijn beter in vergelijken dan in absoluut beoordelen
-- **Consistenter**: Je gebruikt automatisch dezelfde maatstaf voor alle teksten
+- **Betrouwbaarder**: Mensen zijn beter in vergelijken dan in absoluut beoordelen.
+- **Consistenter**: Je gebruikt automatisch dezelfde maatstaf voor alle teksten.
 - **Efficiënter**: Je hoeft niet na te denken over cijfers of rubrics, alleen: "welke is beter?"
 
 ### Hoe werkt het?
 
-1. Je krijgt twee anonieme teksten te zien
-2. Je leest beide teksten
-3. Je klikt op de betere tekst (of kiest "gelijkwaardig" als ze echt even goed zijn)
-4. Het systeem gebruikt een wiskundig model (Bradley-Terry) om uit alle vergelijkingen een rangorde en cijfers te berekenen
+1. Je krijgt twee anonieme teksten te zien.
+2. Je leest beide teksten.
+3. Je klikt op de betere tekst (of kiest "gelijkwaardig" als ze echt even goed zijn).
+4. Het systeem gebruikt een wiskundig model (Bradley-Terry) om uit alle vergelijkingen een rangorde en cijfers te berekenen.
 
 **Vuistregel**: Elk leerlingwerk moet ongeveer 7-10 keer vergeleken worden voor een betrouwbaar resultaat.
 
