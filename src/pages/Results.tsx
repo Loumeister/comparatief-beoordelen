@@ -207,7 +207,15 @@ const Results = () => {
   const n = seList.length;
   const medianSE = n === 0 ? NaN : (n % 2 === 1 ? seList[(n - 1) / 2] : (seList[n / 2 - 1] + seList[n / 2]) / 2);
   const maxSE = n === 0 ? NaN : Math.max(...seList);
-  const pctReliable = n === 0 ? 0 : (results.filter(r => r.standardError <= SE_RELIABLE).length / n) * 100;
+  
+  // Calculate percentages per reliability category
+  const countReliable = n === 0 ? 0 : results.filter(r => r.standardError <= SE_RELIABLE).length;
+  const countModerate = n === 0 ? 0 : results.filter(r => r.standardError > SE_RELIABLE && r.standardError <= 1.00).length;
+  const countInsufficient = n === 0 ? 0 : results.filter(r => r.standardError > 1.00).length;
+  
+  const pctReliable = n === 0 ? 0 : (countReliable / n) * 100;
+  const pctModerate = n === 0 ? 0 : (countModerate / n) * 100;
+  const pctInsufficient = n === 0 ? 0 : (countInsufficient / n) * 100;
 
   // Determine cohort status text + icon class via thresholds
   let reliabilityText: string;
@@ -313,20 +321,31 @@ const Results = () => {
                 </p>
               </div>
             </div>
-            <div className="relative">
-              <Progress value={reliabilityPercentage} className="h-3" />
-              <style>{`
-                [role="progressbar"] > div {
-                  background: ${
-                    reliabilityStatus === "reliable"
-                      ? "hsl(var(--secondary))"
-                      : reliabilityStatus === "moderate"
-                        ? "hsl(var(--primary))"
-                        : "hsl(var(--destructive))"
-                  };
-                  transition: background-color 0.3s ease;
-                }
-              `}</style>
+            {/* Segmented progress bar */}
+            <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary/20">
+              <div className="h-full flex">
+                {pctReliable > 0 && (
+                  <div 
+                    className="h-full bg-secondary transition-all" 
+                    style={{ width: `${pctReliable}%` }}
+                    title={`${Math.round(pctReliable)}% betrouwbaar`}
+                  />
+                )}
+                {pctModerate > 0 && (
+                  <div 
+                    className="h-full bg-primary transition-all" 
+                    style={{ width: `${pctModerate}%` }}
+                    title={`${Math.round(pctModerate)}% middel`}
+                  />
+                )}
+                {pctInsufficient > 0 && (
+                  <div 
+                    className="h-full bg-destructive transition-all" 
+                    style={{ width: `${pctInsufficient}%` }}
+                    title={`${Math.round(pctInsufficient)}% onvoldoende`}
+                  />
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
