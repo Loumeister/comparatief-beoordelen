@@ -391,27 +391,6 @@ const Compare = () => {
             </div>
 
             <div className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">{leftText.anonymizedName} - Opmerking (optioneel)</label>
-                  <Textarea
-                    value={commentLeft}
-                    onChange={(e) => setCommentLeft(e.target.value)}
-                    placeholder="Opmerking voor deze tekst..."
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">{rightText.anonymizedName} - Opmerking (optioneel)</label>
-                  <Textarea
-                    value={commentRight}
-                    onChange={(e) => setCommentRight(e.target.value)}
-                    placeholder="Opmerking voor deze tekst..."
-                    rows={3}
-                  />
-                </div>
-              </div>
-              
               {mode === 'replace' && pairCount > 0 && (
                 <div className="flex items-center space-x-2">
                   <Checkbox 
@@ -444,8 +423,8 @@ const Compare = () => {
         <div className="grid md:grid-cols-2 gap-6">
           {/* Left Text (alfabetisch eerste) */}
           <Card className="shadow-lg">
-            <CardContent className="p-6">
-              <div className="mb-4">
+            <CardContent className="p-6 space-y-4">
+              <div>
                 <span className="inline-block px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
                   {leftText.anonymizedName}
                 </span>
@@ -467,13 +446,23 @@ const Compare = () => {
                   </p>
                 </div>
               )}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Opmerking (optioneel)</label>
+                <Textarea
+                  value={commentLeft}
+                  onChange={(e) => setCommentLeft(e.target.value)}
+                  placeholder="Opmerking voor deze tekst..."
+                  rows={3}
+                  className="mt-2"
+                />
+              </div>
             </CardContent>
           </Card>
 
           {/* Right Text (alfabetisch tweede) */}
           <Card className="shadow-lg">
-            <CardContent className="p-6">
-              <div className="mb-4">
+            <CardContent className="p-6 space-y-4">
+              <div>
                 <span className="inline-block px-3 py-1 bg-secondary/10 text-secondary-foreground rounded-full text-sm font-medium">
                   {rightText.anonymizedName}
                 </span>
@@ -495,6 +484,16 @@ const Compare = () => {
                   </p>
                 </div>
               )}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Opmerking (optioneel)</label>
+                <Textarea
+                  value={commentRight}
+                  onChange={(e) => setCommentRight(e.target.value)}
+                  placeholder="Opmerking voor deze tekst..."
+                  rows={3}
+                  className="mt-2"
+                />
+              </div>
             </CardContent>
           </Card>
         </div>
