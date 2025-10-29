@@ -347,14 +347,7 @@ const Compare = () => {
         {/* Judgement Controls */}
         <Card className="shadow-lg mb-6">
           <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-lg font-medium">Welke tekst is beter?</p>
-              {pairCount > 0 && (
-                <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
-                  Eerder beoordeeld: {pairCount}×
-                </span>
-              )}
-            </div>
+            <p className="text-lg font-medium mb-2">Welke tekst is beter?</p>
             <p className="text-sm text-muted-foreground mb-4">
               Kies de <strong>sterkere</strong> tekst. Bij twijfel: <em>Gelijkwaardig</em> (sneltoets T).
             </p>

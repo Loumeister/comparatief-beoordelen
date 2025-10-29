@@ -4,7 +4,7 @@ export interface Assignment {
   id?: number;
   title: string;
   genre: string;
-  numComparisons: number;
+  numComparisons?: number;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -18,7 +18,6 @@ const Upload = () => {
   const [mode, setMode] = useState<'upload' | 'names'>('upload');
   const [title, setTitle] = useState('');
   const [genre, setGenre] = useState('');
-  const [numComparisons, setNumComparisons] = useState(10);
   const [files, setFiles] = useState<File[]>([]);
   const [namesText, setNamesText] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -80,7 +79,6 @@ const Upload = () => {
       const assignmentId = await db.assignments.add({
         title: title.trim(),
         genre: genre.trim() || 'Algemeen',
-        numComparisons,
         createdAt: new Date(),
         updatedAt: new Date()
       });
@@ -178,34 +176,6 @@ const Upload = () => {
                   onChange={(e) => setGenre(e.target.value)}
                   placeholder="bijv. Betoog, Verslag, Verhaal"
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="comparisons">Aantal vergelijkingen per tekst</Label>
-                <Input
-                  id="comparisons"
-                  type="number"
-                  min={3}
-                  max={20}
-                  value={numComparisons}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (!isNaN(val)) {
-                      setNumComparisons(val);
-                    }
-                  }}
-                  onBlur={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (isNaN(val) || val < 3) {
-                      setNumComparisons(3);
-                    } else if (val > 20) {
-                      setNumComparisons(20);
-                    }
-                  }}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Minimaal 3, aanbevolen: 10 vergelijkingen per tekst
-                </p>
               </div>
             </CardContent>
           </Card>
