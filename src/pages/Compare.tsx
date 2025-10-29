@@ -49,7 +49,8 @@ const Compare = () => {
   const [assignmentMeta, setAssignmentMeta] = useState<AssignmentMeta | null>(null);
   const [pairs, setPairs] = useState<Pair[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [comment, setComment] = useState('');
+  const [commentLeft, setCommentLeft] = useState('');
+  const [commentRight, setCommentRight] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [totalJudgements, setTotalJudgements] = useState(0);
@@ -185,6 +186,13 @@ const Compare = () => {
       const pair = pairs[currentIndex];
       const mode = assignmentMeta.judgementMode || 'accumulate';
 
+      // Bereken leftIsA voor deze pair
+      const sortedAlphabetically = [pair.textA, pair.textB].sort((a, b) => 
+        a.anonymizedName.localeCompare(b.anonymizedName)
+      );
+      const leftText = sortedAlphabetically[0];
+      const leftIsA = leftText.id === pair.textA.id;
+
       try {
         setSaving(true);
         
@@ -205,12 +213,17 @@ const Compare = () => {
           }
         }
 
+        // Map commentLeft en commentRight naar commentA en commentB
+        const commentA = leftIsA ? commentLeft.trim() : commentRight.trim();
+        const commentB = leftIsA ? commentRight.trim() : commentLeft.trim();
+
         await db.judgements.add({
           assignmentId: assignment.id!,
           textAId: pair.textA.id!,
           textBId: pair.textB.id!,
           winner,
-          comment: comment.trim() || undefined,
+          commentA: commentA || undefined,
+          commentB: commentB || undefined,
           createdAt: new Date(),
           raterId,
           source: 'human',
@@ -219,7 +232,8 @@ const Compare = () => {
           pairKey
         });
 
-        setComment('');
+        setCommentLeft('');
+        setCommentRight('');
         setReplaceMode(false);
         setIsFinal(false);
         setTotalJudgements(prev => prev + 1);
@@ -246,7 +260,7 @@ const Compare = () => {
         setSaving(false);
       }
     },
-    [assignment, assignmentMeta, comment, currentIndex, pairs, reloadPairs, saving, toast, raterId, replaceMode, isFinal]
+    [assignment, assignmentMeta, commentLeft, commentRight, currentIndex, pairs, reloadPairs, saving, toast, raterId, replaceMode, isFinal]
   );
 
   // ---------- Keyboard shortcuts (stabiel & up-to-date via handleJudgement dep) ----------
@@ -377,14 +391,25 @@ const Compare = () => {
             </div>
 
             <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Opmerking (optioneel)</label>
-                <Textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Noteer eventuele overwegingen..."
-                  rows={3}
-                />
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">{leftText.anonymizedName} - Opmerking (optioneel)</label>
+                  <Textarea
+                    value={commentLeft}
+                    onChange={(e) => setCommentLeft(e.target.value)}
+                    placeholder="Opmerking voor deze tekst..."
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">{rightText.anonymizedName} - Opmerking (optioneel)</label>
+                  <Textarea
+                    value={commentRight}
+                    onChange={(e) => setCommentRight(e.target.value)}
+                    placeholder="Opmerking voor deze tekst..."
+                    rows={3}
+                  />
+                </div>
               </div>
               
               {mode === 'replace' && pairCount > 0 && (

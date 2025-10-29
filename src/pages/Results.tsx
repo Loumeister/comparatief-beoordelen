@@ -80,12 +80,24 @@ const Results = () => {
         judgementCounts.set(text.id, count);
       }
 
-      // Verzamel opmerkingen per tekst
+      // Verzamel opmerkingen per tekst (inclusief commentA en commentB)
       const commentsMap = new Map<number, string[]>();
       for (const text of texts) {
-        const textComments = judgements
-          .filter((j) => (j.textAId === text.id || j.textBId === text.id) && j.comment?.trim())
-          .map((j) => j.comment!.trim());
+        const textComments: string[] = [];
+        
+        for (const j of judgements) {
+          if (j.textAId === text.id && j.commentA?.trim()) {
+            textComments.push(j.commentA.trim());
+          }
+          if (j.textBId === text.id && j.commentB?.trim()) {
+            textComments.push(j.commentB.trim());
+          }
+          // Backwards compatibility: oude comment veld
+          if ((j.textAId === text.id || j.textBId === text.id) && j.comment?.trim() && !j.commentA && !j.commentB) {
+            textComments.push(j.comment.trim());
+          }
+        }
+        
         if (textComments.length > 0) {
           commentsMap.set(text.id, textComments);
         }

@@ -19,6 +19,8 @@ interface JudgementDetail {
   winner: 'student' | 'opponent' | 'tie';
   createdAt: Date;
   comment?: string;
+  commentStudent?: string;
+  commentOpponent?: string;
 }
 
 export function StudentDetailsDialog({
@@ -95,12 +97,18 @@ export function StudentDetailsDialog({
           losses++;
         }
 
+        // Bepaal welke comment bij welke student hoort
+        const commentStudent = isStudentA ? j.commentA : j.commentB;
+        const commentOpponent = isStudentA ? j.commentB : j.commentA;
+
         details.push({
           id: j.id!,
           opponent,
           winner,
           createdAt: j.createdAt,
-          comment: j.comment
+          comment: j.comment, // Oude algemene comment (backwards compatibility)
+          commentStudent,
+          commentOpponent
         });
       }
 
@@ -206,9 +214,25 @@ export function StudentDetailsDialog({
                             {j.winner === 'tie' && 'Gelijk'}
                           </Badge>
                         </div>
-                        {j.comment && (
-                          <div className="ml-11 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
-                            {j.comment}
+                        {(j.commentStudent || j.commentOpponent || j.comment) && (
+                          <div className="ml-11 space-y-2">
+                            {j.commentStudent && (
+                              <div className="p-3 bg-secondary/10 rounded-lg text-sm">
+                                <div className="font-medium text-xs text-muted-foreground mb-1">{studentName}:</div>
+                                <div className="text-foreground">{j.commentStudent}</div>
+                              </div>
+                            )}
+                            {j.commentOpponent && (
+                              <div className="p-3 bg-muted/50 rounded-lg text-sm">
+                                <div className="font-medium text-xs text-muted-foreground mb-1">{j.opponent}:</div>
+                                <div className="text-muted-foreground">{j.commentOpponent}</div>
+                              </div>
+                            )}
+                            {j.comment && !j.commentStudent && !j.commentOpponent && (
+                              <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+                                {j.comment}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

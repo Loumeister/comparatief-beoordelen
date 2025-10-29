@@ -24,7 +24,9 @@ export interface Judgement {
   textAId: number;
   textBId: number;
   winner: 'A' | 'B' | 'EQUAL';
-  comment?: string;
+  comment?: string; // Oude algemene opmerking (backwards compatibility)
+  commentA?: string; // Opmerking specifiek voor tekst A
+  commentB?: string; // Opmerking specifiek voor tekst B
   createdAt: Date;
   raterId?: string;
   sessionId?: string;
@@ -118,6 +120,16 @@ export class AssessmentDB extends Dexie {
         if (meta.gradeMin === undefined) meta.gradeMin = 1;
         if (meta.gradeMax === undefined) meta.gradeMax = 10;
       });
+    });
+
+    // Version 6: add commentA and commentB fields
+    this.version(6).stores({
+      assignments: '++id, title, createdAt',
+      texts: '++id, assignmentId, anonymizedName',
+      judgements: '++id, assignmentId, pairKey, textAId, textBId, raterId, supersedesJudgementId, createdAt',
+      scores: '++id, assignmentId, textId, rank',
+      previousFits: '++id, assignmentId, calculatedAt',
+      assignmentMeta: 'assignmentId'
     });
   }
 }
