@@ -417,6 +417,29 @@ const Compare = () => {
                   </Label>
                 </div>
               )}
+
+              <div className="grid md:grid-cols-2 gap-4 pt-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Opmerking {leftText.anonymizedName} (optioneel)</label>
+                  <Textarea
+                    value={commentLeft}
+                    onChange={(e) => setCommentLeft(e.target.value)}
+                    placeholder="Opmerking voor deze tekst..."
+                    rows={3}
+                    className="mt-2"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Opmerking {rightText.anonymizedName} (optioneel)</label>
+                  <Textarea
+                    value={commentRight}
+                    onChange={(e) => setCommentRight(e.target.value)}
+                    placeholder="Opmerking voor deze tekst..."
+                    rows={3}
+                    className="mt-2"
+                  />
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -447,16 +470,6 @@ const Compare = () => {
                   </p>
                 </div>
               )}
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Opmerking (optioneel)</label>
-                <Textarea
-                  value={commentLeft}
-                  onChange={(e) => setCommentLeft(e.target.value)}
-                  placeholder="Opmerking voor deze tekst..."
-                  rows={3}
-                  className="mt-2"
-                />
-              </div>
             </CardContent>
           </Card>
 
@@ -485,16 +498,6 @@ const Compare = () => {
                   </p>
                 </div>
               )}
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Opmerking (optioneel)</label>
-                <Textarea
-                  value={commentRight}
-                  onChange={(e) => setCommentRight(e.target.value)}
-                  placeholder="Opmerking voor deze tekst..."
-                  rows={3}
-                  className="mt-2"
-                />
-              </div>
             </CardContent>
           </Card>
         </div>
