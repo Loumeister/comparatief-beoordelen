@@ -246,6 +246,14 @@ const Compare = () => {
           return updated;
         });
 
+        // Update pairCounts direct
+        setPairCounts(prev => {
+          const updated = new Map(prev);
+          const k = key(pair.textA.id!, pair.textB.id!);
+          updated.set(k, (updated.get(k) ?? 0) + 1);
+          return updated;
+        });
+
         // Volgend paar binnen huidige batch…
         if (currentIndex < pairs.length - 1) {
           setCurrentIndex((i) => i + 1);
