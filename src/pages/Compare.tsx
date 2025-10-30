@@ -1,5 +1,5 @@
 // src/pages/Compare.tsx
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,24 +20,23 @@ function key(a: number, b: number): string {
   return `${Math.min(a, b)}-${Math.max(a, b)}`;
 }
 
-// Helper: bereken BT-scores tussendoor voor slimmere pairing
+// Helper: tussentijds BT voor adaptieve pairing (op basis van EFFECTIVE judgements)
 async function buildBTMaps(assignmentId: number) {
   const texts = await db.texts.where('assignmentId').equals(assignmentId).toArray();
   const all = await db.judgements.where('assignmentId').equals(assignmentId).toArray();
   const judgements = getEffectiveJudgements(all);
-  // Hogere ridge (0.3) om extreme θ-uitschieters te temmen
-  const bt = calculateBradleyTerry(texts, judgements, 0.3);
+  const bt = calculateBradleyTerry(texts, judgements, 0.3); // iets meer ridge
   const theta = new Map(bt.rows.map(r => [r.textId, r.theta]));
   const se = new Map(bt.rows.map(r => [r.textId, r.standardError]));
   
-  // Bouw judgedPairsCounts
+  // judgedPairsCounts
   const judgedPairsCounts = new Map<string, number>();
   for (const j of judgements) {
     const k = key(j.textAId, j.textBId);
     judgedPairsCounts.set(k, (judgedPairsCounts.get(k) ?? 0) + 1);
   }
   
-  // Bereken exposures
+  // exposures per tekst
   const exposures = new Array(texts.length).fill(0);
   const id2idx = new Map<number, number>(texts.map((t,i)=>[t.id!, i]));
   for (const j of judgements) {
@@ -95,14 +94,10 @@ const Compare = () => {
       }
       setAssignment(assign);
       
-      // Haal of maak assignmentMeta
+      // AssignmentMeta
       let meta = await db.assignmentMeta.get(id);
       if (!meta) {
-        meta = {
-          assignmentId: id,
-          judgementMode: 'accumulate',
-          seRepeatThreshold: 0.8
-        };
+        meta = { assignmentId: id, judgementMode: 'accumulate', seRepeatThreshold: 0.8 };
         await db.assignmentMeta.put(meta);
       }
       setAssignmentMeta(meta);
@@ -110,7 +105,7 @@ const Compare = () => {
       const { texts, judgements, theta, se, judgedPairsCounts, exposures } = await buildBTMaps(id);
       setPairCounts(judgedPairsCounts);
       
-      // Tel hoe vaak elke tekst is beoordeeld
+      // teller per tekst
       const textCountsMap = new Map<number, number>();
       for (const j of judgements) {
         textCountsMap.set(j.textAId, (textCountsMap.get(j.textAId) ?? 0) + 1);
@@ -128,22 +123,21 @@ const Compare = () => {
         return;
       }
       
-      // Bereken verwacht totaal aantal vergelijkingen voor progress
+      // progress: verwacht totaal
       const targetPerText = assign.numComparisons || DEFAULT_COMPARISONS_PER_TEXT;
-      const expectedTotal = texts.length * targetPerText;
+      const expected = texts.length * targetPerText;
       setTotalJudgements(judgements.length);
-      setExpectedTotal(expectedTotal);
+      setExpectedTotal(expected);
 
       const batch = calculateDynamicBatchSize(texts, se, exposures);
       const newPairs = generatePairs(texts, judgements, {
-        targetComparisonsPerText: assign.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
+        targetComparisonsPerText: targetPerText,
         batchSize: batch,
         bt: { theta, se },
         judgedPairsCounts
       });
 
       if (newPairs.length === 0) {
-        // Alle benodigde vergelijkingen zijn gedaan
         navigate(`/results/${id}`);
         return;
       }
@@ -166,7 +160,6 @@ const Compare = () => {
     const { texts, judgements, theta, se, judgedPairsCounts, exposures } = await buildBTMaps(id);
     setPairCounts(judgedPairsCounts);
     
-    // Tel hoe vaak elke tekst is beoordeeld
     const textCountsMap = new Map<number, number>();
     for (const j of judgements) {
       textCountsMap.set(j.textAId, (textCountsMap.get(j.textAId) ?? 0) + 1);
@@ -193,61 +186,68 @@ const Compare = () => {
     setIsFinal(false);
   }, [assignment, assignmentMeta, navigate]);
 
-  // Init load
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  // ---------- Oordeel opslaan (useCallback i.v.m. keyboard effect) ----------
+  // Huidige paar + alfabetische linker/rechter mapping (voor UI én shortcuts)
+  const currentPair = pairs[currentIndex];
+  const { leftText, rightText, leftIsA } = useMemo(() => {
+    if (!currentPair) return { leftText: undefined as unknown as Text, rightText: undefined as unknown as Text, leftIsA: true };
+    const sorted = [currentPair.textA, currentPair.textB].sort((a, b) =>
+      a.anonymizedName.localeCompare(b.anonymizedName)
+    );
+    const left = sorted[0];
+    const right = sorted[1];
+    return { leftText: left, rightText: right, leftIsA: left.id === currentPair.textA.id };
+  }, [currentPair]);
+
+  // ---------- Oordeel opslaan ----------
   const handleJudgement = useCallback(
     async (winner: 'A' | 'B' | 'EQUAL') => {
-      if (!pairs[currentIndex] || !assignment || !assignmentMeta || saving) return;
+      if (!currentPair || !assignment || !assignmentMeta || saving) return;
 
-      const pair = pairs[currentIndex];
-      const mode = assignmentMeta.judgementMode || 'accumulate';
-
-      // Bereken leftIsA voor deze pair
-      const sortedAlphabetically = [pair.textA, pair.textB].sort((a, b) => 
+      // recompute leftIsA lokaal (robust bij snelle state updates)
+      const sorted = [currentPair.textA, currentPair.textB].sort((a, b) =>
         a.anonymizedName.localeCompare(b.anonymizedName)
       );
-      const leftText = sortedAlphabetically[0];
-      const leftIsA = leftText.id === pair.textA.id;
+      const left = sorted[0];
+      const _leftIsA = left.id === currentPair.textA.id;
 
       try {
         setSaving(true);
         
         let supersedesId: number | undefined;
-        const pairKey = [pair.textA.id!, pair.textB.id!].sort((a, b) => a - b).join('-');
-        
-        // Replace mode: zoek eventuele eerdere beoordeling van dit paar door deze rater
+        const pairKey = [currentPair.textA.id!, currentPair.textB.id!].sort((a, b) => a - b).join('-');
+        const mode = assignmentMeta.judgementMode || 'accumulate';
+
         if (mode === 'replace' && replaceMode) {
           const existingJudgements = await db.judgements
             .where('pairKey').equals(pairKey)
             .filter(j => j.raterId === raterId && j.assignmentId === assignment.id!)
             .toArray();
-          
           if (existingJudgements.length > 0) {
-            // Pak de meest recente
             existingJudgements.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
             supersedesId = existingJudgements[0].id;
           }
         }
 
-        // Map commentLeft en commentRight naar commentA en commentB
-        const commentA = leftIsA ? commentLeft.trim() : commentRight.trim();
-        const commentB = leftIsA ? commentRight.trim() : commentLeft.trim();
+        // Combineer twee commentvelden tot één DB-veld `comment` (schema-compatibel)
+        const cLeft = commentLeft.trim();
+        const cRight = commentRight.trim();
+        const parts: string[] = [];
+        if (cLeft)  parts.push(`L:${cLeft}`);
+        if (cRight) parts.push(`R:${cRight}`);
+        const combinedComment = parts.length ? parts.join(' | ') : undefined;
 
         await db.judgements.add({
           assignmentId: assignment.id!,
-          textAId: pair.textA.id!,
-          textBId: pair.textB.id!,
+          textAId: currentPair.textA.id!,
+          textBId: currentPair.textB.id!,
           winner,
-          commentA: commentA || undefined,
-          commentB: commentB || undefined,
+          comment: combinedComment,
           createdAt: new Date(),
           raterId,
           source: 'human',
-          isFinal: mode === 'moderate' ? isFinal : false,
+          isFinal: (mode === 'moderate') ? isFinal : false,
           supersedesJudgementId: supersedesId,
           pairKey
         });
@@ -257,28 +257,25 @@ const Compare = () => {
         setReplaceMode(false);
         setIsFinal(false);
         setTotalJudgements(prev => prev + 1);
-        
-        // Update textCounts direct
+
+        // Update counters in UI
         setTextCounts(prev => {
-          const updated = new Map(prev);
-          updated.set(pair.textA.id!, (updated.get(pair.textA.id!) ?? 0) + 1);
-          updated.set(pair.textB.id!, (updated.get(pair.textB.id!) ?? 0) + 1);
-          return updated;
+          const m = new Map(prev);
+          m.set(currentPair.textA.id!, (m.get(currentPair.textA.id!) ?? 0) + 1);
+          m.set(currentPair.textB.id!, (m.get(currentPair.textB.id!) ?? 0) + 1);
+          return m;
         });
-
-        // Update pairCounts direct
         setPairCounts(prev => {
-          const updated = new Map(prev);
-          const k = key(pair.textA.id!, pair.textB.id!);
-          updated.set(k, (updated.get(k) ?? 0) + 1);
-          return updated;
+          const m = new Map(prev);
+          const k = key(currentPair.textA.id!, currentPair.textB.id!);
+          m.set(k, (m.get(k) ?? 0) + 1);
+          return m;
         });
 
-        // Volgend paar binnen huidige batch…
+        // Volgende binnen batch of nieuwe batch
         if (currentIndex < pairs.length - 1) {
-          setCurrentIndex((i) => i + 1);
+          setCurrentIndex(i => i + 1);
         } else {
-          // Batch op; laad adaptief een nieuwe batch
           await reloadPairs();
         }
       } catch (error) {
@@ -288,27 +285,28 @@ const Compare = () => {
         setSaving(false);
       }
     },
-    [assignment, assignmentMeta, commentLeft, commentRight, currentIndex, pairs, reloadPairs, saving, toast, raterId, replaceMode, isFinal]
+    [assignment, assignmentMeta, commentLeft, commentRight, currentIndex, currentPair, pairs, reloadPairs, saving, toast, raterId, replaceMode, isFinal]
   );
 
-  // ---------- Keyboard shortcuts (stabiel & up-to-date via handleJudgement dep) ----------
+  // ---------- Keyboard shortcuts: A = LINKS, B = RECHTS ----------
   useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
 
       if (e.key === 'a' || e.key === 'A') {
-        void handleJudgement('A');
+        // kies LINKS → map naar A/B afhankelijk van leftIsA
+        void handleJudgement(leftIsA ? 'A' : 'B');
       } else if (e.key === 'b' || e.key === 'B') {
-        void handleJudgement('B');
+        // kies RECHTS → tegengestelde
+        void handleJudgement(leftIsA ? 'B' : 'A');
       } else if (e.key === 't' || e.key === 'T') {
         void handleJudgement('EQUAL');
       }
     };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [handleJudgement]);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleJudgement, leftIsA]);
 
   if (loading) {
     return (
@@ -318,24 +316,13 @@ const Compare = () => {
     );
   }
 
-  if (pairs.length === 0) {
-    return null;
-  }
+  if (!currentPair) return null;
 
-  const currentPair = pairs[currentIndex];
-  const pairKey = key(currentPair.textA.id!, currentPair.textB.id!);
-  const pairCount = pairCounts.get(pairKey) ?? 0;
+  const pairKeyNow = key(currentPair.textA.id!, currentPair.textB.id!);
+  const pairCount = pairCounts.get(pairKeyNow) ?? 0;
   const mode = assignmentMeta?.judgementMode || 'accumulate';
-  
-  // Sorteer alfabetisch: links = eerder in alfabet
-  const sortedAlphabetically = [currentPair.textA, currentPair.textB].sort((a, b) => 
-    a.anonymizedName.localeCompare(b.anonymizedName)
-  );
-  const leftText = sortedAlphabetically[0];
-  const rightText = sortedAlphabetically[1];
-  const leftIsA = leftText.id === currentPair.textA.id;
-  
-  // Progress gebaseerd op totaal aantal gemaakte oordelen vs verwacht totaal
+
+  // UI progress
   const progress = expectedTotal > 0 ? Math.min((totalJudgements / expectedTotal) * 100, 100) : 0;
 
   return (
@@ -381,7 +368,7 @@ const Compare = () => {
               >
                 <div>
                   <div className="font-bold">{leftText.anonymizedName}</div>
-                  <div className="text-xs opacity-80">Sneltoets: A</div>
+                  <div className="text-xs opacity-80">Sneltoets: A (links)</div>
                 </div>
               </Button>
 
@@ -406,7 +393,7 @@ const Compare = () => {
               >
                 <div>
                   <div className="font-bold">{rightText.anonymizedName}</div>
-                  <div className="text-xs opacity-80">Sneltoets: B</div>
+                  <div className="text-xs opacity-80">Sneltoets: B (rechts)</div>
                 </div>
               </Button>
             </div>
@@ -465,7 +452,7 @@ const Compare = () => {
         </Card>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Left Text (alfabetisch eerste) */}
+          {/* Left Text */}
           <Card className="shadow-lg">
             <CardContent className="p-6 space-y-4">
               <div>
@@ -493,7 +480,7 @@ const Compare = () => {
             </CardContent>
           </Card>
 
-          {/* Right Text (alfabetisch tweede) */}
+          {/* Right Text */}
           <Card className="shadow-lg">
             <CardContent className="p-6 space-y-4">
               <div>

@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle, Link2, Eye, EyeOff, Database, MessageSquare } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
 import { db, Assignment } from "@/lib/db";
 import { calculateBradleyTerry } from "@/lib/bradley-terry";
 import { getEffectiveJudgements } from "@/lib/effective-judgements";
@@ -29,6 +28,11 @@ const Results = () => {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+
+  // Cohort-metrics rechtstreeks uit BT-fit
+  const [pctReliable, setPctReliable] = useState(0);
+  const [medianSE, setMedianSE] = useState<number>(NaN);
+  const [maxSE, setMaxSE] = useState<number>(NaN);
 
   useEffect(() => {
     loadResults();
@@ -72,42 +76,43 @@ const Results = () => {
 
       // BT-fit (ook bij niet-verbonden graaf)
       const bt = calculateBradleyTerry(texts, judgements, 0.1, 0.1, grading);
-      const btResults = bt.rows;
+      const btRows = bt.rows;
 
-      // Bereken aantal beoordelingen per tekst
+      // ---- Eén pass over judgements voor counts + comments (effectieve set) ----
       const judgementCounts = new Map<number, number>();
-      for (const text of texts) {
-        const count = judgements.filter(
-          (j) => j.textAId === text.id || j.textBId === text.id
-        ).length;
-        judgementCounts.set(text.id, count);
-      }
-
-      // Verzamel opmerkingen per tekst (inclusief commentA en commentB)
       const commentsMap = new Map<number, string[]>();
-      for (const text of texts) {
-        const textComments: string[] = [];
-        
-        for (const j of judgements) {
-          if (j.textAId === text.id && j.commentA?.trim()) {
-            textComments.push(j.commentA.trim());
-          }
-          if (j.textBId === text.id && j.commentB?.trim()) {
-            textComments.push(j.commentB.trim());
-          }
-          // Backwards compatibility: oude comment veld
-          if ((j.textAId === text.id || j.textBId === text.id) && j.comment?.trim() && !j.commentA && !j.commentB) {
-            textComments.push(j.comment.trim());
-          }
+
+      for (const j of judgements) {
+        // count
+        judgementCounts.set(j.textAId, (judgementCounts.get(j.textAId) ?? 0) + 1);
+        judgementCounts.set(j.textBId, (judgementCounts.get(j.textBId) ?? 0) + 1);
+
+        // comments (nieuwe velden)
+        if (j.commentA && j.commentA.trim()) {
+          const arr = commentsMap.get(j.textAId) ?? [];
+          arr.push(j.commentA.trim());
+          commentsMap.set(j.textAId, arr);
         }
-        
-        if (textComments.length > 0) {
-          commentsMap.set(text.id, textComments);
+        if (j.commentB && j.commentB.trim()) {
+          const arr = commentsMap.get(j.textBId) ?? [];
+          arr.push(j.commentB.trim());
+          commentsMap.set(j.textBId, arr);
+        }
+
+        // backwards compatibility: enkelvoudig comment-veld
+        if (j.comment && j.comment.trim()) {
+          const c = j.comment.trim();
+          const arrA = commentsMap.get(j.textAId) ?? [];
+          const arrB = commentsMap.get(j.textBId) ?? [];
+          arrA.push(c);
+          arrB.push(c);
+          commentsMap.set(j.textAId, arrA);
+          commentsMap.set(j.textBId, arrB);
         }
       }
 
       // Map naar exportformaat
-      const exportData: ExportData[] = btResults.map((r) => {
+      const exportData: ExportData[] = btRows.map((r) => {
         const text = texts.find((t) => t.id === r.textId)!;
         const comments = commentsMap.get(text.id);
         return {
@@ -119,15 +124,20 @@ const Results = () => {
           standardError: r.standardError,
           reliability: r.reliability,
           judgementCount: judgementCounts.get(text.id) ?? 0,
-          comments: comments ? comments.join(' | ') : undefined,
+          comments: comments ? comments.join(" | ") : undefined,
         };
       });
 
       setResults(exportData);
 
+      // Cohort-metrics uit BT-fit
+      setPctReliable(bt.cohort.pctReliable);
+      setMedianSE(bt.cohort.medianSE);
+      setMaxSE(bt.cohort.maxSE);
+
       // Scores opslaan
       await db.scores.where("assignmentId").equals(id).delete();
-      for (const r of btResults) {
+      for (const r of btRows) {
         await db.scores.add({
           assignmentId: id,
           textId: r.textId,
@@ -216,31 +226,23 @@ const Results = () => {
     );
   }
 
+  // Segmentering voor de voortgangsbalk (categorieën op basis van SE)
+  const n = results.length;
+  const countReliable = results.filter(r => r.standardError <= SE_RELIABLE).length;
+  const countModerate = results.filter(r => r.standardError > SE_RELIABLE && r.standardError <= 1.00).length;
+  const countInsufficient = n - countReliable - countModerate;
 
-  // Calculate overall reliability (cohort-based) - gebruik BT cohort metrics indien beschikbaar
-  const seList = results.map(r => r.standardError).sort((a, b) => a - b);
-  const n = seList.length;
-  const medianSE = n === 0 ? NaN : (n % 2 === 1 ? seList[(n - 1) / 2] : (seList[n / 2 - 1] + seList[n / 2]) / 2);
-  const maxSE = n === 0 ? NaN : Math.max(...seList);
-  
-  // Calculate percentages per reliability category
-  const countReliable = n === 0 ? 0 : results.filter(r => r.standardError <= SE_RELIABLE).length;
-  const countModerate = n === 0 ? 0 : results.filter(r => r.standardError > SE_RELIABLE && r.standardError <= 1.00).length;
-  const countInsufficient = n === 0 ? 0 : results.filter(r => r.standardError > 1.00).length;
-  
-  const pctReliable = n === 0 ? 0 : (countReliable / n) * 100;
-  const pctModerate = n === 0 ? 0 : (countModerate / n) * 100;
-  const pctInsufficient = n === 0 ? 0 : (countInsufficient / n) * 100;
+  const pctModerate = n ? (countModerate / n) * 100 : 0;
+  const pctInsufficient = n ? (countInsufficient / n) * 100 : 0;
 
-  // Determine cohort status text + icon class via thresholds
-  let reliabilityText: string;
-  let reliabilityStatus: 'insufficient' | 'moderate' | 'reliable';
-  let reliabilityIcon: typeof CheckCircle;
-
-  // Check which criterion is met
+  // Stopadvies volgens jouw regels
   const cohortCriterionMet = (medianSE <= STOP_MEDIAN_OK) && (maxSE <= SE_MAX_CAP);
   const individualCriterionMet = pctReliable >= STOP_PCT_RELIABLE;
   const stopAdvice = individualCriterionMet || cohortCriterionMet;
+
+  let reliabilityText: string;
+  let reliabilityStatus: 'insufficient' | 'moderate' | 'reliable';
+  let reliabilityIcon: typeof CheckCircle;
 
   if (stopAdvice) {
     reliabilityStatus = 'reliable';
@@ -257,7 +259,6 @@ const Results = () => {
   }
 
   const ReliabilityIcon = reliabilityIcon;
-  const reliabilityPercentage = pctReliable; // hergebruik voor de progressbar (toont %≤0.75)
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -335,17 +336,18 @@ const Results = () => {
               <div className="flex-1">
                 <h3 className="font-semibold text-lg">{reliabilityText}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {Math.round(reliabilityPercentage)}% ≤ {SE_RELIABLE} • mediaan(SE) = {Number.isFinite(medianSE) ? medianSE.toFixed(2) : '—'} • max(SE) = {Number.isFinite(maxSE) ? maxSE.toFixed(2) : '—'}
+                  {Math.round(pctReliable)}% ≤ {SE_RELIABLE} • mediaan(SE) = {Number.isFinite(medianSE) ? medianSE.toFixed(2) : "—"} • max(SE) = {Number.isFinite(maxSE) ? maxSE.toFixed(2) : "—"}
                 </p>
               </div>
             </div>
-            {/* Progress bar - fully green if cohort criterion met, segmented otherwise */}
+
+            {/* Progress bar */}
             {cohortCriterionMet && !individualCriterionMet ? (
               <div>
                 <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary/20">
-                  <div 
-                    className="h-full bg-secondary transition-all" 
-                    style={{ width: '100%' }}
+                  <div
+                    className="h-full bg-secondary transition-all"
+                    style={{ width: "100%" }}
                     title="Cohortcriterium voldaan"
                   />
                 </div>
@@ -357,22 +359,22 @@ const Results = () => {
               <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary/20">
                 <div className="h-full flex">
                   {pctReliable > 0 && (
-                    <div 
-                      className="h-full bg-secondary transition-all" 
+                    <div
+                      className="h-full bg-secondary transition-all"
                       style={{ width: `${pctReliable}%` }}
                       title={`${Math.round(pctReliable)}% betrouwbaar`}
                     />
                   )}
                   {pctModerate > 0 && (
-                    <div 
-                      className="h-full bg-primary transition-all" 
+                    <div
+                      className="h-full bg-primary transition-all"
                       style={{ width: `${pctModerate}%` }}
                       title={`${Math.round(pctModerate)}% middel`}
                     />
                   )}
                   {pctInsufficient > 0 && (
-                    <div 
-                      className="h-full bg-destructive transition-all" 
+                    <div
+                      className="h-full bg-destructive transition-all"
                       style={{ width: `${pctInsufficient}%` }}
                       title={`${Math.round(pctInsufficient)}% onvoldoende`}
                     />
@@ -425,7 +427,11 @@ const Results = () => {
               </TableHeader>
               <TableBody>
                 {results.map((r) => (
-                  <TableRow key={`${r.rank}-${r.anonymizedName}`} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedStudent(r.anonymizedName)}>
+                  <TableRow
+                    key={`${r.rank}-${r.anonymizedName}`}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => setSelectedStudent(r.anonymizedName)}
+                  >
                     <TableCell className="font-bold text-lg">{r.rank}</TableCell>
                     <TableCell className="font-medium text-primary hover:underline">
                       <div className="flex items-center gap-2">
@@ -464,7 +470,7 @@ const Results = () => {
 
       {/* Student Details Dialog */}
       <StudentDetailsDialog
-        studentName={selectedStudent || ''}
+        studentName={selectedStudent || ""}
         assignmentId={assignment?.id || 0}
         open={!!selectedStudent}
         onOpenChange={(open) => !open && setSelectedStudent(null)}

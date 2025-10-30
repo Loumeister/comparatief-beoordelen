@@ -1,3 +1,4 @@
+// src/lib/bradley-terry.ts
 import { Judgement, Text } from "./db";
 import { SE_RELIABLE, SE_REPEAT } from "./constants";
 
@@ -20,11 +21,90 @@ export interface BTResults {
   };
 }
 
+/* -------------------- EFFECTIVE JUDGEMENTS FILTER -------------------- */
+
+function safePairKey(j: Judgement): string {
+  const a = Math.min(j.textAId, j.textBId);
+  const b = Math.max(j.textAId, j.textBId);
+  return j.pairKey ?? `${a}-${b}`;
+}
+
+function toTime(d: any): number {
+  return d instanceof Date ? d.getTime() : new Date(d).getTime();
+}
+
+/**
+ * Neem per pairKey alleen de "effectieve" oordelen:
+ * - Als er final moderations zijn: pak de laatste final (op createdAt, tiebreak id).
+ * - Anders: per raterId de nieuwste (idem tiebreak).
+ * - Verwijder oordelen die door supersedesJudgementId zijn overschreven.
+ */
+function getEffectiveJudgements(all: Judgement[]): Judgement[] {
+  const input = all.filter(
+    j =>
+      typeof j.textAId === "number" &&
+      typeof j.textBId === "number" &&
+      j.textAId !== j.textBId
+  );
+
+  const byPair = new Map<string, Judgement[]>();
+  for (const j of input) {
+    const pk = safePairKey(j);
+    (byPair.get(pk) ?? byPair.set(pk, []).get(pk)!).push(j);
+  }
+
+  const effective: Judgement[] = [];
+
+  for (const list of byPair.values()) {
+    // verwijder gesupersedede oordelen
+    const superseded = new Set<number>();
+    for (const j of list) {
+      if (typeof j.supersedesJudgementId === "number") {
+        superseded.add(j.supersedesJudgementId);
+      }
+    }
+    const unsup = list.filter(j => !superseded.has(j.id as number));
+
+    // final moderation domineert
+    const finals = unsup.filter(j => j.isFinal === true);
+    if (finals.length > 0) {
+      finals.sort((a, b) => {
+        const dt = toTime(b.createdAt) - toTime(a.createdAt);
+        if (dt !== 0) return dt;
+        return (b.id ?? 0) - (a.id ?? 0);
+      });
+      effective.push(finals[0]);
+      continue;
+    }
+
+    // anders: per rater nieuwste oordeel
+    const byRater = new Map<string, Judgement>();
+    for (const j of unsup) {
+      const r = j.raterId ?? "unknown";
+      const prev = byRater.get(r);
+      if (!prev) {
+        byRater.set(r, j);
+        continue;
+      }
+      const dt = toTime(j.createdAt) - toTime(prev.createdAt);
+      if (dt > 0 || (dt === 0 && (j.id ?? 0) > (prev.id ?? 0))) {
+        byRater.set(r, j);
+      }
+    }
+    effective.push(...byRater.values());
+  }
+
+  return effective;
+}
+
+/* -------------------- BRADLEY–TERRY CORE -------------------- */
+
 /**
  * Bradley–Terry met ridge-regularisatie (diag-Hessian benadering)
  * - Precompute n_ij (aantal vergelijkingen) en w_ij (wins van i tegen j; ties = 0.5)
  * - Newton-Raphson/IRLS met per-iteratie centering Σθ=0
  * - SE uit regularized Hessian-diagonaal
+ * - Gebruikt uitsluitend "effectieve" oordelen (geen gesupersedede, final > newest-per-rater)
  */
 export function calculateBradleyTerry(
   texts: Text[],
@@ -37,8 +117,17 @@ export function calculateBradleyTerry(
   const scale = grading.scale ?? 1.2;
   const gmin = grading.min ?? 1;
   const gmax = grading.max ?? 10;
+
   const n = texts.length;
-  if (n === 0) return { rows: [], cohort: { medianSE: Infinity, maxSE: Infinity, pctReliable: 0 } };
+  if (n === 0) {
+    return {
+      rows: [],
+      cohort: { medianSE: Infinity, maxSE: Infinity, pctReliable: 0 },
+    };
+  }
+
+  // Filter naar effectieve oordelen
+  const eff = getEffectiveJudgements(judgements);
 
   // index mapping
   const idxOf = new Map<number, number>(texts.map((t, i) => [t.id!, i]));
@@ -46,12 +135,13 @@ export function calculateBradleyTerry(
   // Precompute n_ij en w_ij
   const n_ij: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
   const w_ij: number[][] = Array.from({ length: n }, () => Array(n).fill(0)); // wins voor i tegen j
-
   const exposure = new Array(n).fill(0);
-  judgements.forEach((j) => {
+
+  for (const j of eff) {
     const ia = idxOf.get(j.textAId);
     const ib = idxOf.get(j.textBId);
-    if (ia == null || ib == null || ia === ib) return;
+    if (ia == null || ib == null || ia === ib) continue;
+
     n_ij[ia][ib] += 1;
     n_ij[ib][ia] += 1;
     exposure[ia] += 1;
@@ -65,7 +155,7 @@ export function calculateBradleyTerry(
       w_ij[ia][ib] += 0.5;
       w_ij[ib][ia] += 0.5;
     }
-  });
+  }
 
   // Init theta
   const theta = new Array(n).fill(0);
@@ -131,7 +221,7 @@ export function calculateBradleyTerry(
 
   // Normaliseer (μ=0), bereken σ voor z-score
   const mu = theta.reduce((a, b) => a + b, 0) / n;
-  const centered = theta.map((t) => t - mu);
+  const centered = theta.map(t => t - mu);
   const variance = centered.reduce((s, t) => s + t * t, 0) / Math.max(n, 1);
   const sigma = Math.sqrt(Math.max(variance, 1e-12));
 
@@ -143,7 +233,7 @@ export function calculateBradleyTerry(
   }));
   out.sort((a, b) => b.theta - a.theta);
 
-  // Helper functies binnen calculateBradleyTerry scope
+  // Helpers
   function labelFromRank(zeroBasedRank: number, total: number, topPct: number): string {
     const pct = (zeroBasedRank + 1) / total;
     if (pct <= topPct) return "Topgroep";
@@ -168,11 +258,13 @@ export function calculateBradleyTerry(
     reliability: reliabilityFromSE(r.standardError),
   }));
 
-  // Bereken cohort metrics
-  const seList = out.map(o => o.standardError).filter(Number.isFinite).sort((a,b)=>a-b);
-  const medianSE = seList.length ? seList[Math.floor(seList.length/2)] : Infinity;
+  // Cohort-metrics
+  const seList = out.map(o => o.standardError).filter(Number.isFinite).sort((a, b) => a - b);
+  const medianSE = seList.length ? seList[Math.floor(seList.length / 2)] : Infinity;
   const maxSE = seList.length ? Math.max(...seList) : Infinity;
-  const pctReliable = out.length ? (out.filter(o => o.standardError <= SE_RELIABLE).length / out.length) * 100 : 0;
+  const pctReliable = out.length
+    ? (out.filter(o => o.standardError <= SE_RELIABLE).length / out.length) * 100
+    : 0;
 
   return { rows, cohort: { medianSE, maxSE, pctReliable } };
 }
@@ -182,4 +274,3 @@ export function reliabilityFromSE(se: number): string {
   if (se <= SE_REPEAT) return "Nog enkele vergelijkingen nodig";
   return "Onvoldoende gegevens";
 }
-
