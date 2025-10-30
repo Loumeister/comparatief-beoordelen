@@ -1,6 +1,6 @@
 // src/lib/pairing.ts
 import { Text, Judgement } from "./db";
-import { MIN_BASE, SE_RELIABLE, SE_REPEAT, DEFAULT_BATCH_SIZE } from "./constants";
+import { MIN_BASE, SE_RELIABLE, SE_REPEAT, DEFAULT_BATCH_SIZE } from "@/lib/constants";
 
 export interface Pair { textA: Text; textB: Text; }
 
@@ -21,14 +21,27 @@ function key(a: number, b: number): string {
 }
 
 class DSU {
-  parent: number[]; rank: number[];
-  constructor(n: number) { this.parent = Array.from({length:n}, (_,i)=>i); this.rank = new Array(n).fill(0); }
-  find(x: number){ return this.parent[x]===x ? x : (this.parent[x]=this.find(this.parent[x])); }
-  union(a: number, b: number){ a=this.find(a); b=this.find(b); if(a===b) return;
-    if(this.rank[a]<this.rank[b]) [a,b]=[b,a]; this.parent[b]=a; if(this.rank[a]===this.rank[b]) this.rank[a]++; }
+  parent: number[];
+  rank: number[];
+  constructor(n: number) {
+    this.parent = Array.from({ length: n }, (_, i) => i);
+    this.rank = new Array(n).fill(0);
+  }
+  find(x: number) {
+    return this.parent[x] === x ? x : (this.parent[x] = this.find(this.parent[x]));
+  }
+  union(a: number, b: number) {
+    a = this.find(a); b = this.find(b);
+    if (a === b) return;
+    if (this.rank[a] < this.rank[b]) [a, b] = [b, a];
+    this.parent[b] = a;
+    if (this.rank[a] === this.rank[b]) this.rank[a]++;
+  }
 }
 function allInOneComponent(dsu: DSU, n: number): boolean {
-  const r0 = dsu.find(0); for(let i=1;i<n;i++) if(dsu.find(i)!==r0) return false; return true;
+  const r0 = dsu.find(0);
+  for (let i = 1; i < n; i++) if (dsu.find(i) !== r0) return false;
+  return true;
 }
 
 export function generatePairs(texts: Text[], existing: Judgement[], opts: Options = {}): Pair[] {
@@ -37,16 +50,16 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
   if (texts.length < 2) return [];
 
   // indexering
-  const id2idx = new Map<number, number>(texts.map((t,i)=>[t.id!, i]));
+  const id2idx = new Map<number, number>(texts.map((t, i) => [t.id!, i]));
   const n = texts.length;
 
   // exposure & judged
-  const judgedPairs = new Set<string>();
-  const judgedPairsCounts = opts.judgedPairsCounts ?? new Map<string, number>();
-  const exposure = new Array(n).fill(0);
+  const judgedPairs = new Set<string>();                     // alle historisch al beoordeelde paren
+  const judgedPairsCounts = opts.judgedPairsCounts ?? new Map<string, number>(); // # keer beoordeeld (historisch)
+  const exposure = new Array(n).fill(0);                     // # keer dat tekst i voorkwam (historisch)
   for (const j of existing) {
     const ia = id2idx.get(j.textAId), ib = id2idx.get(j.textBId);
-    if (ia==null || ib==null || ia===ib) continue;
+    if (ia == null || ib == null || ia === ib) continue;
     const kkey = key(j.textAId, j.textBId);
     judgedPairs.add(kkey);
     judgedPairsCounts.set(kkey, (judgedPairsCounts.get(kkey) ?? 0) + 1);
@@ -57,7 +70,7 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
   const dsu = new DSU(n);
   for (const j of existing) {
     const ia = id2idx.get(j.textAId), ib = id2idx.get(j.textBId);
-    if (ia==null || ib==null || ia===ib) continue;
+    if (ia == null || ib == null || ia === ib) continue;
     dsu.union(ia, ib);
   }
 
@@ -66,60 +79,50 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
   const thetaOf = (id: number) => (hasBT ? (opts.bt!.theta!.get(id) ?? 0) : 0);
   const seOf    = (id: number) => (hasBT ? (opts.bt!.se!.get(id)    ?? Infinity) : Infinity);
 
-  // Hulp: wat is "reliable" op individueel niveau?
-  const isReliable = (iIdx: number): boolean => {
-    if (!hasBT) return false;
-    const se = seOf(texts[iIdx].id!);
-    return Number.isFinite(se) && se <= SE_RELIABLE;
-  };
-
-  // onderCap: bridging vóór alles, anders fair floor, dan SE
-  const underCap = (iIdx: number): boolean => {
-    // 1) als niet verbonden: iedereen mag meedoen (bridging fase beslist)
+  // ————————————
+  // Tekststatus: heeft deze tekst nog werk nodig?
+  // 1) zolang graaf niet connected: iedereen mag meedoen (bridging eerst)
+  // 2) fair floor: tot MIN_BASE iedereen meedoen
+  // 3) met BT: klaar = SE ≤ SE_RELIABLE
+  // 4) anders fallback op target exposure
+  // ————————————
+  const needsWork = (iIdx: number): boolean => {
     if (!allInOneComponent(dsu, n)) return true;
-    // 2) fair floor voor robuuste initialisatie
     if (exposure[iIdx] < MIN_BASE) return true;
-    // 3) met BT: klaar = SE ≤ SE_RELIABLE, anders werkt het nog
     if (hasBT) {
       const se = seOf(texts[iIdx].id!);
-      if (!Number.isFinite(se)) return true; // cold-start/∞ ⇒ nog werk
+      if (!Number.isFinite(se)) return true; // ∞/NaN → nog werk
       return se > SE_RELIABLE;
     }
-    // 4) fallback zonder BT
     return exposure[iIdx] < target;
   };
 
-  function scoreOpp(iIdx: number, jIdx: number, allowRepeat = false): number {
+  // score voor een kandidaat-paar (zonder repeats)
+  function scoreOpp(iIdx: number, jIdx: number): number {
     const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
     const kkey = key(idI, idJ);
-
     const isBridging = dsu.find(iIdx) !== dsu.find(jIdx);
     const count = judgedPairsCounts.get(kkey) ?? 0;
 
-    // In de normale fasen: beide moeten underCap zijn.
-    // In relaxed/last-resort fase roepen we scoreOpp met allowRepeat of
-    // passen we pre-filters toe; daarom geen harde early-return hier.
+    // beide moeten meedoen in deze fase (fase 1 & 2 & 3 sturen via filters)
     let s = 0;
 
     // fairness: lage gezamenlijke exposure
     s -= (exposure[iIdx] + exposure[jIdx]);
 
-    // bridging grote bonus (ook in fase 2 toegestaan)
+    // bridging grote bonus
     if (isBridging) s += 1000;
 
-    // herhaal penalty (alleen relevant als we repeats toestaan)
-    if (count > 0) {
-      // zwaardere penalty tenzij bridging; bij allowRepeat accepteren we deze trade-off
-      s -= (isBridging ? 2 : 8) * Math.min(count, 3); // max -24 (niet-bridging), -6 (bridging)
-    }
+    // herhaal penalty als geen bridging
+    if (count > 0 && !isBridging) s -= 5;
 
     if (hasBT) {
       const dθ    = Math.abs(thetaOf(idI) - thetaOf(idJ));
       const seI   = seOf(idI), seJ = seOf(idJ);
-      const sumSE = (Number.isFinite(seI)?seI:2) + (Number.isFinite(seJ)?seJ:2);
+      const sumSE = (Number.isFinite(seI) ? seI : 2) + (Number.isFinite(seJ) ? seJ : 2);
 
       // informatief: kleine Δθ
-      s += 10 - 10*Math.min(dθ, 1);
+      s += 10 - 10 * Math.min(dθ, 1);
       // informatief: hoge som van SE's (cap 2)
       s += 5 * Math.min(sumSE, 2);
 
@@ -130,28 +133,77 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
 
       // near-certain penalty
       if (dθ > 3) s -= 20;
-
-      // lichte bonus als precies één van de twee nog werk nodig heeft
-      const iNeeds = !(Number.isFinite(seI) && seI <= SE_RELIABLE);
-      const jNeeds = !(Number.isFinite(seJ) && seJ <= SE_RELIABLE);
-      if (iNeeds !== jNeeds) s += 5;
     }
 
-    // tie-breaker
-    s += Math.random()*0.01;
+    s += Math.random() * 0.01; // tie-breaker
     return s;
   }
 
-  function selectPair(iIdx: number, jIdx: number, selected: Pair[]): boolean {
+  // selecteer een paar ZONDER repeats
+  function selectPairNoRepeat(iIdx: number, jIdx: number, selected: Pair[]): boolean {
     const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
     const kkey = key(idI, idJ);
     if (judgedPairs.has(kkey)) return false;
-    if (!underCap(iIdx) || !underCap(jIdx)) return false;
+
+    // beide moeten (in de fase waar dit gebruikt wordt) door de filter komen
+    const flip = Math.random() < 0.5;
+    selected.push({ textA: flip ? texts[jIdx] : texts[iIdx], textB: flip ? texts[iIdx] : texts[jIdx] });
+
+    judgedPairs.add(kkey);               // voorkom herselectie binnen dezelfde batch-run
+    exposure[iIdx]++; exposure[jIdx]++;  // update lokale exposure
+    dsu.union(iIdx, jIdx);               // grafen kunnen samensmelten
+    return true;
+  }
+
+  // selecteer een paar MET repeats toegestaan (last resort)
+  const pickedThisBatch = new Set<string>(); // voorkom dubbele picks binnen déze batch
+  function scoreOppAllowRepeat(iIdx: number, jIdx: number): number {
+    const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
+    const kkey = key(idI, idJ);
+    const isBridging = dsu.find(iIdx) !== dsu.find(jIdx);
+    const count = judgedPairsCounts.get(kkey) ?? 0;
+
+    let s = 0;
+
+    // blijven prioriteren: minstens één needsWork is het doel van deze fase
+    if (!(needsWork(iIdx) || needsWork(jIdx))) return -Infinity;
+
+    // fairness
+    s -= (exposure[iIdx] + exposure[jIdx]);
+
+    // bridging bonus (kan in praktijk zelden voorkomen in deze fase)
+    if (isBridging) s += 800;
+
+    // herhaal-penalty sterker in deze fase
+    if (count > 0) s -= 8 * Math.min(count, 5); // cap de straf
+
+    if (hasBT) {
+      const dθ    = Math.abs(thetaOf(idI) - thetaOf(idJ));
+      const seI   = seOf(idI), seJ = seOf(idJ);
+      const sumSE = (Number.isFinite(seI) ? seI : 2) + (Number.isFinite(seJ) ? seJ : 2);
+
+      s += 8 - 8 * Math.min(dθ, 1);
+      s += 4 * Math.min(sumSE, 2);
+      if ((Number.isFinite(seI) && seI > SE_REPEAT) || (Number.isFinite(seJ) && seJ > SE_REPEAT)) {
+        s += 12;
+      }
+      if (dθ > 3) s -= 16;
+    }
+
+    s += Math.random() * 0.01;
+    return s;
+  }
+  function selectPairAllowRepeat(iIdx: number, jIdx: number, selected: Pair[]): boolean {
+    const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
+    const kkey = key(idI, idJ);
+    if (pickedThisBatch.has(kkey)) return false; // niet twee keer in dezelfde batch
 
     const flip = Math.random() < 0.5;
     selected.push({ textA: flip ? texts[jIdx] : texts[iIdx], textB: flip ? texts[iIdx] : texts[jIdx] });
 
-    judgedPairs.add(kkey);
+    pickedThisBatch.add(kkey);
+    // let op: judgedPairs (historische set) laten we staan; we laten nu expliciet repeats toe
+    judgedPairsCounts.set(kkey, (judgedPairsCounts.get(kkey) ?? 0) + 1);
     exposure[iIdx]++; exposure[jIdx]++;
     dsu.union(iIdx, jIdx);
     return true;
@@ -159,130 +211,89 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
 
   const selected: Pair[] = [];
 
+  // ——————————————————
   // FASE 1 — BRIDGING
+  // ——————————————————
   if (!allInOneComponent(dsu, n)) {
-    const bridges: Array<{iIdx:number;jIdx:number;score:number}> = [];
-    for (let i=0;i<n;i++){
-      if (!underCap(i)) continue;
-      for (let j=i+1;j<n;j++){
-        if (!underCap(j)) continue;
+    const bridges: Array<{ iIdx: number; jIdx: number; score: number }> = [];
+    for (let i = 0; i < n; i++) {
+      if (!needsWork(i)) continue; // in bridging-fase: iedereen mag, maar we pushen “needsWork” eerst
+      for (let j = i + 1; j < n; j++) {
+        if (!needsWork(j)) continue;
         if (dsu.find(i) === dsu.find(j)) continue;
         const idI = texts[i].id!, idJ = texts[j].id!;
-        if (judgedPairs.has(key(idI,idJ))) continue;
-        const sc = scoreOpp(i,j); bridges.push({iIdx:i,jIdx:j,score:sc});
+        if (judgedPairs.has(key(idI, idJ))) continue;
+        const sc = scoreOpp(i, j);
+        if (sc > -Infinity) bridges.push({ iIdx: i, jIdx: j, score: sc });
       }
     }
-    bridges.sort((a,b)=>b.score-a.score);
-    for (const b of bridges){
+    bridges.sort((a, b) => b.score - a.score);
+    for (const b of bridges) {
       if (selected.length >= batchSize) break;
       if (allInOneComponent(dsu, n)) break;
-      selectPair(b.iIdx, b.jIdx, selected);
+      selectPairNoRepeat(b.iIdx, b.jIdx, selected);
     }
   }
 
-  // FASE 2 — INTRA-COMPONENT (beide underCap)
+  // ——————————————————
+  // FASE 2 — INTRA: beide “needsWork”, geen repeats
+  // ——————————————————
   if (selected.length < batchSize) {
-    const cands: Array<{iIdx:number;jIdx:number;score:number}> = [];
-    for (let i=0;i<n;i++){
-      if (!underCap(i)) continue;
-      for (let j=i+1;j<n;j++){
-        if (!underCap(j)) continue;
+    const cands: Array<{ iIdx: number; jIdx: number; score: number }> = [];
+    for (let i = 0; i < n; i++) {
+      if (!needsWork(i)) continue;
+      for (let j = i + 1; j < n; j++) {
+        if (!needsWork(j)) continue;
         const idI = texts[i].id!, idJ = texts[j].id!;
-        if (judgedPairs.has(key(idI,idJ))) continue;
-        const sc = scoreOpp(i,j); cands.push({iIdx:i,jIdx:j,score:sc});
+        if (judgedPairs.has(key(idI, idJ))) continue;
+        const sc = scoreOpp(i, j);
+        if (sc > -Infinity) cands.push({ iIdx: i, jIdx: j, score: sc });
       }
     }
-    cands.sort((a,b)=>b.score-a.score);
-    for (const c of cands){
+    cands.sort((a, b) => b.score - a.score);
+    for (const c of cands) {
       if (selected.length >= batchSize) break;
-      selectPair(c.iIdx, c.jIdx, selected);
+      selectPairNoRepeat(c.iIdx, c.jIdx, selected);
     }
   }
 
-  // FASE 3 — RELAXED FILL (tenzij we al vol zitten)
-  // Doel: laat paren toe met minstens één "needs work" tekst, zelfs als de ander al betrouwbaar is.
-  // Nog steeds géén repeats in deze stap.
+  // ——————————————————
+  // FASE 3 — RELAXED: minstens één “needsWork”, geen repeats
+  // ——————————————————
   if (selected.length < batchSize) {
-    const relaxed: Array<{iIdx:number;jIdx:number;score:number}> = [];
-    for (let i=0;i<n;i++){
-      const iNeeds = underCap(i); // "heeft nog werk" volgens onze hoofdregel
-      // Als i geen werk heeft én ook betrouwbaar is, kan i nog als "partner" dienen,
-      // maar we willen dan dat j wél needs-work is.
-      for (let j=i+1;j<n;j++){
-        const jNeeds = underCap(j);
-        const atLeastOneNeeds = iNeeds || jNeeds;
-        if (!atLeastOneNeeds) continue;
-
+    const cands: Array<{ iIdx: number; jIdx: number; score: number }> = [];
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        if (!(needsWork(i) || needsWork(j))) continue; // minstens één moet werk nodig hebben
         const idI = texts[i].id!, idJ = texts[j].id!;
-        const kkey = key(idI,idJ);
-        if (judgedPairs.has(kkey)) continue; // nog steeds geen repeats in relaxed
-
-        // De “betrouwbare” tekst mag mee, maar niet twee volledig betrouwbare bij elkaar.
-        if (!iNeeds && !jNeeds) continue;
-
-        const sc = scoreOpp(i,j); relaxed.push({iIdx:i,jIdx:j,score:sc});
+        if (judgedPairs.has(key(idI, idJ))) continue;   // nog steeds geen repeats in fase 3
+        const sc = scoreOpp(i, j);
+        if (sc > -Infinity) cands.push({ iIdx: i, jIdx: j, score: sc });
       }
     }
-    relaxed.sort((a,b)=>b.score-a.score);
-    for (const r of relaxed) {
+    cands.sort((a, b) => b.score - a.score);
+    for (const c of cands) {
       if (selected.length >= batchSize) break;
-
-      // In relaxed fill selecteren we alleen als ten minste één kant underCap is.
-      const ok =
-        (underCap(r.iIdx) || underCap(r.jIdx)) &&
-        // en het paar is nog niet eerder beoordeeld:
-        !judgedPairs.has(key(texts[r.iIdx].id!, texts[r.jIdx].id!));
-
-      if (!ok) continue;
-
-      const idI = texts[r.iIdx].id!, idJ = texts[r.jIdx].id!;
-      const kkey = key(idI, idJ);
-      const flip = Math.random() < 0.5;
-      selected.push({ textA: flip ? texts[r.jIdx] : texts[r.iIdx], textB: flip ? texts[r.iIdx] : texts[r.jIdx] });
-      judgedPairs.add(kkey);
-      exposure[r.iIdx]++; exposure[r.jIdx]++;
-      dsu.union(r.iIdx, r.jIdx);
+      selectPairNoRepeat(c.iIdx, c.jIdx, selected);
     }
   }
 
-  // FASE 4 — LAST RESORT (met repeats): als we nog niet vol zitten, sta repeats toe
-  // Dit is nuttig wanneer alle informatieve combinaties al eens beoordeeld zijn.
+  // ——————————————————
+  // FASE 4 — LAST RESORT: minstens één “needsWork”, repeats toegestaan
+  // ——————————————————
   if (selected.length < batchSize) {
-    const last: Array<{iIdx:number;jIdx:number;score:number;rep:number}> = [];
-    for (let i=0;i<n;i++){
-      // Minstens één moet nog werk hebben (anders blijven we betrouwbare teksten rondpompen)
-      const iNeeds = underCap(i);
-      for (let j=i+1;j<n;j++){
-        const jNeeds = underCap(j);
-        if (!(iNeeds || jNeeds)) continue;
-
-        const idI = texts[i].id!, idJ = texts[j].id!;
-        const kkey = key(idI,idJ);
-        const rep = judgedPairsCounts.get(kkey) ?? 0;
-
-        // Scoor met repeats toegestaan, zwaardere penalty zit in scoreOpp()
-        const sc = scoreOpp(i, j, true);
-        // Bevoordeel paren die minder vaak zijn herhaald
-        last.push({ iIdx: i, jIdx: j, score: sc - rep * 5, rep });
+    const cands: Array<{ iIdx: number; jIdx: number; score: number }> = [];
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        if (!(needsWork(i) || needsWork(j))) continue;
+        const sc = scoreOppAllowRepeat(i, j);
+        if (sc > -Infinity) cands.push({ iIdx: i, jIdx: j, score: sc });
       }
     }
-    last.sort((a,b)=>b.score-a.score);
-
-    for (const c of last) {
+    cands.sort((a, b) => b.score - a.score);
+    for (const c of cands) {
       if (selected.length >= batchSize) break;
-
-      const idI = texts[c.iIdx].id!, idJ = texts[c.jIdx].id!;
-      const kkey = key(idI, idJ);
-
-      // repeats nu toegestaan (maar we updaten judgedPairs en counts lokaal)
-      const flip = Math.random() < 0.5;
-      selected.push({ textA: flip ? texts[c.jIdx] : texts[c.iIdx], textB: flip ? texts[c.iIdx] : texts[c.jIdx] });
-
-      // update lokale staten
-      judgedPairs.add(kkey); // zodat we binnen deze batch niet exact hetzelfde paar dubbel kiezen
-      judgedPairsCounts.set(kkey, (judgedPairsCounts.get(kkey) ?? 0) + 1);
-      exposure[c.iIdx]++; exposure[c.jIdx]++;
-      dsu.union(c.iIdx, c.jIdx);
+      selectPairAllowRepeat(c.iIdx, c.jIdx, selected);
     }
   }
 
