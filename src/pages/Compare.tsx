@@ -27,8 +27,8 @@ async function buildBTMaps(assignmentId: number) {
   const judgements = getEffectiveJudgements(all);
   // Hogere ridge (0.3) om extreme θ-uitschieters te temmen
   const bt = calculateBradleyTerry(texts, judgements, 0.3);
-  const theta: Map<number, number> = new Map(bt.map(r => [r.textId, r.theta]));
-  const se: Map<number, number> = new Map(bt.map(r => [r.textId, r.standardError]));
+  const theta = new Map(bt.rows.map(r => [r.textId, r.theta]));
+  const se = new Map(bt.rows.map(r => [r.textId, r.standardError]));
   
   // Bouw judgedPairsCounts
   const judgedPairsCounts = new Map<string, number>();
@@ -138,7 +138,7 @@ const Compare = () => {
       const newPairs = generatePairs(texts, judgements, {
         targetComparisonsPerText: targetPerText,
         batchSize: batch,
-        bt: { theta: theta, se: se },
+        bt: { theta, se },
         judgedPairsCounts
       });
 
@@ -180,7 +180,7 @@ const Compare = () => {
     const nextPairs = generatePairs(texts, judgements, {
       targetComparisonsPerText: targetPerText,
       batchSize: batch,
-      bt: { theta: theta, se: se },
+      bt: { theta, se },
       judgedPairsCounts
     });
 
