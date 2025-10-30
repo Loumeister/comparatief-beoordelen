@@ -9,6 +9,7 @@ import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircl
 import { Progress } from "@/components/ui/progress";
 import { db, Assignment } from "@/lib/db";
 import { calculateBradleyTerry } from "@/lib/bradley-terry";
+import { getEffectiveJudgements } from "@/lib/effective-judgements";
 import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from "@/lib/export";
 import { exportDataset } from "@/lib/exportImport";
 import { useToast } from "@/hooks/use-toast";
@@ -47,7 +48,8 @@ const Results = () => {
       setAssignment(assign);
 
       const texts = await db.texts.where("assignmentId").equals(id).toArray();
-      const judgements = await db.judgements.where("assignmentId").equals(id).toArray();
+      const all = await db.judgements.where("assignmentId").equals(id).toArray();
+      const judgements = getEffectiveJudgements(all);
 
       if (judgements.length === 0) {
         toast({ title: "Geen beoordelingen", description: "Begin met vergelijken om resultaten te zien" });

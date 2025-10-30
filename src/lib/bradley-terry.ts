@@ -158,12 +158,6 @@ export function calculateBradleyTerry(
     return Math.max(gmin, Math.min(gmax, Math.round(raw * 10) / 10));
   }
 
-  function reliabilityFromSE(se: number): string {
-    if (se <= SE_RELIABLE) return "Resultaat betrouwbaar";
-    if (se <= SE_REPEAT) return "Nog enkele vergelijkingen nodig";
-    return "Onvoldoende gegevens";
-  }
-
   const rows = out.map((r, i) => ({
     textId: r.textId,
     theta: r.theta,
@@ -182,3 +176,10 @@ export function calculateBradleyTerry(
 
   return { rows, cohort: { medianSE, maxSE, pctReliable } };
 }
+
+export function reliabilityFromSE(se: number): string {
+  if (se <= SE_RELIABLE) return "Resultaat betrouwbaar";
+  if (se <= SE_REPEAT) return "Nog enkele vergelijkingen nodig";
+  return "Onvoldoende gegevens";
+}
+

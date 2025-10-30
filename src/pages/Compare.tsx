@@ -9,6 +9,7 @@ import { ArrowLeft } from 'lucide-react';
 import { db, Assignment, AssignmentMeta, Text } from '@/lib/db';
 import { generatePairs, Pair } from '@/lib/pairing';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
+import { getEffectiveJudgements } from '@/lib/effective-judgements';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -22,7 +23,8 @@ function key(a: number, b: number): string {
 // Helper: bereken BT-scores tussendoor voor slimmere pairing
 async function buildBTMaps(assignmentId: number) {
   const texts = await db.texts.where('assignmentId').equals(assignmentId).toArray();
-  const judgements = await db.judgements.where('assignmentId').equals(assignmentId).toArray();
+  const all = await db.judgements.where('assignmentId').equals(assignmentId).toArray();
+  const judgements = getEffectiveJudgements(all);
   // Hogere ridge (0.3) om extreme θ-uitschieters te temmen
   const bt = calculateBradleyTerry(texts, judgements, 0.3);
   const theta = new Map(bt.rows.map(r => [r.textId, r.theta]));

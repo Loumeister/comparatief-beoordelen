@@ -6,6 +6,7 @@ import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users, Set
 import { db, Assignment } from '@/lib/db';
 import { importDataset, importCSV, importResultsFromXLSX, exportDataset } from '@/lib/exportImport';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
+import { getEffectiveJudgements } from '@/lib/effective-judgements';
 import { SE_RELIABLE } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -45,7 +46,8 @@ const Dashboard = () => {
       let reliabilityPct = 0;
       if (judgements > 0 && texts > 0) {
         const textsData = await db.texts.where('assignmentId').equals(assign.id!).toArray();
-        const judgementsData = await db.judgements.where('assignmentId').equals(assign.id!).toArray();
+        const all = await db.judgements.where('assignmentId').equals(assign.id!).toArray();
+        const judgementsData = getEffectiveJudgements(all);
         
         const results = calculateBradleyTerry(textsData, judgementsData);
         const reliableCount = results.rows.filter(r => r.standardError <= SE_RELIABLE).length;
