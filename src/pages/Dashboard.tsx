@@ -1,4 +1,3 @@
-// src/pages/Dashboard.tsx
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,6 @@ import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users, Set
 import { db, Assignment } from '@/lib/db';
 import { importDataset, importCSV, importResultsFromXLSX, exportDataset } from '@/lib/exportImport';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
-import { getEffectiveJudgements } from '@/lib/effective-judgements';
 import { SE_RELIABLE } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -17,23 +15,12 @@ import { ManageStudentsDialog } from '@/components/ManageStudentsDialog';
 import { GradingSettingsDialog } from '@/components/GradingSettingsDialog';
 import { HeaderNav } from '@/components/HeaderNav';
 
-type AssignmentStats = {
-  texts: number;
-  judgementsAll: number;
-  judgementsEffective: number;
-  reliabilityPct: number;  // % met SE ≤ SE_RELIABLE
-  medianSE: number;
-  maxSE: number;
-  statusText: string;      // cohortadvies
-};
-
 const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [stats, setStats] = useState<Map<number, AssignmentStats>>(new Map());
+  const [stats, setStats] = useState<Map<number, { texts: number; judgements: number; reliabilityPct: number }>>(new Map());
   const [importing, setImporting] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -48,63 +35,26 @@ const Dashboard = () => {
     const allAssignments = await db.assignments.orderBy('createdAt').reverse().toArray();
     setAssignments(allAssignments);
 
-    // Stats parallel ophalen
-    const entries = await Promise.all(
-      allAssignments.map(async (assign) => {
-        const assignmentId = assign.id!;
-        const [texts, judgementsAll] = await Promise.all([
-          db.texts.where('assignmentId').equals(assignmentId).count(),
-          db.judgements.where('assignmentId').equals(assignmentId).count(),
-        ]);
-
-        let s: AssignmentStats = {
-          texts,
-          judgementsAll,
-          judgementsEffective: 0,
-          reliabilityPct: 0,
-          medianSE: Infinity,
-          maxSE: Infinity,
-          statusText: '',
-        };
-
-        if (texts > 0 && judgementsAll > 0) {
-          const [textsData, all] = await Promise.all([
-            db.texts.where('assignmentId').equals(assignmentId).toArray(),
-            db.judgements.where('assignmentId').equals(assignmentId).toArray(),
-          ]);
-          const judgementsData = getEffectiveJudgements(all);
-          s.judgementsEffective = judgementsData.length;
-
-          if (judgementsData.length > 0) {
-            const results = calculateBradleyTerry(textsData, judgementsData);
-            const reliableCount = results.rows.filter(r => r.standardError <= SE_RELIABLE).length;
-            const reliabilityPct = results.rows.length ? Math.round((reliableCount / results.rows.length) * 100) : 0;
-
-            const { medianSE, maxSE, pctReliable } = results.cohort;
-            // Cohortadvies volgens afgesproken regels
-            let statusText: string;
-            if ((pctReliable >= 70) || (medianSE <= 0.80 && maxSE <= 1.40)) {
-              statusText = 'Resultaat betrouwbaar (stopadvies)';
-            } else if (medianSE <= 1.00) {
-              statusText = 'Nog enkele vergelijkingen nodig';
-            } else {
-              statusText = 'Onvoldoende gegevens';
-            }
-
-            s = {
-              ...s,
-              reliabilityPct,
-              medianSE: isFinite(medianSE) ? Number(medianSE.toFixed(2)) : Infinity,
-              maxSE: isFinite(maxSE) ? Number(maxSE.toFixed(2)) : Infinity,
-              statusText,
-            };
-          }
-        }
-        return [assignmentId, s] as const;
-      })
-    );
-
-    setStats(new Map(entries));
+    // Load stats for each assignment
+    const statsMap = new Map();
+    for (const assign of allAssignments) {
+      const texts = await db.texts.where('assignmentId').equals(assign.id!).count();
+      const judgements = await db.judgements.where('assignmentId').equals(assign.id!).count();
+      
+      // Calculate reliability percentage if there are judgements
+      let reliabilityPct = 0;
+      if (judgements > 0 && texts > 0) {
+        const textsData = await db.texts.where('assignmentId').equals(assign.id!).toArray();
+        const judgementsData = await db.judgements.where('assignmentId').equals(assign.id!).toArray();
+        
+        const results = calculateBradleyTerry(textsData, judgementsData);
+        const reliableCount = results.rows.filter(r => r.standardError <= SE_RELIABLE).length;
+        reliabilityPct = Math.round((reliableCount / results.rows.length) * 100);
+      }
+      
+      statsMap.set(assign.id, { texts, judgements, reliabilityPct });
+    }
+    setStats(statsMap);
   };
 
   const handleEdit = (assignment: Assignment) => {
@@ -128,41 +78,55 @@ const Dashboard = () => {
 
       setEditingAssignment(null);
       setEditTitle('');
-      await loadAssignments();
+      loadAssignments();
     } catch (error) {
       console.error('Update error:', error);
-      toast({ title: 'Fout bij opslaan', variant: 'destructive' });
+      toast({
+        title: 'Fout bij opslaan',
+        variant: 'destructive'
+      });
     }
   };
 
   const handleExport = async (assignmentId: number, title: string) => {
     try {
       await exportDataset(assignmentId);
-      toast({ title: 'Export gelukt', description: `"${title}" is geëxporteerd als JSON` });
+      toast({
+        title: 'Export gelukt',
+        description: `"${title}" is geëxporteerd als JSON`
+      });
     } catch (error) {
       console.error('Export error:', error);
-      toast({ title: 'Fout bij exporteren', variant: 'destructive' });
+      toast({
+        title: 'Fout bij exporteren',
+        variant: 'destructive'
+      });
     }
   };
 
   const handleDelete = async (id: number, title: string) => {
-    if (!confirm(`Weet je zeker dat je "${title}" wilt verwijderen?`)) return;
+    if (!confirm(`Weet je zeker dat je "${title}" wilt verwijderen?`)) {
+      return;
+    }
 
     try {
-      await Promise.all([
-        db.texts.where('assignmentId').equals(id).delete(),
-        db.judgements.where('assignmentId').equals(id).delete(),
-        db.scores.where('assignmentId').equals(id).delete(),
-        db.previousFits.where('assignmentId').equals(id).delete?.(), // aanwezig in jouw schema
-        db.assignmentMeta.where('assignmentId').equals(id).delete?.(),
-      ]);
+      await db.texts.where('assignmentId').equals(id).delete();
+      await db.judgements.where('assignmentId').equals(id).delete();
+      await db.scores.where('assignmentId').equals(id).delete();
       await db.assignments.delete(id);
 
-      toast({ title: 'Opdracht verwijderd', description: `"${title}" is verwijderd` });
-      await loadAssignments();
+      toast({
+        title: 'Opdracht verwijderd',
+        description: `"${title}" is verwijderd`
+      });
+
+      loadAssignments();
     } catch (error) {
       console.error('Delete error:', error);
-      toast({ title: 'Fout bij verwijderen', variant: 'destructive' });
+      toast({
+        title: 'Fout bij verwijderen',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -173,41 +137,53 @@ const Dashboard = () => {
     setImporting(true);
     try {
       const fileName = file.name.toLowerCase();
-
+      
+      // Determine file type and import accordingly
       if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        // Excel resultaten import
         const result = await importResultsFromXLSX(file);
+        
         toast({
           title: 'Excel resultaten geïmporteerd',
           description: `${result.assignmentTitle}: ${result.newTexts} teksten toegevoegd`,
         });
       } else if (fileName.endsWith('.csv')) {
+        // CSV dataset import
         const result = await importCSV(file);
+        
         toast({
           title: 'CSV dataset geïmporteerd',
           description: `${result.assignmentTitle}: ${result.newTexts} nieuwe teksten, ${result.newJudgements} nieuwe oordelen`,
         });
+
         if (!result.isConnected) {
           toast({
             title: 'Let op: grafiek niet verbonden',
             description: 'Sommige teksten zijn nog niet gekoppeld – voer extra vergelijkingen uit.',
+            variant: 'default',
           });
         }
       } else if (fileName.endsWith('.json')) {
+        // JSON dataset import
         const result = await importDataset(file);
+        
         toast({
           title: 'JSON dataset geïmporteerd',
           description: `${result.assignmentTitle}: ${result.newTexts} nieuwe teksten, ${result.newJudgements} nieuwe oordelen`,
         });
+
         if (!result.isConnected) {
           toast({
             title: 'Let op: grafiek niet verbonden',
             description: 'Sommige teksten zijn nog niet gekoppeld – voer extra vergelijkingen uit.',
+            variant: 'default',
           });
         }
       } else {
         throw new Error('Ongeldig bestandsformaat. Gebruik .xlsx, .csv of .json');
       }
 
+      // Reload assignments
       await loadAssignments();
     } catch (error) {
       console.error('Import error:', error);
@@ -218,7 +194,10 @@ const Dashboard = () => {
       });
     } finally {
       setImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -280,10 +259,7 @@ const Dashboard = () => {
             <h2 className="text-2xl font-bold mb-6">Je beoordelingen</h2>
             <div className="grid gap-4">
               {assignments.map((assignment) => {
-                const s = stats.get(assignment.id!) || {
-                  texts: 0, judgementsAll: 0, judgementsEffective: 0,
-                  reliabilityPct: 0, medianSE: Infinity, maxSE: Infinity, statusText: ''
-                };
+                const assignStats = stats.get(assignment.id!) || { texts: 0, judgements: 0, reliabilityPct: 0 };
 
                 return (
                   <Card key={assignment.id} className="hover:shadow-md transition-shadow">
@@ -294,63 +270,73 @@ const Dashboard = () => {
                           <CardDescription>{assignment.genre}</CardDescription>
                         </div>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(assignment)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(assignment)}
+                          >
                             <Pencil className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(assignment.id!, assignment.title)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(assignment.id!, assignment.title)}
+                          >
                             <Trash2 className="w-4 h-4 text-destructive" />
                           </Button>
                         </div>
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex flex-wrap items-center gap-6 mb-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-6 mb-4 text-sm text-muted-foreground">
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4" />
-                          <span>{s.texts} teksten</span>
+                          <span>{assignStats.texts} teksten</span>
                         </div>
-                        <div className="flex items-center gap-2" title="Rauw (alle) vergelijkingen">
+                        <div className="flex items-center gap-2">
                           <BarChart3 className="w-4 h-4" />
-                          <span>{s.judgementsAll} vergelijkingen (alle)</span>
+                          <span>{assignStats.judgements} vergelijkingen</span>
                         </div>
-                        {s.judgementsAll > 0 && (
-                          <div title="Effectieve vergelijkingen (na replace/moderate-regels)">
-                            <span>{s.judgementsEffective} effectief</span>
+                        {assignStats.judgements > 0 && (
+                          <div>
+                            <span>{assignStats.reliabilityPct}% betrouwbaar</span>
                           </div>
-                        )}
-                        {s.judgementsEffective > 0 && (
-                          <>
-                            <div><span>{s.reliabilityPct}% betrouwbaar</span></div>
-                            <div><span>mediaan SE: {isFinite(s.medianSE) ? s.medianSE : '—'}</span></div>
-                            <div><span>max SE: {isFinite(s.maxSE) ? s.maxSE : '—'}</span></div>
-                            <div className={
-                              s.statusText.includes('stopadvies') ? 'text-secondary' :
-                              s.statusText.includes('Nog enkele') ? 'text-primary' : 'text-destructive'
-                            }>
-                              {s.statusText}
-                            </div>
-                          </>
                         )}
                       </div>
 
                       <div className="flex gap-2">
-                        <Button variant="default" onClick={() => navigate(`/compare/${assignment.id}`)}>
+                        <Button
+                          variant="default"
+                          onClick={() => navigate(`/compare/${assignment.id}`)}
+                        >
                           Vergelijk
                         </Button>
-                        {s.judgementsEffective > 0 && (
-                          <Button variant="outline" onClick={() => navigate(`/results/${assignment.id}`)}>
+                        {assignStats.judgements > 0 && (
+                          <Button
+                            variant="outline"
+                            onClick={() => navigate(`/results/${assignment.id}`)}
+                          >
                             Resultaten
                           </Button>
                         )}
-                        <Button variant="outline" onClick={() => setManagingStudents({ id: assignment.id!, title: assignment.title })}>
+                        <Button
+                          variant="outline"
+                          onClick={() => setManagingStudents({ id: assignment.id!, title: assignment.title })}
+                        >
                           <Users className="w-4 h-4 mr-2" />
                           Leerlingbeheer
                         </Button>
-                        <Button variant="outline" onClick={() => setManagingGrading({ id: assignment.id!, title: assignment.title })}>
+                        <Button
+                          variant="outline"
+                          onClick={() => setManagingGrading({ id: assignment.id!, title: assignment.title })}
+                        >
                           <Settings className="w-4 h-4 mr-2" />
                           Cijferinstellingen
                         </Button>
-                        <Button variant="outline" onClick={() => handleExport(assignment.id!, assignment.title)}>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleExport(assignment.id!, assignment.title)}
+                        >
                           <Download className="w-4 h-4 mr-2" />
                           Export
                         </Button>
@@ -376,7 +362,7 @@ const Dashboard = () => {
               <div>
                 <h4 className="font-semibold mb-1">Upload teksten</h4>
                 <p className="text-sm text-muted-foreground">
-                  Upload DOCX of TXT-bestanden. De teksten worden automatisch geanonimiseerd.
+                  Upload DOCX of TXT bestanden. De teksten worden automatisch geanonimiseerd.
                 </p>
               </div>
             </div>
@@ -400,7 +386,7 @@ const Dashboard = () => {
               <div>
                 <h4 className="font-semibold mb-1">Bekijk resultaten</h4>
                 <p className="text-sm text-muted-foreground">
-                  Het systeem berekent automatisch een rangorde en cijfers. Exporteer naar CSV, Excel of PDF.
+                  Het systeem berekent automatisch een rangorde en cijfers. Export naar CSV, Excel of PDF.
                 </p>
               </div>
             </div>
@@ -409,7 +395,11 @@ const Dashboard = () => {
 
         {/* README Link */}
         <div className="mt-8 text-center">
-          <Button variant="link" onClick={() => navigate('/readme')} className="text-muted-foreground">
+          <Button 
+            variant="link" 
+            onClick={() => navigate('/readme')}
+            className="text-muted-foreground"
+          >
             <BookOpen className="w-4 h-4 mr-2" />
             Bekijk de volledige handleiding
           </Button>
@@ -431,14 +421,20 @@ const Dashboard = () => {
                 onChange={(e) => setEditTitle(e.target.value)}
                 placeholder="Voer een nieuwe titel in"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveEdit();
+                  if (e.key === 'Enter') {
+                    handleSaveEdit();
+                  }
                 }}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingAssignment(null)}>Annuleren</Button>
-            <Button onClick={handleSaveEdit} disabled={!editTitle.trim()}>Opslaan</Button>
+            <Button variant="outline" onClick={() => setEditingAssignment(null)}>
+              Annuleren
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={!editTitle.trim()}>
+              Opslaan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

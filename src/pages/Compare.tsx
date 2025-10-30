@@ -9,7 +9,6 @@ import { ArrowLeft } from 'lucide-react';
 import { db, Assignment, AssignmentMeta, Text } from '@/lib/db';
 import { generatePairs, Pair } from '@/lib/pairing';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
-import { getEffectiveJudgements } from '@/lib/effective-judgements';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -23,8 +22,7 @@ function key(a: number, b: number): string {
 // Helper: bereken BT-scores tussendoor voor slimmere pairing
 async function buildBTMaps(assignmentId: number) {
   const texts = await db.texts.where('assignmentId').equals(assignmentId).toArray();
-  const all = await db.judgements.where('assignmentId').equals(assignmentId).toArray();
-  const judgements = getEffectiveJudgements(all);
+  const judgements = await db.judgements.where('assignmentId').equals(assignmentId).toArray();
   // Hogere ridge (0.3) om extreme θ-uitschieters te temmen
   const bt = calculateBradleyTerry(texts, judgements, 0.3);
   const theta = new Map(bt.rows.map(r => [r.textId, r.theta]));
@@ -80,7 +78,6 @@ const Compare = () => {
   const [textCounts, setTextCounts] = useState<Map<number, number>>(new Map());
   const [replaceMode, setReplaceMode] = useState(false);
   const [isFinal, setIsFinal] = useState(false);
-  const [continueMode, setContinueMode] = useState(false); // <<< NIEUW: doorbeoordelen
   const [raterId] = useState(() => `rater-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
 
   // ---------- Data laden ----------
@@ -136,26 +133,15 @@ const Compare = () => {
       setExpectedTotal(expectedTotal);
 
       const batch = calculateDynamicBatchSize(texts, se, exposures);
-      let newPairs = generatePairs(texts, judgements, {
-        targetComparisonsPerText: targetPerText,
+      const newPairs = generatePairs(texts, judgements, {
+        targetComparisonsPerText: assign.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
         batchSize: batch,
         bt: { theta, se },
         judgedPairsCounts
       });
 
-      // Fallback naar vrije modus als informatieve batch leeg is en doorbeoordelen aanstaat
-      if (newPairs.length === 0 && continueMode) {
-        newPairs = generatePairs(texts, judgements, {
-          targetComparisonsPerText: targetPerText,
-          batchSize: Math.max(2, Math.ceil(batch / 2)),
-          bt: { theta, se },
-          judgedPairsCounts,
-          allowFreeWhenEmpty: true, // <<< hier
-        });
-      }
-
       if (newPairs.length === 0) {
-        // Alle benodigde (en vrije) vergelijkingen zijn gedaan
+        // Alle benodigde vergelijkingen zijn gedaan
         navigate(`/results/${id}`);
         return;
       }
@@ -168,7 +154,7 @@ const Compare = () => {
       toast({ title: 'Fout bij laden', variant: 'destructive' });
       navigate('/');
     }
-  }, [assignmentId, navigate, toast, continueMode]);
+  }, [assignmentId, navigate, toast]);
 
   // Herlaad adaptief een nieuwe batch na oordelen
   const reloadPairs = useCallback(async () => {
@@ -186,26 +172,13 @@ const Compare = () => {
     }
     setTextCounts(textCountsMap);
 
-    const targetPerText = assignment.numComparisons || DEFAULT_COMPARISONS_PER_TEXT;
     const batch = calculateDynamicBatchSize(texts, se, exposures);
-
-    let nextPairs = generatePairs(texts, judgements, {
-      targetComparisonsPerText: targetPerText,
+    const nextPairs = generatePairs(texts, judgements, {
+      targetComparisonsPerText: assignment.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
       batchSize: batch,
       bt: { theta, se },
       judgedPairsCounts
     });
-
-    // Fallback naar vrije modus als informatieve batch leeg is en doorbeoordelen aanstaat
-    if (nextPairs.length === 0 && continueMode) {
-      nextPairs = generatePairs(texts, judgements, {
-        targetComparisonsPerText: targetPerText,
-        batchSize: Math.max(2, Math.ceil(batch / 2)),
-        bt: { theta, se },
-        judgedPairsCounts,
-        allowFreeWhenEmpty: true, // <<< hier
-      });
-    }
 
     if (nextPairs.length === 0) {
       navigate(`/results/${id}`);
@@ -216,7 +189,7 @@ const Compare = () => {
     setCurrentIndex(0);
     setReplaceMode(false);
     setIsFinal(false);
-  }, [assignment, assignmentMeta, navigate, continueMode]);
+  }, [assignment, assignmentMeta, navigate]);
 
   // Init load
   useEffect(() => {
@@ -231,7 +204,7 @@ const Compare = () => {
       const pair = pairs[currentIndex];
       const mode = assignmentMeta.judgementMode || 'accumulate';
 
-      // Bereken leftIsA voor deze pair (links/rechts blijft alfabetisch)
+      // Bereken leftIsA voor deze pair
       const sortedAlphabetically = [pair.textA, pair.textB].sort((a, b) => 
         a.anonymizedName.localeCompare(b.anonymizedName)
       );
@@ -244,7 +217,7 @@ const Compare = () => {
         let supersedesId: number | undefined;
         const pairKey = [pair.textA.id!, pair.textB.id!].sort((a, b) => a - b).join('-');
         
-        // Replace mode: optioneel vervangen van vorig oordeel door dezelfde rater
+        // Replace mode: zoek eventuele eerdere beoordeling van dit paar door deze rater
         if (mode === 'replace' && replaceMode) {
           const existingJudgements = await db.judgements
             .where('pairKey').equals(pairKey)
@@ -252,6 +225,7 @@ const Compare = () => {
             .toArray();
           
           if (existingJudgements.length > 0) {
+            // Pak de meest recente
             existingJudgements.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
             supersedesId = existingJudgements[0].id;
           }
@@ -347,8 +321,8 @@ const Compare = () => {
   }
 
   const currentPair = pairs[currentIndex];
-  const pairKeyStr = key(currentPair.textA.id!, currentPair.textB.id!);
-  const pairCount = pairCounts.get(pairKeyStr) ?? 0;
+  const pairKey = key(currentPair.textA.id!, currentPair.textB.id!);
+  const pairCount = pairCounts.get(pairKey) ?? 0;
   const mode = assignmentMeta?.judgementMode || 'accumulate';
   
   // Sorteer alfabetisch: links = eerder in alfabet
@@ -383,18 +357,6 @@ const Compare = () => {
           </div>
 
           <Progress value={progress} className="h-2" />
-
-          {/* vrije modus toggle */}
-          <div className="mt-3 flex items-center gap-2">
-            <Checkbox
-              id="continue-mode"
-              checked={continueMode}
-              onCheckedChange={(c) => setContinueMode(c === true)}
-            />
-            <Label htmlFor="continue-mode" className="text-sm cursor-pointer">
-              Doorbeoordelen (vrije modus) — blijf paren aanbieden ook na het behalen van het doel
-            </Label>
-          </div>
         </div>
       </div>
 
@@ -447,7 +409,6 @@ const Compare = () => {
               </Button>
             </div>
 
-            {/* Replace / Moderate toggles */}
             <div className="space-y-4">
               {mode === 'replace' && pairCount > 0 && (
                 <div className="flex items-center space-x-2">
