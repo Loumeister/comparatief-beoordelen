@@ -6,9 +6,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft } from 'lucide-react';
-import { db, Assignment, AssignmentMeta, Text } from '@/lib/db';
-import { generatePairs, Pair } from '@/lib/pairing';
-import { calculateBradleyTerry } from '@/lib/bradley-terry';
+import { db, Assignment, AssignmentMeta, Text } from '../lib/db';
+import { generatePairs, Pair } from '../lib/pairing';
+import { calculateBradleyTerry } from '../lib/bradley-terry';
 import { getEffectiveJudgements } from '../lib/effective-judgements'; // ← relatieve import
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
