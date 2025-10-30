@@ -26,8 +26,8 @@ async function buildBTMaps(assignmentId: number) {
   const all = await db.judgements.where('assignmentId').equals(assignmentId).toArray();
   const judgements = getEffectiveJudgements(all);
   const bt = calculateBradleyTerry(texts, judgements, 0.3);
-  const theta = new Map(bt.rows.map(r => [r.textId, r.theta]));
-  const se = new Map(bt.rows.map(r => [r.textId, r.standardError]));
+  const theta = new Map<number, number>(bt.map(r => [r.textId, r.theta]));
+  const se = new Map<number, number>(bt.map(r => [r.textId, r.standardError]));
   
   // judgedPairsCounts
   const judgedPairsCounts = new Map<string, number>();
