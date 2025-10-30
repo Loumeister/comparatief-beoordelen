@@ -12,12 +12,15 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// Only use basename in production (GitHub Pages), not in development (Lovable preview)
+const basename = import.meta.env.PROD ? "/comparatief-beoordelen" : "";
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter basename="/comparatief-beoordelen">
+      <BrowserRouter basename={basename}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/upload" element={<Upload />} />
