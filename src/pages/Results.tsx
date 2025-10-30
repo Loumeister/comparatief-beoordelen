@@ -13,7 +13,7 @@ import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from "@/lib/export
 import { exportDataset } from "@/lib/exportImport";
 import { useToast } from "@/hooks/use-toast";
 import { isConnected } from "@/lib/graph";
-import { SE_RELIABLE, SE_MAX_EDGE, COHORT_PCT_RELIABLE, COHORT_MEDIAN_OK } from "@/lib/reliability-thresholds";
+import { SE_RELIABLE, SE_MAX_CAP, STOP_PCT_RELIABLE, STOP_MEDIAN_OK } from "@/lib/constants";
 import { StudentDetailsDialog } from "@/components/StudentDetailsDialog";
 import { HeaderNav } from "@/components/HeaderNav";
 
@@ -69,7 +69,8 @@ const Results = () => {
       };
 
       // BT-fit (ook bij niet-verbonden graaf)
-      const btResults = calculateBradleyTerry(texts, judgements, 0.1, 0.1, grading);
+      const bt = calculateBradleyTerry(texts, judgements, 0.1, 0.1, grading);
+      const btResults = bt.rows;
 
       // Bereken aantal beoordelingen per tekst
       const judgementCounts = new Map<number, number>();
@@ -214,7 +215,7 @@ const Results = () => {
   }
 
 
-  // Calculate overall reliability (cohort-based)
+  // Calculate overall reliability (cohort-based) - gebruik BT cohort metrics indien beschikbaar
   const seList = results.map(r => r.standardError).sort((a, b) => a - b);
   const n = seList.length;
   const medianSE = n === 0 ? NaN : (n % 2 === 1 ? seList[(n - 1) / 2] : (seList[n / 2 - 1] + seList[n / 2]) / 2);
@@ -235,8 +236,8 @@ const Results = () => {
   let reliabilityIcon: typeof CheckCircle;
 
   // Check which criterion is met
-  const cohortCriterionMet = (medianSE <= COHORT_MEDIAN_OK) && (maxSE <= SE_MAX_EDGE);
-  const individualCriterionMet = pctReliable >= COHORT_PCT_RELIABLE;
+  const cohortCriterionMet = (medianSE <= STOP_MEDIAN_OK) && (maxSE <= SE_MAX_CAP);
+  const individualCriterionMet = pctReliable >= STOP_PCT_RELIABLE;
   const stopAdvice = individualCriterionMet || cohortCriterionMet;
 
   if (stopAdvice) {

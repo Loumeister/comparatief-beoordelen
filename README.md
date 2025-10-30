@@ -145,9 +145,15 @@ Bekijk de definitieve rangorde en cijfers.
 - **Standard Error (SE)** gebaseerd op Hessian-diagonaalel** met ridge-regularisatie
 - **Newton-Raphson o
 
-### Betrouwbaarheidsdrempels
-- Individueel: SE ≤ 0.75 (betrouwbaar), SE ≤ 1.00 (bijna klaar)
-- Cohort: ≥70% betrouwbaar OF (mediaan ≤ 0.80 EN max ≤ 1.40)
+### Betrouwbaarheid & stopadvies
+- **Individueel**: 
+  - SE ≤ 0.75: "Resultaat betrouwbaar"
+  - SE ≤ 1.00: "Nog enkele vergelijkingen nodig"
+  - SE > 1.00: "Onvoldoende gegevens"
+- **Cohort (stopadvies)**: 
+  - ≥70% betrouwbaar (SE ≤ 0.75), **of**
+  - Mediaan(SE) ≤ 0.80 én max(SE) ≤ 1.40
+- **Minimum vergelijkingen**: Elke tekst krijgt minimaal 5 vergelijkingen (MIN_BASE) voordat deze als "klaar" wordt beschouwd
 
 ### Pairing-strategie
 - **Bridging**: Prioriteit voor vergelijkingen tussen ongekoppelde groepen

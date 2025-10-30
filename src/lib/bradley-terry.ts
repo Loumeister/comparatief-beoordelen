@@ -1,7 +1,7 @@
 import { Judgement, Text } from "./db";
-import { SE_RELIABLE, SE_SOME_MORE } from "./reliability-thresholds";
+import { SE_RELIABLE, SE_REPEAT } from "./constants";
 
-interface BTResult {
+export interface BTResultRow {
   textId: number;
   theta: number;
   standardError: number;
@@ -9,6 +9,15 @@ interface BTResult {
   label: string;
   grade: number;
   reliability: string;
+}
+
+export interface BTResults {
+  rows: BTResultRow[];
+  cohort: {
+    medianSE: number;
+    maxSE: number;
+    pctReliable: number; // 0..100
+  };
 }
 
 /**
@@ -23,13 +32,13 @@ export function calculateBradleyTerry(
   lambda: number = 0.1,
   topPct: number = 0.1,
   grading: { base?: number; scale?: number; min?: number; max?: number } = {}
-): BTResult[] {
+): BTResults {
   const base = grading.base ?? 7;
   const scale = grading.scale ?? 1.2;
   const gmin = grading.min ?? 1;
   const gmax = grading.max ?? 10;
   const n = texts.length;
-  if (n === 0) return [];
+  if (n === 0) return { rows: [], cohort: { medianSE: Infinity, maxSE: Infinity, pctReliable: 0 } };
 
   // index mapping
   const idxOf = new Map<number, number>(texts.map((t, i) => [t.id!, i]));
@@ -151,11 +160,11 @@ export function calculateBradleyTerry(
 
   function reliabilityFromSE(se: number): string {
     if (se <= SE_RELIABLE) return "Resultaat betrouwbaar";
-    if (se <= SE_SOME_MORE) return "Nog enkele vergelijkingen nodig";
+    if (se <= SE_REPEAT) return "Nog enkele vergelijkingen nodig";
     return "Onvoldoende gegevens";
   }
 
-  return out.map((r, i) => ({
+  const rows = out.map((r, i) => ({
     textId: r.textId,
     theta: r.theta,
     standardError: r.standardError,
@@ -164,4 +173,12 @@ export function calculateBradleyTerry(
     grade: gradeFromTheta(r.theta, sigma),
     reliability: reliabilityFromSE(r.standardError),
   }));
+
+  // Bereken cohort metrics
+  const seList = out.map(o => o.standardError).filter(Number.isFinite).sort((a,b)=>a-b);
+  const medianSE = seList.length ? seList[Math.floor(seList.length/2)] : Infinity;
+  const maxSE = seList.length ? Math.max(...seList) : Infinity;
+  const pctReliable = out.length ? (out.filter(o => o.standardError <= SE_RELIABLE).length / out.length) * 100 : 0;
+
+  return { rows, cohort: { medianSE, maxSE, pctReliable } };
 }
