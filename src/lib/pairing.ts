@@ -12,14 +12,14 @@ type BTInfo = {
 };
 
 type Options = {
-  targetComparisonsPerText?: number;  // richtwaarde, alleen voor progress
+  targetComparisonsPerText?: number;  // alleen voor progress
   batchSize?: number;                 // aantal paren per batch
   bt?: BTInfo;                        // actuele BT-info
   seThreshold?: number;               // “klaar” als SE ≤ seThreshold (bv. 0.75)
   seRepeatThreshold?: number;         // herhalen pas bij SE ≥ deze drempel (bv. 0.75)
   judgedPairsCounts?: Map<string, number>;
-  postTargetMode?: boolean;           // doorbeoordelen volgens strikte regels
   minBase?: number;                   // minimum exposures/tekst, bv. 3–5
+  allowFreeWhenEmpty?: boolean;       // <<< NIEUW: als geen informatieve paren, maak dan een kleine “vrije” batch
 };
 
 function key(a: number, b: number): string {
@@ -52,13 +52,6 @@ function allInOneComponent(dsu: DSU, n: number): boolean {
   return true;
 }
 
-/**
- * Strikte pairing:
- * - Pair alleen teksten die “werk” nodig hebben: SE > seThreshold of exposure < minBase
- * - Herhaling alleen als (bridge) of (minstens één SE ≥ seRepeatThreshold)
- * - PostTarget: zelfde regels; we laten alleen harde target-exposure los
- * - Geen UI-/positieaanpassing: A en B blijven zoals door caller aangeleverd
- */
 export function generatePairs(
   texts: Text[],
   existingJudgements: Judgement[],
@@ -71,6 +64,7 @@ export function generatePairs(
   const seThreshold = opts.seThreshold ?? 0.75;
   const seRepeatThreshold = opts.seRepeatThreshold ?? seThreshold;
   const minBase = Math.max(0, opts.minBase ?? 3);
+  const allowFreeWhenEmpty = opts.allowFreeWhenEmpty ?? false;
 
   if (texts.length < 2) return [];
 
@@ -128,7 +122,7 @@ export function generatePairs(
     return seOf(idI) >= seRepeatThreshold || seOf(idJ) >= seRepeatThreshold;
   };
 
-  // Scoring van kandidaatparen
+  // Scoring van kandidaatparen (strikt/informatief)
   function scoreOpp(iIdx: number, jIdx: number): number {
     if (!needsWork(iIdx) || !needsWork(jIdx)) return -Infinity;
     if (!canRepeat(iIdx, jIdx)) return -Infinity;
@@ -136,7 +130,6 @@ export function generatePairs(
     const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
     let s = 0;
 
-    // Bridges zijn prioriteit
     const bridge = dsu.find(iIdx) !== dsu.find(jIdx);
     if (bridge) s += 1000;
 
@@ -146,29 +139,43 @@ export function generatePairs(
     if (hasBT) {
       const dθ = Math.abs(thetaOf(idI) - thetaOf(idJ));
       const sumSE = seOf(idI) + seOf(idJ);
-
-      // Informatief: kleine Δθ en hogere SE
-      s += 10 - 10 * Math.min(dθ, 1);
-      s += 5 * Math.min(sumSE, 2);
-
-      // Straf op bijna zekere uitslagen
-      if (dθ > 3) s -= 20;
-
-      // Bonus als minstens één ≥ seRepeatThreshold
+      s += 10 - 10 * Math.min(dθ, 1);           // kleine Δθ informatief
+      s += 5 * Math.min(sumSE, 2);              // hogere SE informatief
+      if (dθ > 3) s -= 20;                      // bijna-zeker => minder waardevol
       if (seOf(idI) >= seRepeatThreshold || seOf(idJ) >= seRepeatThreshold) s += 15;
     }
 
-    // mini tiebreak
+    s += Math.random() * 0.001; // tiebreak
+    return s;
+  }
+
+  // Scoring “vrije modus” (als er geen strikte kandidaten zijn)
+  function scoreFree(iIdx: number, jIdx: number): number {
+    const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
+    const k = key(idI, idJ);
+    if (judgedPairs.has(k)) return -Infinity; // geen directe dubbele aanbieding
+    let s = 0;
+
+    // nog steeds bridges prefereren (past altijd)
+    const bridge = dsu.find(iIdx) !== dsu.find(jIdx);
+    if (bridge) s += 200;
+
+    // Exposures balanceren
+    s -= (exposure[iIdx] + exposure[jIdx]);
+
+    // Nog steeds: voorkom bijna-zekere blowouts en prefereer kleine Δθ
+    if (hasBT) {
+      const dθ = Math.abs(thetaOf(idI) - thetaOf(idJ));
+      s += 6 - 6 * Math.min(dθ, 1);   // iets milder dan strikt
+      if (dθ > 3) s -= 10;
+    }
+
     s += Math.random() * 0.001;
     return s;
   }
 
-  // Selectie: volgorde van aangeboden teksten bepalen; A en B worden getoond zoals aangeleverd
   function selectPair(iIdx: number, jIdx: number, selected: Pair[]) {
-    // geen flipping/logica voor links/rechts — UI blijft alfabetisch sorteren
     selected.push({ textA: texts[iIdx], textB: texts[jIdx] });
-
-    // update state
     const k = key(texts[iIdx].id!, texts[jIdx].id!);
     judgedPairs.add(k);
     exposure[iIdx]++; exposure[jIdx]++;
@@ -177,7 +184,7 @@ export function generatePairs(
 
   const selected: Pair[] = [];
 
-  // Fase 1: bridges
+  // Fase 1: bridges (strikt)
   const bridges: Array<{ iIdx: number; jIdx: number; score: number }> = [];
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
@@ -193,7 +200,7 @@ export function generatePairs(
     selectPair(b.iIdx, b.jIdx, selected);
   }
 
-  // Fase 2: intra-component informatief
+  // Fase 2: intra-component (strikt)
   if (selected.length < batchSize) {
     const candidates: Array<{ iIdx: number; jIdx: number; score: number }> = [];
     for (let i = 0; i < n; i++) {
@@ -207,6 +214,22 @@ export function generatePairs(
     for (const c of candidates) {
       if (selected.length >= batchSize) break;
       selectPair(c.iIdx, c.jIdx, selected);
+    }
+  }
+
+  // Fase 3: vrije modus (pas als fase 1+2 niets opleveren)
+  if (selected.length === 0 && allowFreeWhenEmpty) {
+    const free: Array<{ iIdx: number; jIdx: number; score: number }> = [];
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const sc = scoreFree(i, j);
+        if (sc > -Infinity) free.push({ iIdx: i, jIdx: j, score: sc });
+      }
+    }
+    free.sort((a, b) => b.score - a.score);
+    for (const f of free) {
+      if (selected.length >= Math.max(2, Math.ceil(batchSize / 2))) break; // kleine vrije batch
+      selectPair(f.iIdx, f.jIdx, selected);
     }
   }
 
