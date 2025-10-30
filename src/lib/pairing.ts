@@ -102,13 +102,6 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
     if (isBridging) s += 1000;
     if (count > 0 && !isBridging) s -= 5;
 
-    // NIEUW: Sterke bonus voor studenten die nog niet in batch zitten
-    const iInBatch = studentsInBatch.has(idI);
-    const jInBatch = studentsInBatch.has(idJ);
-    if (!iInBatch && !jInBatch) s += 100; // Beide nieuw: grote bonus
-    else if (!iInBatch || !jInBatch) s += 50; // Een nieuw: middelgrote bonus
-    else s -= 30; // Beide al in batch: penalty
-
     if (hasBT) {
       const dθ    = Math.abs(thetaOf(idI) - thetaOf(idJ));
       const seI   = seOf(idI), seJ = seOf(idJ);
@@ -135,10 +128,6 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
     const flip = Math.random() < 0.5;
     selected.push({ textA: flip ? texts[jIdx] : texts[iIdx], textB: flip ? texts[iIdx] : texts[jIdx] });
 
-    // Track studenten in batch
-    studentsInBatch.add(idI);
-    studentsInBatch.add(idJ);
-    
     judgedPairs.add(kkey);
     exposure[iIdx]++; exposure[jIdx]++;
     dsu.union(iIdx, jIdx);
@@ -146,8 +135,6 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
   }
 
   const pickedThisBatch = new Set<string>();
-  const studentsInBatch = new Set<number>(); // Track welke studenten al in batch zitten
-  
   function scoreOppAllowRepeat(iIdx: number, jIdx: number): number {
     const idI = texts[iIdx].id!, idJ = texts[jIdx].id!;
     const kkey = key(idI, idJ);
@@ -184,10 +171,6 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
     const flip = Math.random() < 0.5;
     selected.push({ textA: flip ? texts[jIdx] : texts[iIdx], textB: flip ? texts[iIdx] : texts[jIdx] });
 
-    // Track studenten in batch
-    studentsInBatch.add(idI);
-    studentsInBatch.add(idJ);
-    
     pickedThisBatch.add(kkey);
     judgedPairsCounts.set(kkey, (judgedPairsCounts.get(kkey) ?? 0) + 1);
     exposure[iIdx]++; exposure[jIdx]++;
