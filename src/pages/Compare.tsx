@@ -140,9 +140,6 @@ const Compare = () => {
         batchSize: batch,
         bt: { theta, se },
         judgedPairsCounts,
-        seThreshold: SE_RELIABLE,
-        seRepeatThreshold: 1.0,
-        relaxIfEmpty: false, // we doen fallback hier handmatig o.b.v. continueMode
       });
 
       // Als normale selectie leeg is en continueMode aan, vraag een vrije batch
@@ -152,9 +149,6 @@ const Compare = () => {
           batchSize: Math.max(2, Math.ceil(batch / 2)), // kleinere vrije batch
           bt: { theta, se },
           judgedPairsCounts,
-          seThreshold: SE_RELIABLE,
-          seRepeatThreshold: 1.0,
-          freeMode: true, // <<< vrije modus
         });
       }
 
@@ -198,9 +192,6 @@ const Compare = () => {
       batchSize: batch,
       bt: { theta, se },
       judgedPairsCounts,
-      seThreshold: SE_RELIABLE,
-      seRepeatThreshold: 1.0,
-      relaxIfEmpty: false,
     });
 
     if (nextPairs.length === 0 && continueMode) {
@@ -209,9 +200,6 @@ const Compare = () => {
         batchSize: Math.max(2, Math.ceil(batch / 2)),
         bt: { theta, se },
         judgedPairsCounts,
-        seThreshold: SE_RELIABLE,
-        seRepeatThreshold: 1.0,
-        freeMode: true,
       });
     }
 
