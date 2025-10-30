@@ -6,7 +6,7 @@ import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users, Set
 import { db, Assignment } from '@/lib/db';
 import { importDataset, importCSV, importResultsFromXLSX, exportDataset } from '@/lib/exportImport';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
-import { SE_RELIABLE } from '@/lib/reliability-thresholds';
+import { SE_RELIABLE } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';

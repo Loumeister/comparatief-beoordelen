@@ -13,7 +13,7 @@ import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from "@/lib/export
 import { exportDataset } from "@/lib/exportImport";
 import { useToast } from "@/hooks/use-toast";
 import { isConnected } from "@/lib/graph";
-import { SE_RELIABLE, SE_MAX_EDGE, COHORT_PCT_RELIABLE, COHORT_MEDIAN_OK } from "@/lib/reliability-thresholds";
+import { SE_RELIABLE, SE_MAX_EDGE, COHORT_PCT_RELIABLE, COHORT_MEDIAN_OK } from "@/lib/constants";
 import { StudentDetailsDialog } from "@/components/StudentDetailsDialog";
 import { HeaderNav } from "@/components/HeaderNav";
 

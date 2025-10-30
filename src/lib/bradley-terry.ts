@@ -1,5 +1,5 @@
 import { Judgement, Text } from "./db";
-import { SE_RELIABLE, SE_SOME_MORE } from "./reliability-thresholds";
+import { SE_RELIABLE, SE_SOME_MORE } from "./constants";
 
 interface BTResult {
   textId: number;
