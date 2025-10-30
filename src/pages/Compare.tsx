@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Info } from 'lucide-react';
 import { db, Assignment, AssignmentMeta, Text } from '@/lib/db';
 import { generatePairs } from '@/lib/pairing';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
@@ -14,6 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { HeaderNav } from '@/components/HeaderNav';
+import { assessReliability, ReliabilityAssessment } from '@/lib/reliability';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { MIN_BASE, SE_RELIABLE, DEFAULT_COMPARISONS_PER_TEXT, DEFAULT_BATCH_SIZE } from '@/lib/constants';
 
 function key(a: number, b: number): string {
@@ -80,7 +82,7 @@ const Compare = () => {
   const [replaceMode, setReplaceMode] = useState(false);
   const [isFinal, setIsFinal] = useState(false);
   const [raterId] = useState(() => `rater-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
-  const [noPairs, setNoPairs] = useState(false);
+  const [reliabilityAdvice, setReliabilityAdvice] = useState<ReliabilityAssessment | null>(null);
 
   // ---------- Data laden ----------
   const loadData = useCallback(async () => {
@@ -136,6 +138,11 @@ const Compare = () => {
 
       const batch = calculateDynamicBatchSize(texts, se, exposures);
 
+      // Bereken betrouwbaarheid voor advies
+      const bt = calculateBradleyTerry(texts, judgements, 0.3);
+      const reliability = assessReliability(bt, texts, judgements);
+      setReliabilityAdvice(reliability);
+
       // 1) Probeer eerst zonder repeats
       let newPairs = generatePairs(texts, judgements, {
         targetComparisonsPerText: targetPerText,
@@ -144,34 +151,29 @@ const Compare = () => {
         judgedPairsCounts
       });
 
-      // 2) Zo niet: als er nog werk is (SE>reliable of exposure<MIN_BASE), sta repeats toe (gecapte herkeuzen)
+      // 2) Als geen paren: sta ALTIJD repeats toe (gebruiker beslist zelf wanneer te stoppen)
       if (newPairs.length === 0) {
-        const thereIsWork = texts.some((t, idx) => {
-          const seVal = se.get(t.id!) ?? Infinity;
-          return exposures[idx] < MIN_BASE || seVal > SE_RELIABLE;
+        newPairs = generatePairs(texts, judgements, {
+          targetComparisonsPerText: targetPerText,
+          batchSize: Math.max(2, Math.ceil(batch / 2)),
+          bt: { theta, se },
+          judgedPairsCounts,
+          allowRepeats: true,
+          maxPairRejudgements: 10 // Verhoogd om altijd door te kunnen gaan
         });
-
-        if (thereIsWork) {
-          newPairs = generatePairs(texts, judgements, {
-            targetComparisonsPerText: targetPerText,
-            batchSize: Math.max(2, Math.ceil(batch / 2)),
-            bt: { theta, se },
-            judgedPairsCounts,
-            allowRepeats: true,
-            maxPairRejudgements: 3
-          });
-        }
       }
 
+      // Als er nog steeds geen paren zijn, probeer met nog hogere repeat limiet
       if (newPairs.length === 0) {
-        // Niet automatisch sluiten; geef zachte status weer in UI
-        setPairs([]);
-        setNoPairs(true);
-        setLoading(false);
-        return;
+        newPairs = generatePairs(texts, judgements, {
+          targetComparisonsPerText: targetPerText,
+          batchSize: Math.max(2, Math.ceil(batch / 2)),
+          bt: { theta, se },
+          judgedPairsCounts,
+          allowRepeats: true,
+          maxPairRejudgements: 100 // Zeer hoog om altijd paren te hebben
+        });
       }
-
-      setNoPairs(false);
       setPairs(newPairs);
       setCurrentIndex(0);
       setLoading(false);
@@ -201,6 +203,11 @@ const Compare = () => {
     const targetPerText = assignment.numComparisons || DEFAULT_COMPARISONS_PER_TEXT;
     const batch = calculateDynamicBatchSize(texts, se, exposures);
 
+    // Bereken betrouwbaarheid voor advies
+    const bt = calculateBradleyTerry(texts, judgements, 0.3);
+    const reliability = assessReliability(bt, texts, judgements);
+    setReliabilityAdvice(reliability);
+
     let nextPairs = generatePairs(texts, judgements, {
       targetComparisonsPerText: targetPerText,
       batchSize: batch,
@@ -208,31 +215,29 @@ const Compare = () => {
       judgedPairsCounts
     });
 
+    // Als geen paren: sta ALTIJD repeats toe
     if (nextPairs.length === 0) {
-      const thereIsWork = texts.some((t, idx) => {
-        const seVal = se.get(t.id!) ?? Infinity;
-        return exposures[idx] < MIN_BASE || seVal > SE_RELIABLE;
+      nextPairs = generatePairs(texts, judgements, {
+        targetComparisonsPerText: targetPerText,
+        batchSize: Math.max(2, Math.ceil(batch / 2)),
+        bt: { theta, se },
+        judgedPairsCounts,
+        allowRepeats: true,
+        maxPairRejudgements: 10
       });
-
-      if (thereIsWork) {
-        nextPairs = generatePairs(texts, judgements, {
-          targetComparisonsPerText: targetPerText,
-          batchSize: Math.max(2, Math.ceil(batch / 2)),
-          bt: { theta, se },
-          judgedPairsCounts,
-          allowRepeats: true,
-          maxPairRejudgements: 3
-        });
-      }
     }
 
+    // Als nog steeds geen paren: nog hogere limiet
     if (nextPairs.length === 0) {
-      setPairs([]);
-      setNoPairs(true);
-      return;
+      nextPairs = generatePairs(texts, judgements, {
+        targetComparisonsPerText: targetPerText,
+        batchSize: Math.max(2, Math.ceil(batch / 2)),
+        bt: { theta, se },
+        judgedPairsCounts,
+        allowRepeats: true,
+        maxPairRejudgements: 100
+      });
     }
-
-    setNoPairs(false);
     setPairs(nextPairs);
     setCurrentIndex(0);
     setReplaceMode(false);
@@ -351,8 +356,7 @@ const Compare = () => {
     );
   }
 
-  // Lege batch? Niet afsluiten—toon zachte melding + knoppen
-  if (pairs.length === 0 && noPairs) {
+  if (pairs.length === 0) {
     return (
       <div className="min-h-screen bg-background">
         <div className="border-b bg-card">
@@ -371,12 +375,12 @@ const Compare = () => {
         <div className="max-w-3xl mx-auto p-8">
           <Card className="shadow-lg">
             <CardContent className="p-6 space-y-4">
-              <p className="text-lg font-medium">Geen nieuwe paren gevonden.</p>
+              <p className="text-lg font-medium">Geen paren beschikbaar</p>
               <p className="text-sm text-muted-foreground">
-                Alle nog informatieve paren zijn tijdelijk uitgeput. Je kunt:
+                Er zijn momenteel geen vergelijkingsparen beschikbaar.
               </p>
               <div className="flex gap-2">
-                <Button variant="default" onClick={reloadPairs}>Nieuwe batch ophalen</Button>
+                <Button variant="default" onClick={loadData}>Opnieuw laden</Button>
                 <Button variant="outline" onClick={() => navigate(`/results/${assignment?.id}`)}>Bekijk resultaten</Button>
               </div>
             </CardContent>
@@ -384,11 +388,6 @@ const Compare = () => {
         </div>
       </div>
     );
-  }
-
-  if (pairs.length === 0) {
-    // fallback (zou zelden worden geraakt)
-    return null;
   }
 
   const currentPair = pairs[currentIndex];
@@ -427,6 +426,26 @@ const Compare = () => {
 
       {/* Comparison Area */}
       <div className="max-w-7xl mx-auto p-6">
+        {/* Reliability Advice Banner */}
+        {reliabilityAdvice && (
+          <Alert className={`mb-6 ${reliabilityAdvice.isReliable ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800' : 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800'}`}>
+            <Info className="h-4 w-4" />
+            <AlertDescription className="ml-2">
+              <div className="font-medium mb-1">
+                {reliabilityAdvice.isReliable ? '✓ Advies: Resultaten zijn betrouwbaar' : 'ℹ️ Advies: Meer vergelijkingen aanbevolen'}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {reliabilityAdvice.message} Je kunt altijd doorgaan met beoordelen of{' '}
+                <button 
+                  onClick={() => navigate(`/results/${assignment?.id}`)}
+                  className="underline hover:text-foreground"
+                >
+                  bekijk de huidige resultaten
+                </button>.
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Judgement Controls */}
         <Card className="shadow-lg mb-6">
           <CardContent className="p-6">
