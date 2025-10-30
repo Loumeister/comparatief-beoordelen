@@ -445,7 +445,7 @@ const Compare = () => {
       {/* Comparison Area */}
       <div className="max-w-7xl mx-auto p-6">
         {/* Reliability Advice Banner */}
-        {reliabilityAdvice && (
+        {reliabilityAdvice && reliabilityAdvice.corePercentage > 80 && (
           <Alert
             className={`mb-6 ${reliabilityAdvice.isReliable ? "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800" : "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800"}`}
           >
