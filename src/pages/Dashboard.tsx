@@ -6,7 +6,7 @@ import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users, Set
 import { db, Assignment } from '@/lib/db';
 import { importDataset, importCSV, importResultsFromXLSX, exportDataset } from '@/lib/exportImport';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
-import { SE_RELIABLE } from '@/lib/constants';
+import { SE_RELIABLE } from '@/lib/reliability-thresholds';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -48,8 +48,8 @@ const Dashboard = () => {
         const judgementsData = await db.judgements.where('assignmentId').equals(assign.id!).toArray();
         
         const results = calculateBradleyTerry(textsData, judgementsData);
-        const reliableCount = results.rows.filter(r => r.standardError <= SE_RELIABLE).length;
-        reliabilityPct = Math.round((reliableCount / results.rows.length) * 100);
+        const reliableCount = results.filter(r => r.standardError <= SE_RELIABLE).length;
+        reliabilityPct = Math.round((reliableCount / results.length) * 100);
       }
       
       statsMap.set(assign.id, { texts, judgements, reliabilityPct });

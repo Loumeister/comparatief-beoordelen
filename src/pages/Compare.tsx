@@ -6,14 +6,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft } from 'lucide-react';
-import { db, Assignment, AssignmentMeta, Text } from '@/lib/db';
+import { db, Assignment, AssignmentMeta } from '@/lib/db';
 import { generatePairs, Pair } from '@/lib/pairing';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { HeaderNav } from '@/components/HeaderNav';
-import { MIN_BASE, SE_RELIABLE, DEFAULT_COMPARISONS_PER_TEXT, DEFAULT_BATCH_SIZE } from '@/lib/constants';
+
+const DEFAULT_COMPARISONS_PER_TEXT = 10;
+const DEFAULT_BATCH_SIZE = 8; // kleinere batches voor sneller adaptief pairen
 
 function key(a: number, b: number): string {
   return `${Math.min(a, b)}-${Math.max(a, b)}`;
@@ -24,9 +26,9 @@ async function buildBTMaps(assignmentId: number) {
   const texts = await db.texts.where('assignmentId').equals(assignmentId).toArray();
   const judgements = await db.judgements.where('assignmentId').equals(assignmentId).toArray();
   // Hogere ridge (0.3) om extreme θ-uitschieters te temmen
-  const bt = calculateBradleyTerry(texts, judgements, 0.3);
-  const theta = new Map(bt.rows.map(r => [r.textId, r.theta]));
-  const se = new Map(bt.rows.map(r => [r.textId, r.standardError]));
+  const res = calculateBradleyTerry(texts, judgements, 0.3);
+  const theta = new Map(res.map(r => [r.textId, r.theta]));
+  const se = new Map(res.map(r => [r.textId, r.standardError]));
   
   // Bouw judgedPairsCounts
   const judgedPairsCounts = new Map<string, number>();
@@ -35,28 +37,7 @@ async function buildBTMaps(assignmentId: number) {
     judgedPairsCounts.set(k, (judgedPairsCounts.get(k) ?? 0) + 1);
   }
   
-  // Bereken exposures
-  const exposures = new Array(texts.length).fill(0);
-  const id2idx = new Map<number, number>(texts.map((t,i)=>[t.id!, i]));
-  for (const j of judgements) {
-    const ia = id2idx.get(j.textAId); 
-    const ib = id2idx.get(j.textBId);
-    if (ia!=null) exposures[ia]++; 
-    if (ib!=null) exposures[ib]++;
-  }
-  
-  return { texts, judgements, theta, se, judgedPairsCounts, exposures };
-}
-
-function calculateDynamicBatchSize(texts: Text[], seMap: Map<number, number>, exposures: number[]): number {
-  const needWork = texts.filter((t, idx) => {
-    const se = seMap.get(t.id!) ?? Infinity;
-    return exposures[idx] < MIN_BASE || se > SE_RELIABLE;
-  }).length;
-
-  const ratio = needWork / texts.length;
-  if (ratio <= 0.3) return Math.max(2, Math.ceil(needWork * 2));
-  return DEFAULT_BATCH_SIZE;
+  return { texts, judgements, theta, se, judgedPairsCounts };
 }
 
 const Compare = () => {
@@ -105,7 +86,7 @@ const Compare = () => {
       }
       setAssignmentMeta(meta);
 
-      const { texts, judgements, theta, se, judgedPairsCounts, exposures } = await buildBTMaps(id);
+      const { texts, judgements, theta, se, judgedPairsCounts } = await buildBTMaps(id);
       setPairCounts(judgedPairsCounts);
       
       // Tel hoe vaak elke tekst is beoordeeld
@@ -132,11 +113,11 @@ const Compare = () => {
       setTotalJudgements(judgements.length);
       setExpectedTotal(expectedTotal);
 
-      const batch = calculateDynamicBatchSize(texts, se, exposures);
       const newPairs = generatePairs(texts, judgements, {
         targetComparisonsPerText: assign.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
-        batchSize: batch,
+        batchSize: DEFAULT_BATCH_SIZE,
         bt: { theta, se },
+        seRepeatThreshold: meta.seRepeatThreshold,
         judgedPairsCounts
       });
 
@@ -161,7 +142,7 @@ const Compare = () => {
     if (!assignment || !assignmentMeta) return;
     const id = assignment.id!;
     
-    const { texts, judgements, theta, se, judgedPairsCounts, exposures } = await buildBTMaps(id);
+    const { texts, judgements, theta, se, judgedPairsCounts } = await buildBTMaps(id);
     setPairCounts(judgedPairsCounts);
     
     // Tel hoe vaak elke tekst is beoordeeld
@@ -172,11 +153,12 @@ const Compare = () => {
     }
     setTextCounts(textCountsMap);
 
-    const batch = calculateDynamicBatchSize(texts, se, exposures);
     const nextPairs = generatePairs(texts, judgements, {
       targetComparisonsPerText: assignment.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
-      batchSize: batch,
+      batchSize: DEFAULT_BATCH_SIZE,
       bt: { theta, se },
+      seThreshold: 0.3,
+      seRepeatThreshold: assignmentMeta.seRepeatThreshold,
       judgedPairsCounts
     });
 
