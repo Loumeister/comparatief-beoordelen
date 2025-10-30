@@ -1,5 +1,6 @@
-import { Judgement, Text } from "./db";
-import { SE_RELIABLE, SE_SOME_MORE } from "./constants";
+// src/lib/bradley-terry.ts
+import type { Judgement, Text } from "@/lib/db";
+import { SE_RELIABLE, SE_SOME_MORE } from "@/lib/constants";
 
 interface BTResult {
   textId: number;
