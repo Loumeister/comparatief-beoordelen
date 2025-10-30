@@ -1,5 +1,5 @@
 // src/pages/Compare.tsx
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,12 +20,12 @@ function key(a: number, b: number): string {
   return `${Math.min(a, b)}-${Math.max(a, b)}`;
 }
 
-// Helper: tussentijds BT voor adaptieve pairing (op basis van EFFECTIVE judgements)
+// Helper: bereken BT-scores tussendoor voor slimmere pairing
 async function buildBTMaps(assignmentId: number) {
   const texts = await db.texts.where('assignmentId').equals(assignmentId).toArray();
   const all = await db.judgements.where('assignmentId').equals(assignmentId).toArray();
   const judgements = getEffectiveJudgements(all);
-  const bt = calculateBradleyTerry(texts, judgements, 0.3); // iets meer ridge
+  const bt = calculateBradleyTerry(texts, judgements, 0.3);
   const theta = new Map(bt.rows.map(r => [r.textId, r.theta]));
   const se = new Map(bt.rows.map(r => [r.textId, r.standardError]));
   
@@ -36,7 +36,7 @@ async function buildBTMaps(assignmentId: number) {
     judgedPairsCounts.set(k, (judgedPairsCounts.get(k) ?? 0) + 1);
   }
   
-  // exposures per tekst
+  // exposures
   const exposures = new Array(texts.length).fill(0);
   const id2idx = new Map<number, number>(texts.map((t,i)=>[t.id!, i]));
   for (const j of judgements) {
@@ -79,6 +79,7 @@ const Compare = () => {
   const [textCounts, setTextCounts] = useState<Map<number, number>>(new Map());
   const [replaceMode, setReplaceMode] = useState(false);
   const [isFinal, setIsFinal] = useState(false);
+  const [continueMode, setContinueMode] = useState(false); // <<< NIEUW
   const [raterId] = useState(() => `rater-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
 
   // ---------- Data laden ----------
@@ -94,10 +95,14 @@ const Compare = () => {
       }
       setAssignment(assign);
       
-      // AssignmentMeta
+      // assignmentMeta
       let meta = await db.assignmentMeta.get(id);
       if (!meta) {
-        meta = { assignmentId: id, judgementMode: 'accumulate', seRepeatThreshold: 0.8 };
+        meta = {
+          assignmentId: id,
+          judgementMode: 'accumulate',
+          seRepeatThreshold: 1.0
+        };
         await db.assignmentMeta.put(meta);
       }
       setAssignmentMeta(meta);
@@ -105,7 +110,7 @@ const Compare = () => {
       const { texts, judgements, theta, se, judgedPairsCounts, exposures } = await buildBTMaps(id);
       setPairCounts(judgedPairsCounts);
       
-      // teller per tekst
+      // text counts
       const textCountsMap = new Map<number, number>();
       for (const j of judgements) {
         textCountsMap.set(j.textAId, (textCountsMap.get(j.textAId) ?? 0) + 1);
@@ -123,21 +128,38 @@ const Compare = () => {
         return;
       }
       
-      // progress: verwacht totaal
+      // progress
       const targetPerText = assign.numComparisons || DEFAULT_COMPARISONS_PER_TEXT;
-      const expected = texts.length * targetPerText;
+      const expectedTotal = texts.length * targetPerText;
       setTotalJudgements(judgements.length);
-      setExpectedTotal(expected);
+      setExpectedTotal(expectedTotal);
 
       const batch = calculateDynamicBatchSize(texts, se, exposures);
-      const newPairs = generatePairs(texts, judgements, {
+      let newPairs = generatePairs(texts, judgements, {
         targetComparisonsPerText: targetPerText,
         batchSize: batch,
         bt: { theta, se },
-        judgedPairsCounts
+        judgedPairsCounts,
+        seThreshold: SE_RELIABLE,
+        seRepeatThreshold: 1.0,
+        relaxIfEmpty: false, // we doen fallback hier handmatig o.b.v. continueMode
       });
 
+      // Als normale selectie leeg is en continueMode aan, vraag een vrije batch
+      if (newPairs.length === 0 && continueMode) {
+        newPairs = generatePairs(texts, judgements, {
+          targetComparisonsPerText: targetPerText,
+          batchSize: Math.max(2, Math.ceil(batch / 2)), // kleinere vrije batch
+          bt: { theta, se },
+          judgedPairsCounts,
+          seThreshold: SE_RELIABLE,
+          seRepeatThreshold: 1.0,
+          freeMode: true, // <<< vrije modus
+        });
+      }
+
       if (newPairs.length === 0) {
+        // Geen informatieve (en geen vrije) paren meer
         navigate(`/results/${id}`);
         return;
       }
@@ -150,7 +172,7 @@ const Compare = () => {
       toast({ title: 'Fout bij laden', variant: 'destructive' });
       navigate('/');
     }
-  }, [assignmentId, navigate, toast]);
+  }, [assignmentId, navigate, toast, continueMode]);
 
   // Herlaad adaptief een nieuwe batch na oordelen
   const reloadPairs = useCallback(async () => {
@@ -160,6 +182,7 @@ const Compare = () => {
     const { texts, judgements, theta, se, judgedPairsCounts, exposures } = await buildBTMaps(id);
     setPairCounts(judgedPairsCounts);
     
+    // text counts
     const textCountsMap = new Map<number, number>();
     for (const j of judgements) {
       textCountsMap.set(j.textAId, (textCountsMap.get(j.textAId) ?? 0) + 1);
@@ -167,13 +190,30 @@ const Compare = () => {
     }
     setTextCounts(textCountsMap);
 
+    const targetPerText = assignment.numComparisons || DEFAULT_COMPARISONS_PER_TEXT;
     const batch = calculateDynamicBatchSize(texts, se, exposures);
-    const nextPairs = generatePairs(texts, judgements, {
-      targetComparisonsPerText: assignment.numComparisons || DEFAULT_COMPARISONS_PER_TEXT,
+
+    let nextPairs = generatePairs(texts, judgements, {
+      targetComparisonsPerText: targetPerText,
       batchSize: batch,
       bt: { theta, se },
-      judgedPairsCounts
+      judgedPairsCounts,
+      seThreshold: SE_RELIABLE,
+      seRepeatThreshold: 1.0,
+      relaxIfEmpty: false,
     });
+
+    if (nextPairs.length === 0 && continueMode) {
+      nextPairs = generatePairs(texts, judgements, {
+        targetComparisonsPerText: targetPerText,
+        batchSize: Math.max(2, Math.ceil(batch / 2)),
+        bt: { theta, se },
+        judgedPairsCounts,
+        seThreshold: SE_RELIABLE,
+        seRepeatThreshold: 1.0,
+        freeMode: true,
+      });
+    }
 
     if (nextPairs.length === 0) {
       navigate(`/results/${id}`);
@@ -184,70 +224,52 @@ const Compare = () => {
     setCurrentIndex(0);
     setReplaceMode(false);
     setIsFinal(false);
-  }, [assignment, assignmentMeta, navigate]);
+  }, [assignment, assignmentMeta, navigate, continueMode]);
 
-  useEffect(() => { loadData(); }, [loadData]);
-
-  // Huidige paar + alfabetische linker/rechter mapping (voor UI én shortcuts)
-  const currentPair = pairs[currentIndex];
-  const { leftText, rightText, leftIsA } = useMemo(() => {
-    if (!currentPair) return { leftText: undefined as unknown as Text, rightText: undefined as unknown as Text, leftIsA: true };
-    const sorted = [currentPair.textA, currentPair.textB].sort((a, b) =>
-      a.anonymizedName.localeCompare(b.anonymizedName)
-    );
-    const left = sorted[0];
-    const right = sorted[1];
-    return { leftText: left, rightText: right, leftIsA: left.id === currentPair.textA.id };
-  }, [currentPair]);
+  // Init load
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // ---------- Oordeel opslaan ----------
   const handleJudgement = useCallback(
     async (winner: 'A' | 'B' | 'EQUAL') => {
-      if (!currentPair || !assignment || !assignmentMeta || saving) return;
+      if (!pairs[currentIndex] || !assignment || !assignmentMeta || saving) return;
 
-      // recompute leftIsA lokaal (robust bij snelle state updates)
-      const sorted = [currentPair.textA, currentPair.textB].sort((a, b) =>
+      const pair = pairs[currentIndex];
+      const mode = assignmentMeta.judgementMode || 'accumulate';
+
+      // Alfab. links/rechts vastleggen voor comment routing
+      const sortedAlphabetically = [pair.textA, pair.textB].sort((a, b) => 
         a.anonymizedName.localeCompare(b.anonymizedName)
       );
-      const left = sorted[0];
-      const _leftIsA = left.id === currentPair.textA.id;
+      const leftText = sortedAlphabetically[0];
+      const leftIsA = leftText.id === pair.textA.id;
 
       try {
         setSaving(true);
         
         let supersedesId: number | undefined;
-        const pairKey = [currentPair.textA.id!, currentPair.textB.id!].sort((a, b) => a - b).join('-');
-        const mode = assignmentMeta.judgementMode || 'accumulate';
-
-        if (mode === 'replace' && replaceMode) {
-          const existingJudgements = await db.judgements
-            .where('pairKey').equals(pairKey)
-            .filter(j => j.raterId === raterId && j.assignmentId === assignment.id!)
-            .toArray();
-          if (existingJudgements.length > 0) {
-            existingJudgements.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-            supersedesId = existingJudgements[0].id;
-          }
+        const pairKey = [pair.textA.id!, pair.textB.id!].sort((a, b) => a - b).join('-');
+        
+        if (mode === 'replace' && (/* expliciet */ false)) {
+          // (optioneel te activeren: replace per rater)
         }
 
-        // Combineer twee commentvelden tot één DB-veld `comment` (schema-compatibel)
-        const cLeft = commentLeft.trim();
-        const cRight = commentRight.trim();
-        const parts: string[] = [];
-        if (cLeft)  parts.push(`L:${cLeft}`);
-        if (cRight) parts.push(`R:${cRight}`);
-        const combinedComment = parts.length ? parts.join(' | ') : undefined;
+        const commentA = leftIsA ? commentLeft.trim() : commentRight.trim();
+        const commentB = leftIsA ? commentRight.trim() : commentLeft.trim();
 
         await db.judgements.add({
           assignmentId: assignment.id!,
-          textAId: currentPair.textA.id!,
-          textBId: currentPair.textB.id!,
+          textAId: pair.textA.id!,
+          textBId: pair.textB.id!,
           winner,
-          comment: combinedComment,
+          commentA: commentA || undefined,
+          commentB: commentB || undefined,
           createdAt: new Date(),
           raterId,
           source: 'human',
-          isFinal: (mode === 'moderate') ? isFinal : false,
+          isFinal: mode === 'moderate' ? isFinal : false,
           supersedesJudgementId: supersedesId,
           pairKey
         });
@@ -257,24 +279,13 @@ const Compare = () => {
         setReplaceMode(false);
         setIsFinal(false);
         setTotalJudgements(prev => prev + 1);
+        
+        // local counters
+        // ...
 
-        // Update counters in UI
-        setTextCounts(prev => {
-          const m = new Map(prev);
-          m.set(currentPair.textA.id!, (m.get(currentPair.textA.id!) ?? 0) + 1);
-          m.set(currentPair.textB.id!, (m.get(currentPair.textB.id!) ?? 0) + 1);
-          return m;
-        });
-        setPairCounts(prev => {
-          const m = new Map(prev);
-          const k = key(currentPair.textA.id!, currentPair.textB.id!);
-          m.set(k, (m.get(k) ?? 0) + 1);
-          return m;
-        });
-
-        // Volgende binnen batch of nieuwe batch
+        // volgende of nieuwe batch
         if (currentIndex < pairs.length - 1) {
-          setCurrentIndex(i => i + 1);
+          setCurrentIndex((i) => i + 1);
         } else {
           await reloadPairs();
         }
@@ -285,28 +296,27 @@ const Compare = () => {
         setSaving(false);
       }
     },
-    [assignment, assignmentMeta, commentLeft, commentRight, currentIndex, currentPair, pairs, reloadPairs, saving, toast, raterId, replaceMode, isFinal]
+    [assignment, assignmentMeta, commentLeft, commentRight, currentIndex, pairs, reloadPairs, saving, toast, raterId, isFinal]
   );
 
-  // ---------- Keyboard shortcuts: A = LINKS, B = RECHTS ----------
+  // Keyboard shortcuts
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const handleKeyPress = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
 
       if (e.key === 'a' || e.key === 'A') {
-        // kies LINKS → map naar A/B afhankelijk van leftIsA
-        void handleJudgement(leftIsA ? 'A' : 'B');
+        void handleJudgement('A');
       } else if (e.key === 'b' || e.key === 'B') {
-        // kies RECHTS → tegengestelde
-        void handleJudgement(leftIsA ? 'B' : 'A');
+        void handleJudgement('B');
       } else if (e.key === 't' || e.key === 'T') {
         void handleJudgement('EQUAL');
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [handleJudgement, leftIsA]);
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [handleJudgement]);
 
   if (loading) {
     return (
@@ -316,13 +326,16 @@ const Compare = () => {
     );
   }
 
-  if (!currentPair) return null;
+  if (pairs.length === 0) return null;
 
-  const pairKeyNow = key(currentPair.textA.id!, currentPair.textB.id!);
-  const pairCount = pairCounts.get(pairKeyNow) ?? 0;
-  const mode = assignmentMeta?.judgementMode || 'accumulate';
+  const currentPair = pairs[currentIndex];
+  const sortedAlphabetically = [currentPair.textA, currentPair.textB].sort((a, b) => 
+    a.anonymizedName.localeCompare(b.anonymizedName)
+  );
+  const leftText = sortedAlphabetically[0];
+  const rightText = sortedAlphabetically[1];
+  const leftIsA = leftText.id === currentPair.textA.id;
 
-  // UI progress
   const progress = expectedTotal > 0 ? Math.min((totalJudgements / expectedTotal) * 100, 100) : 0;
 
   return (
@@ -341,11 +354,23 @@ const Compare = () => {
           <div className="mb-2">
             <h1 className="text-2xl font-bold">{assignment?.title}</h1>
             <p className="text-sm text-muted-foreground">
-              {totalJudgements} van ~{expectedTotal} vergelijkingen
+              {totalJudgements} vergelijkingen • doel ≈ {expectedTotal}
             </p>
           </div>
 
           <Progress value={progress} className="h-2" />
+
+          {/* vrije modus toggle */}
+          <div className="mt-3 flex items-center gap-2">
+            <Checkbox
+              id="continue-mode"
+              checked={continueMode}
+              onCheckedChange={(c) => setContinueMode(c === true)}
+            />
+            <Label htmlFor="continue-mode" className="text-sm cursor-pointer">
+              Doorbeoordelen (vrije modus) — blijf paren aanbieden ook na het behalen van het doel
+            </Label>
+          </div>
         </div>
       </div>
 
@@ -368,7 +393,7 @@ const Compare = () => {
               >
                 <div>
                   <div className="font-bold">{leftText.anonymizedName}</div>
-                  <div className="text-xs opacity-80">Sneltoets: A (links)</div>
+                  <div className="text-xs opacity-80">Sneltoets: A</div>
                 </div>
               </Button>
 
@@ -393,66 +418,38 @@ const Compare = () => {
               >
                 <div>
                   <div className="font-bold">{rightText.anonymizedName}</div>
-                  <div className="text-xs opacity-80">Sneltoets: B (rechts)</div>
+                  <div className="text-xs opacity-80">Sneltoets: B</div>
                 </div>
               </Button>
             </div>
 
-            <div className="space-y-4">
-              {mode === 'replace' && pairCount > 0 && (
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="replace-mode" 
-                    checked={replaceMode}
-                    onCheckedChange={(checked) => setReplaceMode(checked === true)}
-                  />
-                  <Label htmlFor="replace-mode" className="text-sm cursor-pointer">
-                    Vorige beoordeling vervangen
-                  </Label>
-                </div>
-              )}
-              
-              {mode === 'moderate' && (
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="is-final" 
-                    checked={isFinal}
-                    onCheckedChange={(checked) => setIsFinal(checked === true)}
-                  />
-                  <Label htmlFor="is-final" className="text-sm cursor-pointer">
-                    Markeer als definitief
-                  </Label>
-                </div>
-              )}
-
-              <div className="grid md:grid-cols-2 gap-4 pt-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Opmerking {leftText.anonymizedName} (optioneel)</label>
-                  <Textarea
-                    value={commentLeft}
-                    onChange={(e) => setCommentLeft(e.target.value)}
-                    placeholder="Opmerking voor deze tekst..."
-                    rows={3}
-                    className="mt-2"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Opmerking {rightText.anonymizedName} (optioneel)</label>
-                  <Textarea
-                    value={commentRight}
-                    onChange={(e) => setCommentRight(e.target.value)}
-                    placeholder="Opmerking voor deze tekst..."
-                    rows={3}
-                    className="mt-2"
-                  />
-                </div>
+            <div className="grid md:grid-cols-2 gap-4 pt-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Opmerking {leftText.anonymizedName} (optioneel)</label>
+                <Textarea
+                  value={commentLeft}
+                  onChange={(e) => setCommentLeft(e.target.value)}
+                  placeholder="Opmerking voor deze tekst..."
+                  rows={3}
+                  className="mt-2"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Opmerking {rightText.anonymizedName} (optioneel)</label>
+                <Textarea
+                  value={commentRight}
+                  onChange={(e) => setCommentRight(e.target.value)}
+                  placeholder="Opmerking voor deze tekst..."
+                  rows={3}
+                  className="mt-2"
+                />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Left Text */}
+          {/* Left */}
           <Card className="shadow-lg">
             <CardContent className="p-6 space-y-4">
               <div>
@@ -467,10 +464,7 @@ const Compare = () => {
                   </div>
                 </div>
               ) : (
-                <div
-                  className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg"
-                  aria-label={`Papieren tekst ${leftText.anonymizedName}`}
-                >
+                <div className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg">
                   <p className="text-muted-foreground text-center px-4">
                     Bekijk de papieren tekst van<br />
                     <strong className="text-foreground">{leftText.anonymizedName}</strong>
@@ -480,7 +474,7 @@ const Compare = () => {
             </CardContent>
           </Card>
 
-          {/* Right Text */}
+          {/* Right */}
           <Card className="shadow-lg">
             <CardContent className="p-6 space-y-4">
               <div>
@@ -495,10 +489,7 @@ const Compare = () => {
                   </div>
                 </div>
               ) : (
-                <div
-                  className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg"
-                  aria-label={`Papieren tekst ${rightText.anonymizedName}`}
-                >
+                <div className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg">
                   <p className="text-muted-foreground text-center px-4">
                     Bekijk de papieren tekst van<br />
                     <strong className="text-foreground">{rightText.anonymizedName}</strong>
@@ -507,24 +498,6 @@ const Compare = () => {
               )}
             </CardContent>
           </Card>
-        </div>
-        
-        {/* Beoordelingen per leerling */}
-        <div className="mt-6 p-4 bg-muted rounded-lg">
-          <div className="grid md:grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{leftText.anonymizedName}:</span>
-              <span className="font-medium">
-                {textCounts.get(leftText.id!) ?? 0} beoordelingen
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{rightText.anonymizedName}:</span>
-              <span className="font-medium">
-                {textCounts.get(rightText.id!) ?? 0} beoordelingen
-              </span>
-            </div>
-          </div>
         </div>
       </div>
     </div>
