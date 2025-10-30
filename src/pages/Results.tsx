@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle, Link2, Eye, EyeOff, Database, MessageSquare } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle, Link2, Eye, EyeOff, Database, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { db, Assignment } from "@/lib/db";
 import { calculateBradleyTerry } from "@/lib/bradley-terry";
@@ -28,6 +28,8 @@ const Results = () => {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<'rank' | 'name' | null>('rank');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     loadResults();
@@ -203,6 +205,32 @@ const Results = () => {
     if (reliability === "Resultaat betrouwbaar") return "text-secondary";
     if (reliability === "Nog enkele vergelijkingen nodig") return "text-primary";
     return "text-destructive";
+  };
+
+  const handleSort = (column: 'rank' | 'name') => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedResults = [...results].sort((a, b) => {
+    if (sortColumn === 'name') {
+      const comparison = a.anonymizedName.localeCompare(b.anonymizedName, 'nl');
+      return sortDirection === 'asc' ? comparison : -comparison;
+    }
+    // Default: sort by rank
+    const comparison = a.rank - b.rank;
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+
+  const getSortIcon = (column: 'rank' | 'name') => {
+    if (sortColumn !== column) return <ArrowUpDown className="w-4 h-4 ml-1 inline" />;
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="w-4 h-4 ml-1 inline" />
+      : <ArrowDown className="w-4 h-4 ml-1 inline" />;
   };
 
   if (loading) {
@@ -406,8 +434,12 @@ const Results = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-16">Rang</TableHead>
-                  <TableHead>Tekst</TableHead>
+                  <TableHead className="w-16 cursor-pointer hover:bg-muted/50" onClick={() => handleSort('rank')}>
+                    Rang{getSortIcon('rank')}
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('name')}>
+                    Tekst{getSortIcon('name')}
+                  </TableHead>
                   <TableHead>Label</TableHead>
                   <TableHead className="text-right">Cijfer</TableHead>
                   {showDetails && (
@@ -421,7 +453,7 @@ const Results = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {results.map((r) => (
+                {sortedResults.map((r) => (
                   <TableRow key={`${r.rank}-${r.anonymizedName}`} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedStudent(r.anonymizedName)}>
                     <TableCell className="font-bold text-lg">{r.rank}</TableCell>
                     <TableCell className="font-medium text-primary hover:underline">
