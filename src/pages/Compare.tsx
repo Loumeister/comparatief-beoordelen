@@ -29,15 +29,14 @@ async function buildBTMaps(assignmentId: number) {
   const theta = new Map<number, number>(bt.map((r) => [r.textId, r.theta]));
   const se = new Map<number, number>(bt.map((r) => [r.textId, r.standardError]));
 
-  // judgedPairsCounts - tel ALLE judgements (niet alleen effectieve)
-  // zodat gebruiker niet steeds dezelfde paren krijgt
+  // telt ALLE judgements (niet alleen effectieve) voor herhaalbeperking
   const judgedPairsCounts = new Map<string, number>();
   for (const j of all) {
     const k = key(j.textAId, j.textBId);
     judgedPairsCounts.set(k, (judgedPairsCounts.get(k) ?? 0) + 1);
   }
 
-  // exposures - tel ook ALLE judgements voor consistentie
+  // exposures (ook alle judgements)
   const exposures = new Array(texts.length).fill(0);
   const id2idx = new Map<number, number>(texts.map((t, i) => [t.id!, i]));
   for (const j of all) {
@@ -148,7 +147,7 @@ const Compare = () => {
       const reliability = assessReliability(bt, texts, judgements);
       setReliabilityAdvice(reliability);
 
-      // 1) Probeer eerst zonder repeats
+      // Globale batchselectie (matching) in pairing.ts — geen extra flags nodig
       let newPairs = generatePairs(texts, judgements, {
         targetComparisonsPerText: targetPerText,
         batchSize: batch,
@@ -156,7 +155,6 @@ const Compare = () => {
         judgedPairsCounts,
       });
 
-      // 2) Als geen paren: sta ALTIJD repeats toe (gebruiker beslist zelf wanneer te stoppen)
       if (newPairs.length === 0) {
         newPairs = generatePairs(texts, judgements, {
           targetComparisonsPerText: targetPerText,
@@ -164,11 +162,10 @@ const Compare = () => {
           bt: { theta, se },
           judgedPairsCounts,
           allowRepeats: true,
-          maxPairRejudgements: 10, // Verhoogd om altijd door te kunnen gaan
+          maxPairRejudgements: 10,
         });
       }
 
-      // Als er nog steeds geen paren zijn, probeer met nog hogere repeat limiet
       if (newPairs.length === 0) {
         newPairs = generatePairs(texts, judgements, {
           targetComparisonsPerText: targetPerText,
@@ -176,7 +173,7 @@ const Compare = () => {
           bt: { theta, se },
           judgedPairsCounts,
           allowRepeats: true,
-          maxPairRejudgements: 100, // Zeer hoog om altijd paren te hebben
+          maxPairRejudgements: 100,
         });
       }
       setPairs(newPairs);
@@ -220,7 +217,6 @@ const Compare = () => {
       judgedPairsCounts,
     });
 
-    // Als geen paren: sta ALTIJD repeats toe
     if (nextPairs.length === 0) {
       nextPairs = generatePairs(texts, judgements, {
         targetComparisonsPerText: targetPerText,
@@ -232,7 +228,6 @@ const Compare = () => {
       });
     }
 
-    // Als nog steeds geen paren: nog hogere limiet
     if (nextPairs.length === 0) {
       nextPairs = generatePairs(texts, judgements, {
         targetComparisonsPerText: targetPerText,
@@ -262,7 +257,6 @@ const Compare = () => {
       const pair = pairs[currentIndex];
       const mode = assignmentMeta.judgementMode || "accumulate";
 
-      // Alfab. links/rechts vastleggen voor comment routing
       const sortedAlphabetically = [pair.textA, pair.textB].sort((a, b) =>
         a.anonymizedName.localeCompare(b.anonymizedName),
       );
@@ -303,7 +297,6 @@ const Compare = () => {
         setIsFinal(false);
         setTotalJudgements((prev) => prev + 1);
 
-        // local counters
         setTextCounts((prev) => {
           const updated = new Map(prev);
           updated.set(pair.textA.id!, (updated.get(pair.textA.id!) ?? 0) + 1);
@@ -318,7 +311,6 @@ const Compare = () => {
           return updated;
         });
 
-        // volgende of nieuwe batch
         if (currentIndex < pairs.length - 1) {
           setCurrentIndex((i) => i + 1);
         } else {
@@ -346,7 +338,6 @@ const Compare = () => {
     ],
   );
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -445,7 +436,6 @@ const Compare = () => {
 
       {/* Comparison Area */}
       <div className="max-w-7xl mx-auto p-6">
-        {/* Reliability Advice Banner */}
         {reliabilityAdvice && reliabilityAdvice.corePercentage > 80 && (
           <Alert
             className={`mb-6 ${reliabilityAdvice.isReliable ? "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800" : "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800"}`}
@@ -470,7 +460,7 @@ const Compare = () => {
             </AlertDescription>
           </Alert>
         )}
-        {/* Judgement Controls */}
+
         <Card className="shadow-lg mb-6">
           <CardContent className="p-6">
             <p className="text-lg font-medium mb-2">Welke tekst is beter?</p>
@@ -547,7 +537,6 @@ const Compare = () => {
         </Card>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Left */}
           <Card className="shadow-lg">
             <CardContent className="p-6 space-y-4">
               <div>
@@ -571,7 +560,6 @@ const Compare = () => {
             </CardContent>
           </Card>
 
-          {/* Right */}
           <Card className="shadow-lg">
             <CardContent className="p-6 space-y-4">
               <div>
