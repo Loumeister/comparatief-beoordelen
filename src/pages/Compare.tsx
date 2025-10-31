@@ -29,17 +29,18 @@ async function buildBTMaps(assignmentId: number) {
   const theta = new Map<number, number>(bt.map((r) => [r.textId, r.theta]));
   const se = new Map<number, number>(bt.map((r) => [r.textId, r.standardError]));
 
-  // judgedPairsCounts
+  // judgedPairsCounts - tel ALLE judgements (niet alleen effectieve)
+  // zodat gebruiker niet steeds dezelfde paren krijgt
   const judgedPairsCounts = new Map<string, number>();
-  for (const j of judgements) {
+  for (const j of all) {
     const k = key(j.textAId, j.textBId);
     judgedPairsCounts.set(k, (judgedPairsCounts.get(k) ?? 0) + 1);
   }
 
-  // exposures
+  // exposures - tel ook ALLE judgements voor consistentie
   const exposures = new Array(texts.length).fill(0);
   const id2idx = new Map<number, number>(texts.map((t, i) => [t.id!, i]));
-  for (const j of judgements) {
+  for (const j of all) {
     const ia = id2idx.get(j.textAId);
     const ib = id2idx.get(j.textBId);
     if (ia != null) exposures[ia]++;
