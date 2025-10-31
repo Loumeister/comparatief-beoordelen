@@ -154,6 +154,17 @@ export function calculateBradleyTerry(
     }
     const refVar = cnt > 0 ? Math.max(avgVar / cnt, 0) : Infinity;
     se[ref] = Number.isFinite(refVar) ? Math.sqrt(refVar) : Infinity;
+  } else {
+    // Fallback: gebruik diagonale benadering 1/√H[i][i]
+    // Dit is minder nauwkeurig maar geeft een redelijke schatting
+    for (let i = 0; i < n; i++) {
+      const Hii = H[i][i];
+      if (Hii > 1e-12) {
+        se[i] = 1 / Math.sqrt(Hii);
+      } else {
+        se[i] = Infinity;
+      }
+    }
   }
 
   // Normaliseer (μ=0), bereken σ voor z-score
