@@ -128,8 +128,10 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
         s += 15;
       }
 
-      // near-certain penalty
-      if (dθ > 3) s -= 20;
+      // near-certain penalty (sterke penalty voor zeer uiteenlopende teksten)
+      if (dθ > 3) s -= 200;
+      // moderate penalty voor matig uiteenlopende teksten
+      else if (dθ > 2) s -= 50;
     }
 
     // tie-breaker
