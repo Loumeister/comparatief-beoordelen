@@ -69,7 +69,7 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
   const id2idx = new Map<number, number>(texts.map((t, i) => [t.id!, i]));
   const n = texts.length;
 
-  // exposure & judged
+  // exposure & judged (tel ALLE judgements)
   const judgedPairsCounts = opts.judgedPairsCounts ?? new Map<string, number>();
   const exposure = new Array(n).fill(0);
   for (const j of existing) {
@@ -96,7 +96,6 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
   const thetaOf = (id: number) => (hasBT ? (opts.bt!.theta!.get(id) ?? 0) : 0);
   const seOf = (id: number) => (hasBT ? (opts.bt!.se!.get(id) ?? Infinity) : Infinity);
 
-  // --- nieuwe balans- en kernparameters ---
   // theta→z: centre & scale
   let mu = 0,
     sigma = 1;
@@ -107,53 +106,52 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
     sigma = Math.sqrt(Math.max(varc, 1e-12));
   }
   const zOf = (id: number) => (thetaOf(id) - mu) / sigma;
-  const isCore = (id: number) => Math.abs(zOf(id)) <= 1.0; // core = |z| ≤ 1
-  const isLeftWing = (id: number) => zOf(id) < -1.0;
-  const isRightWing = (id: number) => zOf(id) > 1.0;
+
+  // core/wings detectie
+  const CORE_Z = 1.0; // |z| ≤ 1 is core
+  const isCore = (id: number) => Math.abs(zOf(id)) <= CORE_Z;
+  const isLeftWing = (id: number) => zOf(id) < -CORE_Z;
+  const isRightWing = (id: number) => zOf(id) > CORE_Z;
+  const isOppositeWings = (id1: number, id2: number) =>
+    (isLeftWing(id1) && isRightWing(id2)) || (isRightWing(id1) && isLeftWing(id2));
 
   // relatieve exposure mediaan
   const expMedian = median(exposure);
 
-  // gate: wie heeft nog werk nodig?
+  // wie heeft nog werk?
   const underCap = (iIdx: number): boolean => {
-    // 1) bridging vóór alles
-    if (!allInOneComponent(dsu, n)) return true;
-
-    // 2) fair floor
-    if (exposure[iIdx] < MIN_BASE) return true;
-
-    // 3) relative exposure balancing: onder mediaan → nog meedoen
-    if (exposure[iIdx] < expMedian) return true;
-
-    // 4) met BT: nog niet betrouwbaar → nog meedoen
+    if (!allInOneComponent(dsu, n)) return true; // bridging eerst
+    if (exposure[iIdx] < MIN_BASE) return true; // fair floor
+    if (exposure[iIdx] < expMedian) return true; // balans t.o.v. mediaan
     if (hasBT) {
       const se = seOf(texts[iIdx].id!);
       if (!Number.isFinite(se)) return true; // cold-start
-      if (se > SE_RELIABLE) return true;
+      if (se > SE_RELIABLE) return true; // nog niet betrouwbaar
     }
-
-    // 5) anders klaar
-    return false;
+    return false; // anders klaar
   };
 
-  // score van een kandidaatpaar
-  function scoreOpp(iIdx: number, jIdx: number): number {
+  // score voor kandidaat
+  function scoreOpp(iIdx: number, jIdx: number, phase: "bridge" | "intra"): number {
     const idI = texts[iIdx].id!,
       idJ = texts[jIdx].id!;
     const kkey = key(idI, idJ);
     const count = judgedPairsCounts.get(kkey) ?? 0;
 
-    // basisgate
+    // basis gates
     if (!underCap(iIdx) || !underCap(jIdx)) return -Infinity;
+
+    // **HARD RULE**: in INTRA fase geen opposite-wings
+    if (phase === "intra" && hasBT && isOppositeWings(idI, idJ)) return -Infinity;
 
     let s = 0;
 
     // fairness: lage gezamenlijke exposure
     s -= exposure[iIdx] + exposure[jIdx];
 
-    // bridging met duidelijke maar niet allesbepalende bonus
+    // bridgingbonus: genoeg om te verbinden, niet dominant
     const isBridge = dsu.find(iIdx) !== dsu.find(jIdx);
-    if (isBridge) s += 200;
+    if (isBridge) s += 150;
 
     // repeats-penalty als géén bridge
     if (count > 0 && !isBridge) s -= 10;
@@ -164,13 +162,15 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
         seJ = seOf(idJ);
       const sumSE = (Number.isFinite(seI) ? seI : 2) + (Number.isFinite(seJ) ? seJ : 2);
 
-      // Fisher-informatie: max bij Δθ=0
+      // Fisher-informatie
       const p = 1 / (1 + Math.exp(dθ));
       const info = p * (1 - p); // 0..0.25
-      s += 40 * info; // 0..10
-      s += 4 * Math.min(sumSE, 2); // 0..8  (meer aandacht voor hoge SE)
+      s += 36 * info; // 0..9
 
-      // extra als minstens één tekst duidelijk nog werk nodig heeft
+      // aandacht voor hoge SE
+      s += 4 * Math.min(sumSE, 2); // 0..8
+
+      // prioriteit als minstens één tekst echt nog hoog is
       if ((Number.isFinite(seI) && seI > SE_REPEAT) || (Number.isFinite(seJ) && seJ > SE_REPEAT)) {
         s += 8;
       }
@@ -184,14 +184,19 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
       if (coreI && coreJ)
         s += 10; // core-core stimuleren
       else if (coreI || coreJ) s += 6; // core-wing oké
-      if (sameLeftWing || sameRightWing) s -= 14; // wing-wing (zelfde kant) afremmen
+      if (sameLeftWing || sameRightWing) s -= 12; // wing-wing zelfde kant: afremmen
 
-      // heel grote Δθ zelden informatief → stevige straf
+      // Δθ-str af
       if (dθ > 3) s -= 80;
       else if (dθ > 2) s -= 30;
+
+      // Extra: in bridging mag opposite-wings, maar niet super ver uit elkaar
+      if (phase === "bridge" && isOppositeWings(idI, idJ) && dθ > 2.5) {
+        s -= 40;
+      }
     }
 
-    // lichte voorkeur voor underexposed i/j t.o.v. mediaan
+    // lichte voorkeur voor underexposed t.o.v. mediaan
     const defI = Math.max(0, expMedian - exposure[iIdx]);
     const defJ = Math.max(0, expMedian - exposure[jIdx]);
     s += 2 * (defI + defJ);
@@ -214,8 +219,8 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
   }
 
   function selectPair(iIdx: number, jIdx: number, selected: Pair[]): boolean {
-    if (!underCap(iIdx) || !underCap(jIdx)) return false;
     if (!canUsePair(iIdx, jIdx)) return false;
+    if (!underCap(iIdx) || !underCap(jIdx)) return false;
 
     const idI = texts[iIdx].id!,
       idJ = texts[jIdx].id!;
@@ -234,7 +239,7 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
 
   const selected: Pair[] = [];
 
-  // --- FASE 1: BRIDGING (greedy matching, disjoint nodes) ---
+  // --- FASE 1: BRIDGING (disjoint nodes, greedy matching) ---
   if (!allInOneComponent(dsu, n)) {
     const bridges: Array<{ iIdx: number; jIdx: number; score: number }> = [];
     for (let i = 0; i < n; i++) {
@@ -243,7 +248,7 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
         if (!underCap(j)) continue;
         if (dsu.find(i) === dsu.find(j)) continue;
         if (!canUsePair(i, j)) continue;
-        const sc = scoreOpp(i, j);
+        const sc = scoreOpp(i, j, "bridge");
         if (sc > -Infinity) bridges.push({ iIdx: i, jIdx: j, score: sc });
       }
     }
@@ -260,7 +265,7 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
     }
   }
 
-  // --- FASE 2: INTRA-COMPONENT (greedy matching, disjoint nodes) ---
+  // --- FASE 2: INTRA-COMPONENT (geen opposite-wings) ---
   if (selected.length < batchSize) {
     const cands: Array<{ iIdx: number; jIdx: number; score: number }> = [];
     for (let i = 0; i < n; i++) {
@@ -268,7 +273,7 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
       for (let j = i + 1; j < n; j++) {
         if (!underCap(j)) continue;
         if (!canUsePair(i, j)) continue;
-        const sc = scoreOpp(i, j);
+        const sc = scoreOpp(i, j, "intra");
         if (sc > -Infinity) cands.push({ iIdx: i, jIdx: j, score: sc });
       }
     }
