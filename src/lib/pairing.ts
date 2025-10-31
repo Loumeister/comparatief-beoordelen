@@ -108,7 +108,7 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
 
     // bridging grote bonus (ook in fase 2 toegestaan)
     const isBridging = dsu.find(iIdx) !== dsu.find(jIdx);
-    if (isBridging) s += 1000;
+    if (isBridging) s += 200; // ruim genoeg, maar niet allesoverstemmend
 
     // herhaal penalty als geen bridging
     if (count > 0 && !isBridging) s -= 5;
@@ -118,20 +118,24 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
       const seI   = seOf(idI), seJ = seOf(idJ);
       const sumSE = (Number.isFinite(seI)?seI:2) + (Number.isFinite(seJ)?seJ:2);
 
-      // informatief: kleine Δθ
-      s += 10 - 10*Math.min(dθ, 1);
-      // informatief: hoge som van SE's (cap 2)
-      s += 5 * Math.min(sumSE, 2);
+      // Fisher-info benadering (max bij Δθ=0, daalt netjes af)
+      const absD = Math.abs(dθ);
+      const p = 1 / (1 + Math.exp(absD));
+      const info = p * (1 - p); // ∈ (0, 0.25]
 
-      // extra prioriteit als minstens één tekst echt nog hoog is
+      /** Informatieve paren:
+       *  - Hoog als Δθ klein (via info)
+       *  - Ook wat hoger als SE-som groot is (je wilt onzekerheid afbouwen)
+       */
+      s += 40 * info;                   // 0..10 bij Δθ≈0 → zachte afbouw
+      s += 4 * Math.min(sumSE, 2);      // 0..8 extra als er nog onzekerheid is
+
+      // Extra prioriteit als tenminste één tekst nog duidelijk onstabiel is
       if ((Number.isFinite(seI) && seI > SE_REPEAT) || (Number.isFinite(seJ) && seJ > SE_REPEAT)) {
-        s += 15;
+        s += 10; // was 15; iets ingetogener zodat info-term meer weegt
       }
 
-      // near-certain penalty (sterke penalty voor zeer uiteenlopende teksten)
-      if (dθ > 3) s -= 200;
-      // moderate penalty voor matig uiteenlopende teksten
-      else if (dθ > 2) s -= 50;
+      // Geen harde knalstraffen meer voor dθ>2/3; info-term regelt dit al
     }
 
     // tie-breaker
