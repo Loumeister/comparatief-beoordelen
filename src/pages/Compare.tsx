@@ -444,6 +444,31 @@ const Compare = () => {
 
       {/* Comparison Area */}
       <div className="max-w-7xl mx-auto p-6">
+        {/* Reliability Advice Banner */}
+        {reliabilityAdvice && reliabilityAdvice.corePercentage > 80 && (
+          <Alert
+            className={`mb-6 ${reliabilityAdvice.isReliable ? "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800" : "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800"}`}
+          >
+            <Info className="h-4 w-4" />
+            <AlertDescription className="ml-2">
+              <div className="font-medium mb-1">
+                {reliabilityAdvice.isReliable
+                  ? "✓ Advies: Resultaten zijn betrouwbaar"
+                  : "ℹ️ Advies: Meer vergelijkingen aanbevolen"}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {reliabilityAdvice.message} Je kunt altijd doorgaan met beoordelen of{" "}
+                <button
+                  onClick={() => navigate(`/results/${assignment?.id}`)}
+                  className="underline hover:text-foreground"
+                >
+                  bekijk de huidige resultaten
+                </button>
+                .
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Judgement Controls */}
         <Card className="shadow-lg mb-6">
           <CardContent className="p-6">
