@@ -29,6 +29,7 @@ export interface Judgement {
   commentB?: string; // Opmerking specifiek voor tekst B
   createdAt: Date;
   raterId?: string;
+  raterName?: string;
   sessionId?: string;
   source?: 'human' | 'ai';
   supersedesJudgementId?: number;
@@ -124,6 +125,16 @@ export class AssessmentDB extends Dexie {
 
     // Version 6: add commentA and commentB fields
     this.version(6).stores({
+      assignments: '++id, title, createdAt',
+      texts: '++id, assignmentId, anonymizedName',
+      judgements: '++id, assignmentId, pairKey, textAId, textBId, raterId, supersedesJudgementId, createdAt',
+      scores: '++id, assignmentId, textId, rank',
+      previousFits: '++id, assignmentId, calculatedAt',
+      assignmentMeta: 'assignmentId'
+    });
+
+    // Version 7: add raterName field to judgements (team judgement support)
+    this.version(7).stores({
       assignments: '++id, title, createdAt',
       texts: '++id, assignmentId, anonymizedName',
       judgements: '++id, assignmentId, pairKey, textAId, textBId, raterId, supersedesJudgementId, createdAt',

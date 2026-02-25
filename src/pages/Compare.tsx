@@ -3,9 +3,10 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Info } from "lucide-react";
+import { ArrowLeft, Info, AlertTriangle } from "lucide-react";
 import { db, Assignment, AssignmentMeta, Text } from "@/lib/db";
 import { generatePairs } from "@/lib/pairing";
 import { calculateBradleyTerry } from "@/lib/bradley-terry";
@@ -78,8 +79,18 @@ const Compare = () => {
   const [textCounts, setTextCounts] = useState<Map<number, number>>(new Map<number, number>());
   const [replaceMode, setReplaceMode] = useState(false);
   const [isFinal, setIsFinal] = useState(false);
-  const [raterId] = useState(() => `rater-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`);
   const [reliabilityAdvice, setReliabilityAdvice] = useState<ReliabilityAssessment | null>(null);
+
+  // Rater identification (persistent via localStorage)
+  const [raterName, setRaterName] = useState<string>(() => localStorage.getItem('raterName') || '');
+  const [raterNameInput, setRaterNameInput] = useState('');
+  const [showRaterPrompt, setShowRaterPrompt] = useState(() => !localStorage.getItem('raterName'));
+  const raterId = raterName
+    ? `rater-${raterName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`
+    : `rater-anon-${Date.now()}`;
+
+  // Tie rate nudge (PLAN-9)
+  const [tieRate, setTieRate] = useState(0);
 
   // ---------- Data laden ----------
   const loadData = useCallback(async () => {
@@ -145,6 +156,14 @@ const Compare = () => {
       const reliability = assessReliability(btResults, texts, judgements);
       setReliabilityAdvice(reliability);
 
+      // Tie rate for current rater (PLAN-9)
+      const all = await db.judgements.where("assignmentId").equals(id).toArray();
+      const myJudgements = all.filter(j => j.raterId === raterId);
+      if (myJudgements.length >= 5) {
+        const ties = myJudgements.filter(j => j.winner === 'EQUAL').length;
+        setTieRate(ties / myJudgements.length);
+      }
+
       // Globale batchselectie (matching) in pairing.ts — geen extra flags nodig
       let newPairs = generatePairs(texts, judgements, {
         targetComparisonsPerText: targetPerText,
@@ -182,7 +201,7 @@ const Compare = () => {
       toast({ title: "Fout bij laden", variant: "destructive" });
       navigate("/");
     }
-  }, [assignmentId, navigate, toast]);
+  }, [assignmentId, navigate, toast, raterId]);
 
   // Herlaad adaptief een nieuwe batch na oordelen
   const reloadPairs = useCallback(async () => {
@@ -206,6 +225,14 @@ const Compare = () => {
     // Hergebruik BT-resultaten van buildBTMaps (geen dubbele berekening)
     const reliability = assessReliability(btResults, texts, judgements);
     setReliabilityAdvice(reliability);
+
+    // Tie rate for current rater (PLAN-9)
+    const all = await db.judgements.where("assignmentId").equals(id).toArray();
+    const myJudgements = all.filter(j => j.raterId === raterId);
+    if (myJudgements.length >= 5) {
+      const ties = myJudgements.filter(j => j.winner === 'EQUAL').length;
+      setTieRate(ties / myJudgements.length);
+    }
 
     let nextPairs = generatePairs(texts, judgements, {
       targetComparisonsPerText: targetPerText,
@@ -239,7 +266,7 @@ const Compare = () => {
     setCurrentIndex(0);
     setReplaceMode(false);
     setIsFinal(false);
-  }, [assignment, assignmentMeta]);
+  }, [assignment, assignmentMeta, raterId]);
 
   // Init load
   useEffect(() => {
@@ -282,6 +309,7 @@ const Compare = () => {
           commentB: commentB || undefined,
           createdAt: new Date(),
           raterId,
+          raterName: raterName || undefined,
           source: "human",
           isFinal: mode === "moderate" ? isFinal : false,
           supersedesJudgementId: supersedesId,
@@ -331,6 +359,7 @@ const Compare = () => {
       saving,
       toast,
       raterId,
+      raterName,
       isFinal,
     ],
   );
@@ -352,6 +381,47 @@ const Compare = () => {
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, [handleJudgement]);
+
+  // "Wie ben je?" handler
+  const handleRaterNameSubmit = () => {
+    const name = raterNameInput.trim();
+    if (name) {
+      setRaterName(name);
+      localStorage.setItem('raterName', name);
+    } else {
+      // Solo mode — use default
+      setRaterName('Docent');
+      localStorage.setItem('raterName', 'Docent');
+    }
+    setShowRaterPrompt(false);
+  };
+
+  if (showRaterPrompt) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="shadow-lg max-w-md w-full mx-4">
+          <CardContent className="p-6 space-y-4">
+            <h2 className="text-xl font-bold">Wie ben je?</h2>
+            <p className="text-sm text-muted-foreground">
+              Vul je naam in zodat je oordelen herleidbaar zijn. Werk je alleen, klik dan direct op "Start".
+            </p>
+            <Input
+              value={raterNameInput}
+              onChange={(e) => setRaterNameInput(e.target.value)}
+              placeholder="Je naam (bijv. Jan)"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleRaterNameSubmit(); }}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <Button onClick={handleRaterNameSubmit} className="flex-1">
+                Start
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -424,6 +494,7 @@ const Compare = () => {
             <h1 className="text-2xl font-bold">{assignment?.title}</h1>
             <p className="text-sm text-muted-foreground">
               {totalJudgements} vergelijkingen • doel ≈ {expectedTotal}
+              {raterName && <> • beoordelaar: <strong>{raterName}</strong></>}
             </p>
           </div>
 
@@ -458,11 +529,23 @@ const Compare = () => {
           </Alert>
         )}
 
+        {/* Tie rate nudge (PLAN-9) */}
+        {tieRate > 0.4 && (
+          <Alert className="mb-6 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="ml-2">
+              <div className="text-sm">
+                <strong>Tip:</strong> Je kiest vaak "Gelijkwaardig" ({Math.round(tieRate * 100)}%). Probeer vaker een keuze te maken, ook als het verschil klein is. Dat maakt de resultaten nauwkeuriger.
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Card className="shadow-lg mb-6">
           <CardContent className="p-6">
             <p className="text-lg font-medium mb-2">Welke tekst is beter?</p>
             <p className="text-sm text-muted-foreground mb-4">
-              Kies de <strong>sterkere</strong> tekst. Bij twijfel: <em>Gelijkwaardig</em> (sneltoets T).
+              Kies de <strong>betere</strong> tekst, ook als het verschil klein is. Alleen <em>Gelijkwaardig</em> (sneltoets T) als ze echt even goed zijn.
             </p>
 
             <div className="grid grid-cols-3 gap-4 mb-6">

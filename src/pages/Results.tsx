@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle, Link2, Eye, EyeOff, Database, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, FileText, CheckCircle, AlertCircle, XCircle, Link2, Eye, EyeOff, Database, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, Users, Share2, ChevronDown, ChevronUp } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { db, Assignment } from "@/lib/db";
+import { db, Assignment, Judgement } from "@/lib/db";
 import { calculateBradleyTerry } from "@/lib/bradley-terry";
 import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from "@/lib/export";
-import { exportDataset } from "@/lib/exportImport";
+import { exportDataset, exportTextsOnly } from "@/lib/exportImport";
 import { getEffectiveJudgements } from "@/lib/effective-judgements";
+import { analyzeRaters, RaterAnalysis } from "@/lib/rater-analysis";
 import { useToast } from "@/hooks/use-toast";
 import { isConnected } from "@/lib/graph";
 import { SE_RELIABLE, SE_MAX_EDGE, COHORT_PCT_RELIABLE, COHORT_MEDIAN_OK } from "@/lib/constants";
@@ -31,6 +32,9 @@ const Results = () => {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<'rank' | 'name' | null>('rank');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [raterAnalysis, setRaterAnalysis] = useState<RaterAnalysis | null>(null);
+  const [showRaterOverview, setShowRaterOverview] = useState(false);
+  const [showDisagreements, setShowDisagreements] = useState(false);
 
   useEffect(() => {
     loadResults();
@@ -74,6 +78,16 @@ const Results = () => {
 
       // BT-fit (ook bij niet-verbonden graaf)
       const btResults = calculateBradleyTerry(texts, judgements, 0.1, 0.1, grading);
+
+      // Rater analysis (only compute if multiple raters)
+      const raterIds = new Set(judgements.map(j => j.raterId ?? 'unknown'));
+      if (raterIds.size > 1) {
+        const thetaMap = new Map(btResults.map(r => [r.textId, r.theta]));
+        const analysis = analyzeRaters(judgements, texts, thetaMap);
+        setRaterAnalysis(analysis);
+      } else {
+        setRaterAnalysis(null);
+      }
 
       // Bereken aantal beoordelingen en opmerkingen per tekst in één pass (O(m))
       const judgementCounts = new Map<number, number>();
@@ -174,6 +188,21 @@ const Results = () => {
       });
     } catch (error) {
       console.error("Export dataset error:", error);
+      toast({ title: "Export mislukt", variant: "destructive" });
+    }
+  };
+
+  const handleShareAssignment = async () => {
+    if (!assignment?.id) return;
+
+    try {
+      await exportTextsOnly(assignment.id);
+      toast({
+        title: "Opdracht gedeeld",
+        description: "JSON met alleen teksten geëxporteerd — collega's kunnen hiermee starten",
+      });
+    } catch (error) {
+      console.error("Share error:", error);
       toast({ title: "Export mislukt", variant: "destructive" });
     }
   };
@@ -314,6 +343,10 @@ const Results = () => {
               <Database className="w-4 h-4 mr-2" />
               JSON Dataset
             </Button>
+            <Button variant="outline" onClick={handleShareAssignment}>
+              <Share2 className="w-4 h-4 mr-2" />
+              Deel opdracht
+            </Button>
           </div>
         </div>
 
@@ -401,6 +434,106 @@ const Results = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Rater Overview — only shown when multiple raters */}
+        {raterAnalysis && raterAnalysis.uniqueRaterCount > 1 && (
+          <Card className="mb-6">
+            <CardContent className="p-6">
+              <button
+                className="flex items-center gap-2 w-full text-left"
+                onClick={() => setShowRaterOverview(!showRaterOverview)}
+              >
+                <Users className="w-5 h-5 text-primary" />
+                <h3 className="font-semibold text-lg flex-1">
+                  Beoordelaarsoverzicht ({raterAnalysis.uniqueRaterCount} beoordelaars)
+                </h3>
+                {showRaterOverview ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+
+              {showRaterOverview && (
+                <div className="mt-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Beoordelaar</TableHead>
+                        <TableHead className="text-right">Oordelen</TableHead>
+                        <TableHead className="text-right">Overeenstemming</TableHead>
+                        <TableHead className="text-right">Gelijkwaardig-rate</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {raterAnalysis.raterStats.map((r) => (
+                        <TableRow key={r.raterId}>
+                          <TableCell className="font-medium">{r.raterName}</TableCell>
+                          <TableCell className="text-right">{r.judgementCount}</TableCell>
+                          <TableCell className="text-right">
+                            <span className={r.modelAgreement < 0.6 ? 'text-destructive font-medium' : ''}>
+                              {Math.round(r.modelAgreement * 100)}%
+                            </span>
+                            {r.modelAgreement < 0.6 && (
+                              <span className="text-xs text-destructive ml-1">(laag)</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className={r.tieRate > 0.4 ? 'text-amber-600 dark:text-amber-400 font-medium' : ''}>
+                              {Math.round(r.tieRate * 100)}%
+                            </span>
+                            {r.tieRate > 0.4 && (
+                              <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">(hoog)</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Overeenstemming = % oordelen dat overeenkomt met de gezamenlijke rangorde. Gelijkwaardig boven 40% kan de nauwkeurigheid verlagen.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Disagreement Analysis — only shown when disagreements exist */}
+        {raterAnalysis && raterAnalysis.disagreements.length > 0 && (
+          <Card className="mb-6">
+            <CardContent className="p-6">
+              <button
+                className="flex items-center gap-2 w-full text-left"
+                onClick={() => setShowDisagreements(!showDisagreements)}
+              >
+                <AlertCircle className="w-5 h-5 text-amber-500" />
+                <h3 className="font-semibold text-lg flex-1">
+                  Meningsverschillen ({raterAnalysis.disagreements.length})
+                </h3>
+                {showDisagreements ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+
+              {showDisagreements && (
+                <div className="mt-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Paren waar beoordelaars het oneens zijn over welke tekst beter is. Dit zijn de teksten die het meest geschikt zijn voor gezamenlijk overleg.
+                  </p>
+                  {raterAnalysis.disagreements.map((d, idx) => (
+                    <div key={idx} className="p-3 border rounded-lg">
+                      <div className="font-medium mb-2">
+                        {d.textAName} vs {d.textBName}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {d.raterVotes.map((v, vIdx) => (
+                          <Badge key={vIdx} variant="outline" className="text-xs">
+                            {v.raterName}: {v.winner === 'A' ? d.textAName : v.winner === 'B' ? d.textBName : 'Gelijk'}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Results Table */}
         <Card>

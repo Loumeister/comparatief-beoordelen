@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users, Settings, BookOpen } from 'lucide-react';
+import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users, Settings, BookOpen, UserCheck } from 'lucide-react';
 import { db, Assignment } from '@/lib/db';
 import { importDataset, importCSV, importResultsFromXLSX, exportDataset } from '@/lib/exportImport';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
@@ -20,7 +20,7 @@ const Dashboard = () => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [stats, setStats] = useState<Map<number, { texts: number; judgements: number; reliabilityPct: number }>>(new Map());
+  const [stats, setStats] = useState<Map<number, { texts: number; judgements: number; reliabilityPct: number; raterCount: number }>>(new Map());
   const [importing, setImporting] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -41,18 +41,23 @@ const Dashboard = () => {
       const texts = await db.texts.where('assignmentId').equals(assign.id!).count();
       const judgements = await db.judgements.where('assignmentId').equals(assign.id!).count();
       
-      // Calculate reliability percentage if there are judgements
+      // Calculate reliability percentage and rater count if there are judgements
       let reliabilityPct = 0;
+      let raterCount = 0;
       if (judgements > 0 && texts > 0) {
         const textsData = await db.texts.where('assignmentId').equals(assign.id!).toArray();
         const judgementsData = await db.judgements.where('assignmentId').equals(assign.id!).toArray();
-        
+
         const results = calculateBradleyTerry(textsData, judgementsData);
         const reliableCount = results.filter(r => r.standardError <= SE_RELIABLE).length;
         reliabilityPct = Math.round((reliableCount / results.length) * 100);
+
+        // Count unique raters
+        const raters = new Set(judgementsData.map(j => j.raterId ?? 'unknown'));
+        raterCount = raters.size;
       }
-      
-      statsMap.set(assign.id, { texts, judgements, reliabilityPct });
+
+      statsMap.set(assign.id, { texts, judgements, reliabilityPct, raterCount });
     }
     setStats(statsMap);
   };
@@ -300,6 +305,12 @@ const Dashboard = () => {
                         {assignStats.judgements > 0 && (
                           <div>
                             <span>{assignStats.reliabilityPct}% betrouwbaar</span>
+                          </div>
+                        )}
+                        {assignStats.raterCount > 1 && (
+                          <div className="flex items-center gap-2">
+                            <UserCheck className="w-4 h-4" />
+                            <span>{assignStats.raterCount} beoordelaars</span>
                           </div>
                         )}
                       </div>
