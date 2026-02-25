@@ -264,6 +264,7 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
   }
 
   // --- FASE 2: INTRA-COMPONENT (geen opposite-wings) ---
+  // Teksten mogen max 2× in een batch voorkomen (narrative thread voor docent)
   if (selected.length < batchSize) {
     const cands: Array<{ iIdx: number; jIdx: number; score: number }> = [];
     for (let i = 0; i < n; i++) {
@@ -276,16 +277,58 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
       }
     }
     cands.sort((a, b) => b.score - a.score);
-    const used = new Array(n).fill(false);
+    const MAX_APPEARANCES = 2;
+    const usedCount = new Array(n).fill(0);
+    // Tel ook bridging-paren mee
+    for (const p of selected) {
+      const ia = id2idx.get(p.textA.id!);
+      const ib = id2idx.get(p.textB.id!);
+      if (ia != null) usedCount[ia]++;
+      if (ib != null) usedCount[ib]++;
+    }
     for (const c of cands) {
       if (selected.length >= batchSize) break;
       const { iIdx, jIdx } = c;
-      if (used[iIdx] || used[jIdx]) continue;
+      if (usedCount[iIdx] >= MAX_APPEARANCES || usedCount[jIdx] >= MAX_APPEARANCES) continue;
       if (!selectPair(iIdx, jIdx, selected)) continue;
-      used[iIdx] = true;
-      used[jIdx] = true;
+      usedCount[iIdx]++;
+      usedCount[jIdx]++;
     }
   }
 
-  return selected;
+  return chainOrder(selected);
+}
+
+/**
+ * Herorden paren zodat opeenvolgende paren een tekst delen (narrative thread).
+ * Greedy: kies steeds het paar dat een tekst deelt met het vorige.
+ */
+function chainOrder(pairs: Pair[]): Pair[] {
+  if (pairs.length <= 1) return pairs;
+
+  const remaining = [...pairs];
+  const ordered: Pair[] = [remaining.shift()!];
+
+  while (remaining.length > 0) {
+    const last = ordered[ordered.length - 1];
+    const lastIds = new Set([last.textA.id!, last.textB.id!]);
+
+    // Zoek een paar dat een tekst deelt met het vorige
+    let bestIdx = -1;
+    for (let i = 0; i < remaining.length; i++) {
+      if (lastIds.has(remaining[i].textA.id!) || lastIds.has(remaining[i].textB.id!)) {
+        bestIdx = i;
+        break;
+      }
+    }
+
+    if (bestIdx >= 0) {
+      ordered.push(remaining.splice(bestIdx, 1)[0]);
+    } else {
+      // Geen gedeelde tekst — neem de volgende
+      ordered.push(remaining.shift()!);
+    }
+  }
+
+  return ordered;
 }

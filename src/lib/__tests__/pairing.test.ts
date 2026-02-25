@@ -135,17 +135,37 @@ describe('generatePairs', () => {
     }
   });
 
-  it('every text in a batch appears at most once (greedy matching)', () => {
+  it('each text appears at most 2 times per batch (narrative thread)', () => {
     const texts = Array.from({ length: 8 }, (_, i) => makeText(i + 1));
-    const pairs = generatePairs(texts, [], { batchSize: 4 });
+    const pairs = generatePairs(texts, [], { batchSize: 6 });
 
-    // Each text should appear at most once across all pairs in a batch
-    const seen = new Set<number>();
+    // Count appearances per text
+    const counts = new Map<number, number>();
     for (const p of pairs) {
-      expect(seen.has(p.textA.id!)).toBe(false);
-      expect(seen.has(p.textB.id!)).toBe(false);
-      seen.add(p.textA.id!);
-      seen.add(p.textB.id!);
+      counts.set(p.textA.id!, (counts.get(p.textA.id!) ?? 0) + 1);
+      counts.set(p.textB.id!, (counts.get(p.textB.id!) ?? 0) + 1);
+    }
+    for (const [, count] of counts) {
+      expect(count).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('chain ordering: consecutive pairs share a text when possible', () => {
+    const texts = Array.from({ length: 10 }, (_, i) => makeText(i + 1));
+    const pairs = generatePairs(texts, [], { batchSize: 6 });
+
+    if (pairs.length >= 2) {
+      // Count how many consecutive pairs share a text
+      let shared = 0;
+      for (let i = 1; i < pairs.length; i++) {
+        const prevIds = new Set([pairs[i - 1].textA.id!, pairs[i - 1].textB.id!]);
+        if (prevIds.has(pairs[i].textA.id!) || prevIds.has(pairs[i].textB.id!)) {
+          shared++;
+        }
+      }
+      // At least some consecutive pairs should share a text (narrative thread)
+      // With max 2 appearances per text, chaining is possible but not guaranteed for all
+      expect(shared).toBeGreaterThanOrEqual(1);
     }
   });
 
