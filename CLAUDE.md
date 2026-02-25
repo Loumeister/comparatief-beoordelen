@@ -142,49 +142,71 @@ The features below are **optional improvements** that can increase validity, rel
 
 ### PLAN-1: Team Judgement Mode (multi-rater collaboration)
 
-**What**: Allow multiple colleagues to judge the same assignment together, each on their own device, with combined results.
+**What**: Allow multiple colleagues to judge the same assignment together, each on their own device, with combined results. Each rater is identified by name so differences can be traced.
 
 **Why**: Multiple independent raters dramatically improve validity and reliability. In CJ literature, 2-3 raters are sufficient for stable rankings. Inter-rater agreement provides evidence that the ranking reflects real quality differences.
 
-**How it could work**:
-1. **Share via JSON export/import** (simplest, no server needed):
+**Current state**: The `raterId` field exists on every Judgement but is auto-generated as a random string per page load. There is no human-readable name, no persistence across sessions, and no UI showing who judged what. This needs to be fixed first.
+
+**Implementation steps**:
+
+1. **Rater identification** (prerequisite for everything else):
+   - Add `raterName` field to Judgement interface in `db.ts` (schema v7)
+   - On Compare page, prompt "Wie ben je?" with a text input on first visit
+   - Store name in `localStorage` for persistence across sessions
+   - Generate stable `raterId` from name (slugified) instead of random string
+   - Solo users can dismiss with "Alleen ik" — default name, no team UI
+
+2. **Share via JSON export/import** (simplest, no server needed):
    - Teacher A creates the assignment and exports a JSON dataset
    - Colleagues B and C import the JSON, make their own comparisons, export back
    - Teacher A imports all JSON files — `importDataset()` already merges judgements with dedup
-   - The `raterId` field on each Judgement distinguishes raters
+   - The `raterId` + `raterName` fields on each Judgement distinguish raters
    - Results page shows combined BT fit across all raters
+   - "Deel opdracht" button exports texts-only JSON (no judgements) for clean start
 
-2. **Share via link/code** (more advanced, needs consideration):
-   - Generate a shareable link or room code
-   - Uses WebRTC or a simple relay to sync IndexedDB data
-   - Still local-first, no permanent server
+3. **Per-rater overview on Results page** (only shown when >1 rater):
+   - "Beoordelaarsoverzicht" card showing per rater: name, # judgements, model agreement %, tie rate
+   - Flag raters with <60% agreement or >40% ties with gentle warnings
+   - Overall inter-rater agreement percentage
 
-3. **UI additions needed**:
-   - Dashboard: show which raters have contributed, how many judgements each
-   - Results: per-rater agreement statistics (see PLAN-2)
-   - Compare: rater name input at start of session (currently auto-generated raterId)
-   - Settings: choose "Solo" or "Team" mode per assignment
-   - Clear workflow: "Deel deze opdracht met collega's" button that exports the assignment + texts (without judgements) for others to import
+4. **Disagreement analysis** (the key insight feature):
+   - Detect pairs where raters explicitly disagree (A says X wins, B says Y wins)
+   - "Meningsverschillen" section: list contested pairs, sorted by disagreement count
+   - Per-text disagreement hotspots — texts involved in many disputes may be ambiguous
+   - In StudentDetailsDialog: show which rater made each judgement
 
-4. **Solo mode must always work**. Team features are additive — a teacher working alone should never see team-specific UI unless they opt in.
+5. **Per-rater rank comparison** (advanced, behind "Toon achtergrondscores"):
+   - Separate BT fit per rater (only those with >10 judgements)
+   - Kendall's tau correlation between each rater's ranking and the consensus
+   - Highlight texts with largest rank difference between raters
 
-**The existing data model already supports this**: `raterId` on Judgement, `getEffectiveJudgements()` handles per-rater dedup, `importDataset()` merges data. The main work is UI and workflow.
+6. **Dashboard enhancements**:
+   - Show rater count on assignment cards ("2 beoordelaars")
+   - Include rater name in CSV/Excel/PDF exports and JSON dataset
+
+7. **Solo mode must always work**. Team features are additive — a teacher working alone should never see team-specific UI unless they opt in (multiple raters detected).
+
+**The existing data model mostly supports this**: `raterId` on Judgement, `getEffectiveJudgements()` handles per-rater dedup, `importDataset()` merges data. The main work is rater identification, analysis logic (`src/lib/rater-analysis.ts`), and UI.
 
 ---
 
 ### PLAN-2: Judge Consistency Metrics
 
-**What**: Show per-rater agreement statistics when multiple raters are involved.
+**What**: Show per-rater agreement statistics and disagreement analysis when multiple raters are involved.
 
-**Why**: One inconsistent rater can silently corrupt results. Without metrics, there is no way to identify rater disagreement.
+**Why**: One inconsistent rater can silently corrupt results. Without metrics, there is no way to identify rater disagreement. Teachers need to see where colleagues' views diverge — those are the texts worth discussing.
 
-**How**:
-- Compute per-judge accuracy against model predictions (% of judgements that agree with BT predicted winner)
-- Flag judges with agreement rate below 60%
-- Show on Results page only when multiple raters exist
-- Simple UI: a small table or accordion "Beoordelaarsoverzicht" with rater name, # judgements, agreement %
+**How** (implemented as `src/lib/rater-analysis.ts`):
+- **Per-judge model agreement**: % of judgements that agree with BT predicted winner. Flag judges <60%.
+- **Per-judge tie rate**: % of EQUAL judgements. Warn if >40% (ties are half as informative).
+- **Pairwise disagreement detection**: find pairs where rater A says X wins but rater B says Y wins.
+- **Disagreement hotspots**: texts involved in the most disputes (may be genuinely ambiguous).
+- **Per-rater BT fit** (advanced): separate BT per rater, Kendall's tau vs. consensus ranking.
+- Show on Results page only when multiple raters exist, in collapsible sections.
+- Simple Dutch labels: "Beoordelaarsoverzicht", "Meningsverschillen", "Overeenstemming".
 
-**Depends on**: PLAN-1 (team mode) for practical relevance, though it works with any multi-rater data.
+**Depends on**: PLAN-1 step 1 (rater identification with `raterName` field).
 
 ---
 
