@@ -113,6 +113,7 @@ export function calculateBradleyTerry(
   // H_ii = lambda + Σ_j n_ij p_ij(1-p_ij)
   // H_ij = - n_ij p_ij(1-p_ij) (i != j)
   const H: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+  // Pass 1: diagonaal — loop alle j!=i voor Hii accumulatie
   for (let i = 0; i < n; i++) {
     let Hii = lambda;
     for (let j = 0; j < n; j++) {
@@ -120,12 +121,20 @@ export function calculateBradleyTerry(
       const nij = n_ij[i][j];
       if (nij === 0) continue;
       const pij = 1 / (1 + Math.exp(theta[j] - theta[i]));
-      const w = nij * pij * (1 - pij);
-      Hii += w;
-      H[i][j] -= w;
-      H[j][i] -= w; // symmetrisch
+      Hii += nij * pij * (1 - pij);
     }
     H[i][i] = Hii;
+  }
+  // Pass 2: off-diagonaal — elk paar (i,j) precies één keer bezoeken
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const nij = n_ij[i][j];
+      if (nij === 0) continue;
+      const pij = 1 / (1 + Math.exp(theta[j] - theta[i]));
+      const w = nij * pij * (1 - pij);
+      H[i][j] = -w;
+      H[j][i] = -w;
+    }
   }
 
   // Graafconnectiviteit (op basis van n_ij > 0)

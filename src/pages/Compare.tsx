@@ -15,12 +15,11 @@ import { HeaderNav } from "@/components/HeaderNav";
 import { assessReliability, ReliabilityAssessment } from "@/lib/reliability";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MIN_BASE, SE_RELIABLE, DEFAULT_COMPARISONS_PER_TEXT, DEFAULT_BATCH_SIZE } from "@/lib/constants";
+import { pairKey } from "@/lib/utils";
 
-function key(a: number, b: number): string {
-  return `${Math.min(a, b)}-${Math.max(a, b)}`;
-}
-
-// Helper: bereken BT-scores tussendoor voor slimmere pairing
+// Helper: bereken BT-scores tussendoor voor slimmere pairing.
+// NB: lambda=0.3 (sterker dan de finale 0.1 op de Results-pagina) om stabilere
+// schattingen te geven bij weinig data, wat betere pair-selectie oplevert.
 async function buildBTMaps(assignmentId: number) {
   const texts = await db.texts.where("assignmentId").equals(assignmentId).toArray();
   const all = await db.judgements.where("assignmentId").equals(assignmentId).toArray();
@@ -32,7 +31,7 @@ async function buildBTMaps(assignmentId: number) {
   // telt ALLE judgements (niet alleen effectieve) voor herhaalbeperking
   const judgedPairsCounts = new Map<string, number>();
   for (const j of all) {
-    const k = key(j.textAId, j.textBId);
+    const k = pairKey(j.textAId, j.textBId);
     judgedPairsCounts.set(k, (judgedPairsCounts.get(k) ?? 0) + 1);
   }
 
@@ -46,7 +45,7 @@ async function buildBTMaps(assignmentId: number) {
     if (ib != null) exposures[ib]++;
   }
 
-  return { texts, judgements, theta, se, judgedPairsCounts, exposures };
+  return { texts, judgements, theta, se, judgedPairsCounts, exposures, btResults: bt };
 }
 
 function calculateDynamicBatchSize(texts: Text[], seMap: Map<number, number>, exposures: number[]): number {
@@ -113,7 +112,7 @@ const Compare = () => {
       }
       setAssignmentMeta(meta);
 
-      const { texts, judgements, theta, se, judgedPairsCounts, exposures } = await buildBTMaps(id);
+      const { texts, judgements, theta, se, judgedPairsCounts, exposures, btResults } = await buildBTMaps(id);
       setPairCounts(judgedPairsCounts);
 
       // text counts
@@ -142,9 +141,8 @@ const Compare = () => {
 
       const batch = calculateDynamicBatchSize(texts, se, exposures);
 
-      // Bereken betrouwbaarheid voor advies
-      const bt = calculateBradleyTerry(texts, judgements, 0.3);
-      const reliability = assessReliability(bt, texts, judgements);
+      // Hergebruik BT-resultaten van buildBTMaps (geen dubbele berekening)
+      const reliability = assessReliability(btResults, texts, judgements);
       setReliabilityAdvice(reliability);
 
       // Globale batchselectie (matching) in pairing.ts — geen extra flags nodig
@@ -191,7 +189,7 @@ const Compare = () => {
     if (!assignment || !assignmentMeta) return;
     const id = assignment.id!;
 
-    const { texts, judgements, theta, se, judgedPairsCounts, exposures } = await buildBTMaps(id);
+    const { texts, judgements, theta, se, judgedPairsCounts, exposures, btResults } = await buildBTMaps(id);
     setPairCounts(judgedPairsCounts);
 
     // text counts
@@ -205,9 +203,8 @@ const Compare = () => {
     const targetPerText = assignment.numComparisons || DEFAULT_COMPARISONS_PER_TEXT;
     const batch = calculateDynamicBatchSize(texts, se, exposures);
 
-    // Bereken betrouwbaarheid voor advies
-    const bt = calculateBradleyTerry(texts, judgements, 0.3);
-    const reliability = assessReliability(bt, texts, judgements);
+    // Hergebruik BT-resultaten van buildBTMaps (geen dubbele berekening)
+    const reliability = assessReliability(btResults, texts, judgements);
     setReliabilityAdvice(reliability);
 
     let nextPairs = generatePairs(texts, judgements, {
@@ -306,7 +303,7 @@ const Compare = () => {
 
         setPairCounts((prev) => {
           const updated = new Map(prev);
-          const k = key(pair.textA.id!, pair.textB.id!);
+          const k = pairKey(pair.textA.id!, pair.textB.id!);
           updated.set(k, (updated.get(k) ?? 0) + 1);
           return updated;
         });

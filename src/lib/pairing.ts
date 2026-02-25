@@ -1,6 +1,7 @@
 // src/lib/pairing.ts
 import { Text, Judgement } from "./db";
 import { MIN_BASE, SE_RELIABLE, SE_REPEAT, DEFAULT_BATCH_SIZE } from "@/lib/constants";
+import { pairKey } from "@/lib/utils";
 
 export interface Pair {
   textA: Text;
@@ -20,10 +21,6 @@ type Options = {
   allowRepeats?: boolean;
   maxPairRejudgements?: number;
 };
-
-function key(a: number, b: number): string {
-  return `${Math.min(a, b)}-${Math.max(a, b)}`;
-}
 
 class DSU {
   parent: number[];
@@ -76,7 +73,7 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
     const ia = id2idx.get(j.textAId),
       ib = id2idx.get(j.textBId);
     if (ia == null || ib == null || ia === ib) continue;
-    const kkey = key(j.textAId, j.textBId);
+    const kkey = pairKey(j.textAId, j.textBId);
     judgedPairsCounts.set(kkey, (judgedPairsCounts.get(kkey) ?? 0) + 1);
     exposure[ia]++;
     exposure[ib]++;
@@ -135,11 +132,12 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
   function scoreOpp(iIdx: number, jIdx: number, phase: "bridge" | "intra"): number {
     const idI = texts[iIdx].id!,
       idJ = texts[jIdx].id!;
-    const kkey = key(idI, idJ);
+    const kkey = pairKey(idI, idJ);
     const count = judgedPairsCounts.get(kkey) ?? 0;
 
-    // basis gates
-    if (!underCap(iIdx) || !underCap(jIdx)) return -Infinity;
+    // basis gate: minstens één tekst moet nog werk nodig hebben
+    // (een goed-gemeten tekst is een nuttige partner voor een onzekere tekst)
+    if (!underCap(iIdx) && !underCap(jIdx)) return -Infinity;
 
     // **HARD RULE**: in INTRA fase geen opposite-wings
     if (phase === "intra" && hasBT && isOppositeWings(idI, idJ)) return -Infinity;
@@ -209,7 +207,7 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
   function canUsePair(iIdx: number, jIdx: number): boolean {
     const idI = texts[iIdx].id!,
       idJ = texts[jIdx].id!;
-    const kkey = key(idI, idJ);
+    const kkey = pairKey(idI, idJ);
     const count = judgedPairsCounts.get(kkey) ?? 0;
     const isBridge = dsu.find(iIdx) !== dsu.find(jIdx);
 
@@ -220,11 +218,11 @@ export function generatePairs(texts: Text[], existing: Judgement[], opts: Option
 
   function selectPair(iIdx: number, jIdx: number, selected: Pair[]): boolean {
     if (!canUsePair(iIdx, jIdx)) return false;
-    if (!underCap(iIdx) || !underCap(jIdx)) return false;
+    if (!underCap(iIdx) && !underCap(jIdx)) return false;
 
     const idI = texts[iIdx].id!,
       idJ = texts[jIdx].id!;
-    const kkey = key(idI, idJ);
+    const kkey = pairKey(idI, idJ);
 
     const flip = Math.random() < 0.5;
     selected.push({ textA: flip ? texts[jIdx] : texts[iIdx], textB: flip ? texts[iIdx] : texts[jIdx] });

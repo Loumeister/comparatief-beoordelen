@@ -11,6 +11,7 @@ import { db, Assignment } from "@/lib/db";
 import { calculateBradleyTerry } from "@/lib/bradley-terry";
 import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from "@/lib/export";
 import { exportDataset } from "@/lib/exportImport";
+import { getEffectiveJudgements } from "@/lib/effective-judgements";
 import { useToast } from "@/hooks/use-toast";
 import { isConnected } from "@/lib/graph";
 import { SE_RELIABLE, SE_MAX_EDGE, COHORT_PCT_RELIABLE, COHORT_MEDIAN_OK } from "@/lib/constants";
@@ -49,7 +50,8 @@ const Results = () => {
       setAssignment(assign);
 
       const texts = await db.texts.where("assignmentId").equals(id).toArray();
-      const judgements = await db.judgements.where("assignmentId").equals(id).toArray();
+      const allJudgements = await db.judgements.where("assignmentId").equals(id).toArray();
+      const judgements = getEffectiveJudgements(allJudgements);
 
       if (judgements.length === 0) {
         toast({ title: "Geen beoordelingen", description: "Begin met vergelijken om resultaten te zien" });
@@ -73,35 +75,27 @@ const Results = () => {
       // BT-fit (ook bij niet-verbonden graaf)
       const btResults = calculateBradleyTerry(texts, judgements, 0.1, 0.1, grading);
 
-      // Bereken aantal beoordelingen per tekst
+      // Bereken aantal beoordelingen en opmerkingen per tekst in één pass (O(m))
       const judgementCounts = new Map<number, number>();
-      for (const text of texts) {
-        const count = judgements.filter(
-          (j) => j.textAId === text.id || j.textBId === text.id
-        ).length;
-        judgementCounts.set(text.id, count);
-      }
-
-      // Verzamel opmerkingen per tekst (inclusief commentA en commentB)
       const commentsMap = new Map<number, string[]>();
-      for (const text of texts) {
-        const textComments: string[] = [];
-        
-        for (const j of judgements) {
-          if (j.textAId === text.id && j.commentA?.trim()) {
-            textComments.push(j.commentA.trim());
-          }
-          if (j.textBId === text.id && j.commentB?.trim()) {
-            textComments.push(j.commentB.trim());
-          }
-          // Backwards compatibility: oude comment veld
-          if ((j.textAId === text.id || j.textBId === text.id) && j.comment?.trim() && !j.commentA && !j.commentB) {
-            textComments.push(j.comment.trim());
-          }
+      for (const j of judgements) {
+        judgementCounts.set(j.textAId, (judgementCounts.get(j.textAId) ?? 0) + 1);
+        judgementCounts.set(j.textBId, (judgementCounts.get(j.textBId) ?? 0) + 1);
+
+        if (j.commentA?.trim()) {
+          if (!commentsMap.has(j.textAId)) commentsMap.set(j.textAId, []);
+          commentsMap.get(j.textAId)!.push(j.commentA.trim());
         }
-        
-        if (textComments.length > 0) {
-          commentsMap.set(text.id, textComments);
+        if (j.commentB?.trim()) {
+          if (!commentsMap.has(j.textBId)) commentsMap.set(j.textBId, []);
+          commentsMap.get(j.textBId)!.push(j.commentB.trim());
+        }
+        // Backwards compatibility: oude comment veld
+        if (j.comment?.trim() && !j.commentA && !j.commentB) {
+          for (const tid of [j.textAId, j.textBId]) {
+            if (!commentsMap.has(tid)) commentsMap.set(tid, []);
+            commentsMap.get(tid)!.push(j.comment.trim());
+          }
         }
       }
 
