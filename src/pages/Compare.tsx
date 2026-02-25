@@ -630,10 +630,17 @@ const Compare = () => {
                   {leftText.anonymizedName}
                 </span>
               </div>
-              {leftText.content ? (
-                <div className="prose prose-sm max-w-none">
-                  <div className="whitespace-pre-wrap text-foreground leading-relaxed">{leftText.content}</div>
-                </div>
+              {leftText.content || leftText.contentHtml ? (
+                leftText.contentHtml ? (
+                  <div
+                    className="docx-content prose prose-sm max-w-none text-foreground leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: leftText.contentHtml }}
+                  />
+                ) : (
+                  <div className="prose prose-sm max-w-none">
+                    <div className="whitespace-pre-wrap text-foreground leading-relaxed">{leftText.content}</div>
+                  </div>
+                )
               ) : (
                 <div className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg">
                   <p className="text-muted-foreground text-center px-4">
@@ -653,10 +660,17 @@ const Compare = () => {
                   {rightText.anonymizedName}
                 </span>
               </div>
-              {rightText.content ? (
-                <div className="prose prose-sm max-w-none">
-                  <div className="whitespace-pre-wrap text-foreground leading-relaxed">{rightText.content}</div>
-                </div>
+              {rightText.content || rightText.contentHtml ? (
+                rightText.contentHtml ? (
+                  <div
+                    className="docx-content prose prose-sm max-w-none text-foreground leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: rightText.contentHtml }}
+                  />
+                ) : (
+                  <div className="prose prose-sm max-w-none">
+                    <div className="whitespace-pre-wrap text-foreground leading-relaxed">{rightText.content}</div>
+                  </div>
+                )
               ) : (
                 <div className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg">
                   <p className="text-muted-foreground text-center px-4">

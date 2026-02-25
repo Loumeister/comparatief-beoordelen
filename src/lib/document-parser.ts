@@ -1,19 +1,33 @@
 import mammoth from 'mammoth';
 
 /**
- * Parse DOCX or TXT file to plain text
+ * Parse result containing both plain text and (optional) HTML
  */
-export async function parseDocument(file: File): Promise<string> {
+export interface ParseResult {
+  text: string;
+  html?: string;
+}
+
+/**
+ * Parse DOCX or TXT file to plain text + HTML (for .docx formatting)
+ */
+export async function parseDocument(file: File): Promise<ParseResult> {
   const extension = file.name.split('.').pop()?.toLowerCase();
 
   if (extension === 'txt') {
-    return await file.text();
+    return { text: await file.text() };
   }
 
   if (extension === 'docx' || extension === 'doc') {
     const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    return result.value;
+    const [textResult, htmlResult] = await Promise.all([
+      mammoth.extractRawText({ arrayBuffer }),
+      mammoth.convertToHtml({ arrayBuffer }),
+    ]);
+    return {
+      text: textResult.value,
+      html: htmlResult.value,
+    };
   }
 
   throw new Error(`Onondersteund bestandstype: ${extension}`);

@@ -13,6 +13,7 @@ export interface Text {
   id?: number;
   assignmentId: number;
   content: string;
+  contentHtml?: string; // HTML-opmaak uit .docx (vet, cursief, kopjes, lijsten)
   originalFilename: string;
   anonymizedName: string;
   createdAt: Date;
@@ -135,6 +136,16 @@ export class AssessmentDB extends Dexie {
 
     // Version 7: add raterName field to judgements (team judgement support)
     this.version(7).stores({
+      assignments: '++id, title, createdAt',
+      texts: '++id, assignmentId, anonymizedName',
+      judgements: '++id, assignmentId, pairKey, textAId, textBId, raterId, supersedesJudgementId, createdAt',
+      scores: '++id, assignmentId, textId, rank',
+      previousFits: '++id, assignmentId, calculatedAt',
+      assignmentMeta: 'assignmentId'
+    });
+
+    // Version 8: add contentHtml field to texts (preserve Word document formatting)
+    this.version(8).stores({
       assignments: '++id, title, createdAt',
       texts: '++id, assignmentId, anonymizedName',
       judgements: '++id, assignmentId, pairKey, textAId, textBId, raterId, supersedesJudgementId, createdAt',
