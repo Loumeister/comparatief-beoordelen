@@ -16,4 +16,8 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  test: {
+    environment: 'node',
+    include: ['src/**/__tests__/**/*.test.ts'],
+  },
 }));
