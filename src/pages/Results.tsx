@@ -127,6 +127,8 @@ const Results = () => {
           reliability: r.reliability,
           judgementCount: judgementCounts.get(text.id) ?? 0,
           comments: comments ? comments.join(' | ') : undefined,
+          infit: r.infit,
+          infitLabel: r.infitLabel,
         };
       });
 
@@ -577,6 +579,7 @@ const Results = () => {
                     <>
                       <TableHead className="text-right">Theta (θ)</TableHead>
                       <TableHead className="text-right">SE</TableHead>
+                      <TableHead className="text-right">Infit</TableHead>
                       <TableHead className="text-right">Aantal beoordelingen</TableHead>
                     </>
                   )}
@@ -601,6 +604,11 @@ const Results = () => {
                       <>
                         <TableCell className="text-right font-mono text-sm">{r.theta.toFixed(3)}</TableCell>
                         <TableCell className="text-right font-mono text-sm">{r.standardError.toFixed(3)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          <span className={r.infit != null && (r.infit > 1.3 || r.infit < 0.7) ? 'text-amber-600 dark:text-amber-400 font-medium' : ''}>
+                            {r.infit != null ? r.infit.toFixed(2) : '–'}
+                          </span>
+                        </TableCell>
                         <TableCell className="text-right font-mono text-sm">{r.judgementCount}</TableCell>
                       </>
                     )}

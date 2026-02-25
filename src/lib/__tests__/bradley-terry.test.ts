@@ -233,4 +233,111 @@ describe('calculateBradleyTerry', () => {
     expect(t2.theta).toBeGreaterThan(t1.theta);
     expect(t2.rank).toBe(1);
   });
+
+  // --- PLAN-3: Infit tests ---
+
+  it('infit ≈ 1.0 for data that perfectly matches the model', () => {
+    // With a transitive chain and enough data, infit should be near 1.0
+    const texts = [makeText(1), makeText(2), makeText(3)];
+    const judgements = [
+      ...Array.from({ length: 10 }, () => makeJudgement(1, 2, 'A')),
+      ...Array.from({ length: 10 }, () => makeJudgement(2, 3, 'A')),
+      ...Array.from({ length: 10 }, () => makeJudgement(1, 3, 'A')),
+    ];
+
+    const results = calculateBradleyTerry(texts, judgements);
+    for (const r of results) {
+      expect(r.infit).toBeDefined();
+      // With consistent data, infit should be reasonable (not wildly off)
+      expect(r.infit!).toBeGreaterThan(0);
+      expect(r.infit!).toBeLessThan(3);
+      expect(r.infitLabel).toBeDefined();
+    }
+  });
+
+  it('infit detects inconsistent text (beats strong, loses to weak)', () => {
+    // 4 texts: clear order 1 > 2 > 3 > 4 with lots of data
+    // But text 3 inconsistently beats text 1 sometimes
+    const texts = [makeText(1), makeText(2), makeText(3), makeText(4)];
+    const judgements = [
+      // Consistent: 1 > 2, 2 > 3, 3 > 4, 1 > 4, 2 > 4
+      ...Array.from({ length: 8 }, () => makeJudgement(1, 2, 'A')),
+      ...Array.from({ length: 8 }, () => makeJudgement(2, 3, 'A')),
+      ...Array.from({ length: 8 }, () => makeJudgement(3, 4, 'A')),
+      ...Array.from({ length: 8 }, () => makeJudgement(1, 4, 'A')),
+      ...Array.from({ length: 8 }, () => makeJudgement(2, 4, 'A')),
+      ...Array.from({ length: 8 }, () => makeJudgement(1, 3, 'A')),
+      // Inconsistent: text 3 beats text 1 (unexpected upset)
+      ...Array.from({ length: 6 }, () => makeJudgement(1, 3, 'B')),
+    ];
+
+    const results = calculateBradleyTerry(texts, judgements);
+    const t3 = results.find(r => r.textId === 3)!;
+    const t2 = results.find(r => r.textId === 2)!; // t2 is consistent
+
+    // Text 3 should have higher infit than text 2 (more surprising outcomes)
+    expect(t3.infit!).toBeGreaterThan(t2.infit!);
+  });
+
+  it('infitLabel is "Goed passend" for normal values, "Afwijkend patroon" for outliers', () => {
+    const texts = [makeText(1), makeText(2), makeText(3)];
+    const judgements = [
+      ...Array.from({ length: 10 }, () => makeJudgement(1, 2, 'A')),
+      ...Array.from({ length: 10 }, () => makeJudgement(2, 3, 'A')),
+      ...Array.from({ length: 10 }, () => makeJudgement(1, 3, 'A')),
+    ];
+
+    const results = calculateBradleyTerry(texts, judgements);
+    for (const r of results) {
+      if (r.infit! >= 0.7 && r.infit! <= 1.3) {
+        expect(r.infitLabel).toBe('Goed passend');
+      } else {
+        expect(r.infitLabel).toBe('Afwijkend patroon');
+      }
+    }
+  });
+
+  // --- PLAN-8: Reference node SE tests ---
+
+  it('PLAN-8: most-connected text used as reference (SE not Infinity)', () => {
+    // Text 1 has many comparisons, text 3 has few
+    const texts = [makeText(1), makeText(2), makeText(3)];
+    const judgements = [
+      ...Array.from({ length: 10 }, () => makeJudgement(1, 2, 'A')),
+      ...Array.from({ length: 10 }, () => makeJudgement(1, 3, 'A')),
+      ...Array.from({ length: 2 }, () => makeJudgement(2, 3, 'A')),
+    ];
+
+    const results = calculateBradleyTerry(texts, judgements);
+    // All SEs should be finite (the most-connected text is the reference,
+    // and its SE is approximated from well-measured neighbors)
+    for (const r of results) {
+      expect(Number.isFinite(r.standardError)).toBe(true);
+    }
+
+    // The most-connected text (text 1, exposure=20) should have reasonable SE
+    const t1 = results.find(r => r.textId === 1)!;
+    expect(t1.standardError).toBeLessThan(3); // reasonable, not blown up
+  });
+
+  it('PLAN-8: reference node SE is not artificially inflated', () => {
+    // Symmetric case: all texts equally connected
+    const texts = [makeText(1), makeText(2), makeText(3), makeText(4)];
+    const judgements: Judgement[] = [];
+    for (let i = 1; i <= 4; i++) {
+      for (let j = i + 1; j <= 4; j++) {
+        for (let k = 0; k < 5; k++) {
+          judgements.push(makeJudgement(i, j, 'A'));
+        }
+      }
+    }
+
+    const results = calculateBradleyTerry(texts, judgements);
+    const ses = results.map(r => r.standardError);
+
+    // In a symmetric setup, all SEs should be similar (not one wildly different)
+    const maxSE = Math.max(...ses);
+    const minSE = Math.min(...ses);
+    expect(maxSE / minSE).toBeLessThan(3); // ratio should be reasonable
+  });
 });

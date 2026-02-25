@@ -13,6 +13,8 @@ export interface ExportData {
   reliability: string;
   judgementCount: number;
   comments?: string;
+  infit?: number;
+  infitLabel?: string;
 }
 
 /**
