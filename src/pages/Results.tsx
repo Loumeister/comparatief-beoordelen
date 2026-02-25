@@ -292,15 +292,15 @@ const Results = () => {
 
   if (stopAdvice) {
     reliabilityStatus = 'reliable';
-    reliabilityText = 'Resultaat betrouwbaar (stopadvies)';
+    reliabilityText = 'Resultaten zijn betrouwbaar — je kunt stoppen met beoordelen';
     reliabilityIcon = CheckCircle;
   } else if (medianSE <= 1.00) {
     reliabilityStatus = 'moderate';
-    reliabilityText = 'Nog enkele vergelijkingen nodig';
+    reliabilityText = 'Bijna klaar — nog een paar vergelijkingen nodig';
     reliabilityIcon = AlertCircle;
   } else {
     reliabilityStatus = 'insufficient';
-    reliabilityText = 'Onvoldoende gegevens';
+    reliabilityText = 'Nog niet genoeg vergelijkingen — ga verder met beoordelen';
     reliabilityIcon = XCircle;
   }
 
@@ -326,27 +326,30 @@ const Results = () => {
             <HeaderNav />
           </div>
 
-          <div className="flex gap-2 mt-4">
-            <Button variant="outline" onClick={() => handleExport("csv")}>
-              <Download className="w-4 h-4 mr-2" />
-              CSV
-            </Button>
-            <Button variant="outline" onClick={() => handleExport("xlsx")}>
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Excel
-            </Button>
-            <Button variant="outline" onClick={() => handleExport("pdf")}>
-              <FileText className="w-4 h-4 mr-2" />
-              PDF
-            </Button>
-            <Button variant="outline" onClick={handleExportDataset}>
-              <Database className="w-4 h-4 mr-2" />
-              JSON Dataset
-            </Button>
-            <Button variant="outline" onClick={handleShareAssignment}>
-              <Share2 className="w-4 h-4 mr-2" />
-              Deel opdracht
-            </Button>
+          <div className="mt-4">
+            <p className="text-sm text-muted-foreground mb-2">Exporteer resultaten:</p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => handleExport("xlsx")} title="Download als Excel-bestand">
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Excel
+              </Button>
+              <Button variant="outline" onClick={() => handleExport("pdf")} title="Download als PDF-bestand">
+                <FileText className="w-4 h-4 mr-2" />
+                PDF
+              </Button>
+              <Button variant="outline" onClick={() => handleExport("csv")} title="Download als CSV (voor eigen verwerking)">
+                <Download className="w-4 h-4 mr-2" />
+                CSV
+              </Button>
+              <Button variant="outline" onClick={handleShareAssignment} title="Exporteer alleen de teksten zodat een collega zelf kan beoordelen">
+                <Share2 className="w-4 h-4 mr-2" />
+                Deel met collega
+              </Button>
+              <Button variant="outline" onClick={handleExportDataset} title="Exporteer alles (teksten + oordelen) als back-up of om samen te voegen">
+                <Database className="w-4 h-4 mr-2" />
+                Volledige back-up
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -387,7 +390,8 @@ const Results = () => {
               <div className="flex-1">
                 <h3 className="font-semibold text-lg">{reliabilityText}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {Math.round(reliabilityPercentage)}% ≤ {SE_RELIABLE} • mediaan(SE) = {Number.isFinite(medianSE) ? medianSE.toFixed(2) : '—'} • max(SE) = {Number.isFinite(maxSE) ? maxSE.toFixed(2) : '—'}
+                  {Math.round(reliabilityPercentage)}% van de teksten heeft een betrouwbare score
+                  {countInsufficient > 0 && <> • {countInsufficient} tekst{countInsufficient !== 1 ? 'en' : ''} nog onvoldoende vergeleken</>}
                 </p>
               </div>
             </div>
@@ -402,7 +406,7 @@ const Results = () => {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Mediaan en maximum SE voldoen aan de norm
+                  Alle teksten zijn voldoende vergeleken
                 </p>
               </div>
             ) : (
@@ -547,12 +551,12 @@ const Results = () => {
               {showDetails ? (
                 <>
                   <EyeOff className="w-4 h-4 mr-2" />
-                  Verberg details
+                  Verberg technische details
                 </>
               ) : (
                 <>
                   <Eye className="w-4 h-4 mr-2" />
-                  Toon achtergrondscores
+                  Toon technische details
                 </>
               )}
             </Button>
@@ -611,10 +615,15 @@ const Results = () => {
         </Card>
 
         {/* Continue comparing button */}
-        <div className="mt-6">
+        <div className="mt-6 flex items-center gap-4">
           <Button variant="outline" onClick={() => navigate(`/compare/${assignment?.id}`)}>
             Meer vergelijkingen maken
           </Button>
+          {reliabilityStatus !== 'reliable' && (
+            <p className="text-sm text-muted-foreground">
+              De resultaten worden nauwkeuriger naarmate je meer vergelijkingen maakt.
+            </p>
+          )}
         </div>
       </div>
 

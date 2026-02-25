@@ -401,9 +401,9 @@ const Compare = () => {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="shadow-lg max-w-md w-full mx-4">
           <CardContent className="p-6 space-y-4">
-            <h2 className="text-xl font-bold">Wie ben je?</h2>
+            <h2 className="text-xl font-bold">Voor we beginnen</h2>
             <p className="text-sm text-muted-foreground">
-              Vul je naam in zodat je oordelen herleidbaar zijn. Werk je alleen, klik dan direct op "Start".
+              Beoordeel je met meerdere collega's? Vul dan je naam in, zodat duidelijk is wie welk oordeel gaf.
             </p>
             <Input
               value={raterNameInput}
@@ -414,9 +414,12 @@ const Compare = () => {
             />
             <div className="flex gap-2">
               <Button onClick={handleRaterNameSubmit} className="flex-1">
-                Start
+                {raterNameInput.trim() ? 'Start met beoordelen' : 'Ik werk alleen — start'}
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Je naam wordt alleen lokaal opgeslagen en verschijnt bij je oordelen.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -493,7 +496,7 @@ const Compare = () => {
           <div className="mb-2">
             <h1 className="text-2xl font-bold">{assignment?.title}</h1>
             <p className="text-sm text-muted-foreground">
-              {totalJudgements} vergelijkingen • doel ≈ {expectedTotal}
+              {totalJudgements} van ca. {expectedTotal} vergelijkingen gedaan
               {raterName && <> • beoordelaar: <strong>{raterName}</strong></>}
             </p>
           </div>
@@ -587,7 +590,7 @@ const Compare = () => {
               </Button>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4 pt-4">
+            <div className="grid md:grid-cols-2 gap-4 pt-4 border-t">
               <div>
                 <label className="text-sm font-medium text-muted-foreground">
                   Opmerking {leftText.anonymizedName} (optioneel)
@@ -595,8 +598,8 @@ const Compare = () => {
                 <Textarea
                   value={commentLeft}
                   onChange={(e) => setCommentLeft(e.target.value)}
-                  placeholder="Opmerking voor deze tekst..."
-                  rows={3}
+                  placeholder="Bijv. 'goede opbouw' of 'veel spelfouten'..."
+                  rows={2}
                   className="mt-2"
                 />
               </div>
@@ -607,11 +610,14 @@ const Compare = () => {
                 <Textarea
                   value={commentRight}
                   onChange={(e) => setCommentRight(e.target.value)}
-                  placeholder="Opmerking voor deze tekst..."
-                  rows={3}
+                  placeholder="Bijv. 'goede opbouw' of 'veel spelfouten'..."
+                  rows={2}
                   className="mt-2"
                 />
               </div>
+              <p className="text-xs text-muted-foreground md:col-span-2">
+                Opmerkingen zijn voor jezelf — ze verschijnen later bij de resultaten per leerling. Ze tellen niet mee voor het cijfer.
+              </p>
             </div>
           </CardContent>
         </Card>

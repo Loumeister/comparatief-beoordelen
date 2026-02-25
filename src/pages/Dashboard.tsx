@@ -218,19 +218,20 @@ const Dashboard = () => {
           <p className="text-xl text-muted-foreground mb-6">
             Beoordeel leerlingteksten objectief door ze paarsgewijs te vergelijken
           </p>
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             <Button size="lg" onClick={() => navigate('/upload')}>
               <Plus className="w-5 h-5 mr-2" />
               Nieuwe Opdracht
             </Button>
-            <Button 
-              size="lg" 
-              variant="secondary" 
+            <Button
+              size="lg"
+              variant="secondary"
               onClick={() => fileInputRef.current?.click()}
               disabled={importing}
+              title="Importeer een eerder geëxporteerd bestand (van jezelf of een collega)"
             >
               <Upload className="w-5 h-5 mr-2" />
-              {importing ? 'Importeren...' : 'Importeer Dataset'}
+              {importing ? 'Importeren...' : 'Importeer bestand'}
             </Button>
             <input
               ref={fileInputRef}
@@ -363,7 +364,8 @@ const Dashboard = () => {
         {/* Info Section */}
         <Card className="mt-8">
           <CardHeader>
-            <CardTitle>Hoe werkt het?</CardTitle>
+            <CardTitle>Hoe werkt vergelijkende beoordeling?</CardTitle>
+            <p className="text-sm text-muted-foreground">In drie stappen van leerlingteksten naar cijfers</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-4">
@@ -373,7 +375,7 @@ const Dashboard = () => {
               <div>
                 <h4 className="font-semibold mb-1">Upload teksten</h4>
                 <p className="text-sm text-muted-foreground">
-                  Upload DOCX of TXT bestanden. De teksten worden automatisch geanonimiseerd.
+                  Maak een opdracht aan en upload de leerlingteksten (Word-bestanden of platte tekst). Je kunt ook alleen namen invoeren als je papieren teksten beoordeelt.
                 </p>
               </div>
             </div>
@@ -383,9 +385,9 @@ const Dashboard = () => {
                 <span className="font-bold text-primary">2</span>
               </div>
               <div>
-                <h4 className="font-semibold mb-1">Vergelijk paarsgewijs</h4>
+                <h4 className="font-semibold mb-1">Vergelijk steeds twee teksten</h4>
                 <p className="text-sm text-muted-foreground">
-                  Bekijk twee teksten naast elkaar en kies welke beter is. Gebruik de sneltoetsen A, B of T.
+                  Je krijgt telkens twee teksten naast elkaar te zien. Klik op de betere tekst — dat is alles. Het systeem kiest slimme paren en geeft aan wanneer je genoeg hebt vergeleken.
                 </p>
               </div>
             </div>
@@ -395,9 +397,9 @@ const Dashboard = () => {
                 <span className="font-bold text-primary">3</span>
               </div>
               <div>
-                <h4 className="font-semibold mb-1">Bekijk resultaten</h4>
+                <h4 className="font-semibold mb-1">Bekijk rangorde en cijfers</h4>
                 <p className="text-sm text-muted-foreground">
-                  Het systeem berekent automatisch een rangorde en cijfers. Export naar CSV, Excel of PDF.
+                  Uit alle vergelijkingen berekent het systeem automatisch een rangorde met cijfers. Je kunt de resultaten downloaden als Excel of PDF.
                 </p>
               </div>
             </div>

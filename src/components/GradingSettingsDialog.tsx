@@ -67,8 +67,12 @@ export const GradingSettingsDialog = ({
         </DialogHeader>
 
         <div className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            De cijfers worden berekend ten opzichte van het klasgemiddelde. De gemiddelde leerling krijgt altijd het basiscijfer.
+          </p>
+
           <div className="space-y-2">
-            <Label htmlFor="gradeBase">Basiscijfer (5.0 - 8.0)</Label>
+            <Label htmlFor="gradeBase">Basiscijfer</Label>
             <Input
               id="gradeBase"
               type="number"
@@ -79,12 +83,12 @@ export const GradingSettingsDialog = ({
               onChange={(e) => setGradeBase(parseFloat(e.target.value))}
             />
             <p className="text-sm text-muted-foreground">
-              Cijfer voor gemiddelde prestatie (z = 0)
+              Welk cijfer krijgt een gemiddelde leerling? (standaard: 7,0)
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="gradeScale">Schaal per σ (0.6 - 1.6)</Label>
+            <Label htmlFor="gradeScale">Spreiding</Label>
             <Input
               id="gradeScale"
               type="number"
@@ -95,7 +99,13 @@ export const GradingSettingsDialog = ({
               onChange={(e) => setGradeScale(parseFloat(e.target.value))}
             />
             <p className="text-sm text-muted-foreground">
-              Hoeveel cijferpunten per standaarddeviatie
+              Hoe ver liggen de cijfers uit elkaar? Hoger = meer verschil tussen leerlingen. (standaard: 1,2)
+            </p>
+          </div>
+
+          <div className="bg-muted/50 p-3 rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              <strong>Voorbeeld:</strong> Met basiscijfer {gradeBase.toFixed(1)} en spreiding {gradeScale.toFixed(1)} krijgt de beste leerling ongeveer een <strong>{Math.min(10, gradeBase + 2 * gradeScale).toFixed(1)}</strong> en de zwakste ongeveer een <strong>{Math.max(1, gradeBase - 2 * gradeScale).toFixed(1)}</strong>.
             </p>
           </div>
 
