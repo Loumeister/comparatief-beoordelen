@@ -48,7 +48,8 @@ function hasLadderEvidence(
       (j.textBId === textId && neighborIds.has(j.textAId))
   );
 
-  return matchesAgainstNeighbors.length >= minMatches;
+  const hasNonTrivial = matchesAgainstNeighbors.some(j => j.winner !== "EQUAL");
+  return matchesAgainstNeighbors.length >= minMatches && hasNonTrivial;
 }
 
 /**
@@ -90,16 +91,19 @@ export function assessReliability(
   const corePercentage = core.length > 0 ? (coreReliableCount / core.length) * 100 : 0;
   const coreReliable = corePercentage >= 80;
 
-  // 2. UITERSTEN ladder-bewijs
+  // 2. UITERSTEN ladder-bewijs (top/bottom 10%, minstens 1 tekst per kant)
   let topHasLadder = true;
   let bottomHasLadder = true;
 
   if (n > 2) {
-    const top = sorted[0];
-    const bottom = sorted[n - 1];
+    const extremeCount = Math.max(1, Math.floor(0.1 * n));
+    const topTexts = sorted.slice(0, extremeCount);
+    const bottomTexts = sorted.slice(n - extremeCount);
 
-    topHasLadder = hasLadderEvidence(top.textId, top.theta, currentResults, judgements);
-    bottomHasLadder = hasLadderEvidence(bottom.textId, bottom.theta, currentResults, judgements);
+    topHasLadder = topTexts.every(t =>
+      hasLadderEvidence(t.textId, t.theta, currentResults, judgements));
+    bottomHasLadder = bottomTexts.every(t =>
+      hasLadderEvidence(t.textId, t.theta, currentResults, judgements));
   }
 
   // 3. CONVERGENTIE (alleen als we vorige resultaten hebben)

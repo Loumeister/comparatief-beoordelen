@@ -10,7 +10,9 @@ interface BTResult {
   label: string;
   grade: number;
   reliability: string;
-  // Nieuw: signaal over graafconnectiviteit (voor UI/pairing)
+  infit?: number;       // infit mean-square (1.0 = perfect fit)
+  infitLabel?: string;  // "Goed passend" / "Afwijkend patroon"
+  // Signaal over graafconnectiviteit (voor UI/pairing)
   isGraphConnected?: boolean;
   components?: number;
 }
@@ -113,6 +115,7 @@ export function calculateBradleyTerry(
   // H_ii = lambda + Σ_j n_ij p_ij(1-p_ij)
   // H_ij = - n_ij p_ij(1-p_ij) (i != j)
   const H: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+  // Pass 1: diagonaal — loop alle j!=i voor Hii accumulatie
   for (let i = 0; i < n; i++) {
     let Hii = lambda;
     for (let j = 0; j < n; j++) {
@@ -120,20 +123,33 @@ export function calculateBradleyTerry(
       const nij = n_ij[i][j];
       if (nij === 0) continue;
       const pij = 1 / (1 + Math.exp(theta[j] - theta[i]));
-      const w = nij * pij * (1 - pij);
-      Hii += w;
-      H[i][j] -= w;
-      H[j][i] -= w; // symmetrisch
+      Hii += nij * pij * (1 - pij);
     }
     H[i][i] = Hii;
+  }
+  // Pass 2: off-diagonaal — elk paar (i,j) precies één keer bezoeken
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const nij = n_ij[i][j];
+      if (nij === 0) continue;
+      const pij = 1 / (1 + Math.exp(theta[j] - theta[i]));
+      const w = nij * pij * (1 - pij);
+      H[i][j] = -w;
+      H[j][i] = -w;
+    }
   }
 
   // Graafconnectiviteit (op basis van n_ij > 0)
   const compCount = countGraphComponents(n_ij);
 
-  // SE’s via gereduceerde inverse (fix 1 referentie om de nul-som gauge te hanteren)
-  // We kiezen de laatste index als referentie en nemen de (n-1)x(n-1) submatrix.
-  const ref = n - 1;
+  // SE's via gereduceerde inverse (fix 1 referentie om de nul-som gauge te hanteren)
+  // PLAN-8: Kies de best-verbonden tekst (hoogste exposure) als referentie.
+  // Dit minimaliseert de benaderingsfout omdat goed-verbonden nodes de meeste
+  // informatie dragen in het netwerk.
+  let ref = 0;
+  for (let i = 1; i < n; i++) {
+    if (exposure[i] > exposure[ref]) ref = i;
+  }
   const { variancesReduced, ok } = invertReducedForVariances(H, ref);
 
   // Map variances terug naar volledige vector:
@@ -167,6 +183,31 @@ export function calculateBradleyTerry(
     }
   }
 
+  // ---------- PLAN-3: INFIT MEAN-SQUARE per tekst ----------
+  // infit_i = Σ (observed - expected)² / Σ var_ij
+  // Verwachte waarde = 1.0; >1.3 = underfit (onvoorspelbaar), <0.7 = overfit
+  const infitNum = new Array(n).fill(0);
+  const infitDen = new Array(n).fill(0);
+  for (const j of judgements) {
+    const ia = idxOf.get(j.textAId);
+    const ib = idxOf.get(j.textBId);
+    if (ia == null || ib == null || ia === ib) continue;
+
+    const p_ab = 1 / (1 + Math.exp(theta[ib] - theta[ia])); // P(A wint)
+    const v = p_ab * (1 - p_ab);
+    const obs = j.winner === "A" ? 1 : j.winner === "B" ? 0 : 0.5;
+    const r2 = (obs - p_ab) ** 2;
+
+    infitNum[ia] += r2;
+    infitNum[ib] += r2; // symmetrisch: residual² is gelijk voor beide kanten
+    infitDen[ia] += v;
+    infitDen[ib] += v;
+  }
+  const infit = new Array(n).fill(1.0);
+  for (let i = 0; i < n; i++) {
+    if (infitDen[i] > 0) infit[i] = infitNum[i] / infitDen[i];
+  }
+
   // Normaliseer (μ=0), bereken σ voor z-score
   const mu = theta.reduce((a, b) => a + b, 0) / n;
   const centered = theta.map((t) => t - mu);
@@ -178,6 +219,7 @@ export function calculateBradleyTerry(
     textId: t.id!,
     theta: centered[i],
     standardError: se[i],
+    infit: infit[i],
   }));
   outBasic.sort((a, b) => b.theta - a.theta);
 
@@ -201,6 +243,11 @@ export function calculateBradleyTerry(
     return "Onvoldoende gegevens";
   }
 
+  function infitLabelFromValue(v: number): string {
+    if (v > 1.3 || v < 0.7) return "Afwijkend patroon";
+    return "Goed passend";
+  }
+
   const results: BTResult[] = outBasic.map((r, i) => ({
     textId: r.textId,
     theta: r.theta,
@@ -209,6 +256,8 @@ export function calculateBradleyTerry(
     label: labelFromRank(i, n, topPct),
     grade: gradeFromTheta(r.theta, sigma),
     reliability: reliabilityFromSE(r.standardError),
+    infit: r.infit,
+    infitLabel: infitLabelFromValue(r.infit),
     isGraphConnected: compCount === 1,
     components: compCount,
   }));

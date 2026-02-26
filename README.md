@@ -141,9 +141,9 @@ Bekijk de definitieve rangorde en cijfers.
 ## ⚙️ Technische Details
 
 ### Wiskundig model
-- **Bradley-Terry modptimalisatie** voor theta-schatting
-- **Standard Error (SE)** gebaseerd op Hessian-diagonaalel** met ridge-regularisatie
-- **Newton-Raphson o
+- **Bradley-Terry model** met ridge-regularisatie
+- **Newton-Raphson optimalisatie** voor theta-schatting
+- **Standard Error (SE)** gebaseerd op de inverse van de volledige Hessian-matrix (Cholesky-decompositie)
 
 ### Betrouwbaarheidsdrempels
 - Individueel: SE ≤ 0.75 (betrouwbaar), SE ≤ 1.00 (bijna klaar)

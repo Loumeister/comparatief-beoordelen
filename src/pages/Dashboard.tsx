@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users, Settings, BookOpen } from 'lucide-react';
+import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users, Settings, BookOpen, UserCheck } from 'lucide-react';
 import { db, Assignment } from '@/lib/db';
 import { importDataset, importCSV, importResultsFromXLSX, exportDataset } from '@/lib/exportImport';
 import { calculateBradleyTerry } from '@/lib/bradley-terry';
@@ -20,7 +20,7 @@ const Dashboard = () => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [stats, setStats] = useState<Map<number, { texts: number; judgements: number; reliabilityPct: number }>>(new Map());
+  const [stats, setStats] = useState<Map<number, { texts: number; judgements: number; reliabilityPct: number; raterCount: number }>>(new Map());
   const [importing, setImporting] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -41,18 +41,23 @@ const Dashboard = () => {
       const texts = await db.texts.where('assignmentId').equals(assign.id!).count();
       const judgements = await db.judgements.where('assignmentId').equals(assign.id!).count();
       
-      // Calculate reliability percentage if there are judgements
+      // Calculate reliability percentage and rater count if there are judgements
       let reliabilityPct = 0;
+      let raterCount = 0;
       if (judgements > 0 && texts > 0) {
         const textsData = await db.texts.where('assignmentId').equals(assign.id!).toArray();
         const judgementsData = await db.judgements.where('assignmentId').equals(assign.id!).toArray();
-        
+
         const results = calculateBradleyTerry(textsData, judgementsData);
         const reliableCount = results.filter(r => r.standardError <= SE_RELIABLE).length;
         reliabilityPct = Math.round((reliableCount / results.length) * 100);
+
+        // Count unique raters
+        const raters = new Set(judgementsData.map(j => j.raterId ?? 'unknown'));
+        raterCount = raters.size;
       }
-      
-      statsMap.set(assign.id, { texts, judgements, reliabilityPct });
+
+      statsMap.set(assign.id, { texts, judgements, reliabilityPct, raterCount });
     }
     setStats(statsMap);
   };
@@ -213,19 +218,20 @@ const Dashboard = () => {
           <p className="text-xl text-muted-foreground mb-6">
             Beoordeel leerlingteksten objectief door ze paarsgewijs te vergelijken
           </p>
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             <Button size="lg" onClick={() => navigate('/upload')}>
               <Plus className="w-5 h-5 mr-2" />
               Nieuwe Opdracht
             </Button>
-            <Button 
-              size="lg" 
-              variant="secondary" 
+            <Button
+              size="lg"
+              variant="secondary"
               onClick={() => fileInputRef.current?.click()}
               disabled={importing}
+              title="Importeer een eerder geëxporteerd bestand (van jezelf of een collega)"
             >
               <Upload className="w-5 h-5 mr-2" />
-              {importing ? 'Importeren...' : 'Importeer Dataset'}
+              {importing ? 'Importeren...' : 'Importeer bestand'}
             </Button>
             <input
               ref={fileInputRef}
@@ -302,6 +308,12 @@ const Dashboard = () => {
                             <span>{assignStats.reliabilityPct}% betrouwbaar</span>
                           </div>
                         )}
+                        {assignStats.raterCount > 1 && (
+                          <div className="flex items-center gap-2">
+                            <UserCheck className="w-4 h-4" />
+                            <span>{assignStats.raterCount} beoordelaars</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex gap-2">
@@ -352,7 +364,8 @@ const Dashboard = () => {
         {/* Info Section */}
         <Card className="mt-8">
           <CardHeader>
-            <CardTitle>Hoe werkt het?</CardTitle>
+            <CardTitle>Hoe werkt vergelijkende beoordeling?</CardTitle>
+            <p className="text-sm text-muted-foreground">In drie stappen van leerlingteksten naar cijfers</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-4">
@@ -362,7 +375,7 @@ const Dashboard = () => {
               <div>
                 <h4 className="font-semibold mb-1">Upload teksten</h4>
                 <p className="text-sm text-muted-foreground">
-                  Upload DOCX of TXT bestanden. De teksten worden automatisch geanonimiseerd.
+                  Maak een opdracht aan en upload de leerlingteksten (Word-bestanden of platte tekst). Je kunt ook alleen namen invoeren als je papieren teksten beoordeelt.
                 </p>
               </div>
             </div>
@@ -372,9 +385,9 @@ const Dashboard = () => {
                 <span className="font-bold text-primary">2</span>
               </div>
               <div>
-                <h4 className="font-semibold mb-1">Vergelijk paarsgewijs</h4>
+                <h4 className="font-semibold mb-1">Vergelijk steeds twee teksten</h4>
                 <p className="text-sm text-muted-foreground">
-                  Bekijk twee teksten naast elkaar en kies welke beter is. Gebruik de sneltoetsen A, B of T.
+                  Je krijgt telkens twee teksten naast elkaar te zien. Klik op de betere tekst — dat is alles. Het systeem kiest slimme paren en geeft aan wanneer je genoeg hebt vergeleken.
                 </p>
               </div>
             </div>
@@ -384,9 +397,9 @@ const Dashboard = () => {
                 <span className="font-bold text-primary">3</span>
               </div>
               <div>
-                <h4 className="font-semibold mb-1">Bekijk resultaten</h4>
+                <h4 className="font-semibold mb-1">Bekijk rangorde en cijfers</h4>
                 <p className="text-sm text-muted-foreground">
-                  Het systeem berekent automatisch een rangorde en cijfers. Export naar CSV, Excel of PDF.
+                  Uit alle vergelijkingen berekent het systeem automatisch een rangorde met cijfers. Je kunt de resultaten downloaden als Excel of PDF.
                 </p>
               </div>
             </div>

@@ -5,6 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Canonical key for a text pair: "smallId-bigId" */
+export function pairKey(a: number, b: number): string {
+  return `${Math.min(a, b)}-${Math.max(a, b)}`;
+}
+
 /**
  * Kendall's tau-b: rangcorrelatie tussen twee ranglijsten
  * Retourneert waarde tussen -1 en 1 (1 = perfecte overeenkomst)

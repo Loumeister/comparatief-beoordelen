@@ -3,9 +3,10 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Info } from "lucide-react";
+import { ArrowLeft, Info, AlertTriangle } from "lucide-react";
 import { db, Assignment, AssignmentMeta, Text } from "@/lib/db";
 import { generatePairs } from "@/lib/pairing";
 import { calculateBradleyTerry } from "@/lib/bradley-terry";
@@ -15,12 +16,11 @@ import { HeaderNav } from "@/components/HeaderNav";
 import { assessReliability, ReliabilityAssessment } from "@/lib/reliability";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MIN_BASE, SE_RELIABLE, DEFAULT_COMPARISONS_PER_TEXT, DEFAULT_BATCH_SIZE } from "@/lib/constants";
+import { pairKey } from "@/lib/utils";
 
-function key(a: number, b: number): string {
-  return `${Math.min(a, b)}-${Math.max(a, b)}`;
-}
-
-// Helper: bereken BT-scores tussendoor voor slimmere pairing
+// Helper: bereken BT-scores tussendoor voor slimmere pairing.
+// NB: lambda=0.3 (sterker dan de finale 0.1 op de Results-pagina) om stabilere
+// schattingen te geven bij weinig data, wat betere pair-selectie oplevert.
 async function buildBTMaps(assignmentId: number) {
   const texts = await db.texts.where("assignmentId").equals(assignmentId).toArray();
   const all = await db.judgements.where("assignmentId").equals(assignmentId).toArray();
@@ -32,7 +32,7 @@ async function buildBTMaps(assignmentId: number) {
   // telt ALLE judgements (niet alleen effectieve) voor herhaalbeperking
   const judgedPairsCounts = new Map<string, number>();
   for (const j of all) {
-    const k = key(j.textAId, j.textBId);
+    const k = pairKey(j.textAId, j.textBId);
     judgedPairsCounts.set(k, (judgedPairsCounts.get(k) ?? 0) + 1);
   }
 
@@ -46,7 +46,7 @@ async function buildBTMaps(assignmentId: number) {
     if (ib != null) exposures[ib]++;
   }
 
-  return { texts, judgements, theta, se, judgedPairsCounts, exposures };
+  return { texts, judgements, theta, se, judgedPairsCounts, exposures, btResults: bt };
 }
 
 function calculateDynamicBatchSize(texts: Text[], seMap: Map<number, number>, exposures: number[]): number {
@@ -79,8 +79,18 @@ const Compare = () => {
   const [textCounts, setTextCounts] = useState<Map<number, number>>(new Map<number, number>());
   const [replaceMode, setReplaceMode] = useState(false);
   const [isFinal, setIsFinal] = useState(false);
-  const [raterId] = useState(() => `rater-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`);
   const [reliabilityAdvice, setReliabilityAdvice] = useState<ReliabilityAssessment | null>(null);
+
+  // Rater identification (persistent via localStorage)
+  const [raterName, setRaterName] = useState<string>(() => localStorage.getItem('raterName') || '');
+  const [raterNameInput, setRaterNameInput] = useState('');
+  const [showRaterPrompt, setShowRaterPrompt] = useState(() => !localStorage.getItem('raterName'));
+  const raterId = raterName
+    ? `rater-${raterName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`
+    : `rater-anon-${Date.now()}`;
+
+  // Tie rate nudge (PLAN-9)
+  const [tieRate, setTieRate] = useState(0);
 
   // ---------- Data laden ----------
   const loadData = useCallback(async () => {
@@ -113,7 +123,7 @@ const Compare = () => {
       }
       setAssignmentMeta(meta);
 
-      const { texts, judgements, theta, se, judgedPairsCounts, exposures } = await buildBTMaps(id);
+      const { texts, judgements, theta, se, judgedPairsCounts, exposures, btResults } = await buildBTMaps(id);
       setPairCounts(judgedPairsCounts);
 
       // text counts
@@ -142,10 +152,17 @@ const Compare = () => {
 
       const batch = calculateDynamicBatchSize(texts, se, exposures);
 
-      // Bereken betrouwbaarheid voor advies
-      const bt = calculateBradleyTerry(texts, judgements, 0.3);
-      const reliability = assessReliability(bt, texts, judgements);
+      // Hergebruik BT-resultaten van buildBTMaps (geen dubbele berekening)
+      const reliability = assessReliability(btResults, texts, judgements);
       setReliabilityAdvice(reliability);
+
+      // Tie rate for current rater (PLAN-9)
+      const all = await db.judgements.where("assignmentId").equals(id).toArray();
+      const myJudgements = all.filter(j => j.raterId === raterId);
+      if (myJudgements.length >= 5) {
+        const ties = myJudgements.filter(j => j.winner === 'EQUAL').length;
+        setTieRate(ties / myJudgements.length);
+      }
 
       // Globale batchselectie (matching) in pairing.ts — geen extra flags nodig
       let newPairs = generatePairs(texts, judgements, {
@@ -184,14 +201,14 @@ const Compare = () => {
       toast({ title: "Fout bij laden", variant: "destructive" });
       navigate("/");
     }
-  }, [assignmentId, navigate, toast]);
+  }, [assignmentId, navigate, toast, raterId]);
 
   // Herlaad adaptief een nieuwe batch na oordelen
   const reloadPairs = useCallback(async () => {
     if (!assignment || !assignmentMeta) return;
     const id = assignment.id!;
 
-    const { texts, judgements, theta, se, judgedPairsCounts, exposures } = await buildBTMaps(id);
+    const { texts, judgements, theta, se, judgedPairsCounts, exposures, btResults } = await buildBTMaps(id);
     setPairCounts(judgedPairsCounts);
 
     // text counts
@@ -205,10 +222,17 @@ const Compare = () => {
     const targetPerText = assignment.numComparisons || DEFAULT_COMPARISONS_PER_TEXT;
     const batch = calculateDynamicBatchSize(texts, se, exposures);
 
-    // Bereken betrouwbaarheid voor advies
-    const bt = calculateBradleyTerry(texts, judgements, 0.3);
-    const reliability = assessReliability(bt, texts, judgements);
+    // Hergebruik BT-resultaten van buildBTMaps (geen dubbele berekening)
+    const reliability = assessReliability(btResults, texts, judgements);
     setReliabilityAdvice(reliability);
+
+    // Tie rate for current rater (PLAN-9)
+    const all = await db.judgements.where("assignmentId").equals(id).toArray();
+    const myJudgements = all.filter(j => j.raterId === raterId);
+    if (myJudgements.length >= 5) {
+      const ties = myJudgements.filter(j => j.winner === 'EQUAL').length;
+      setTieRate(ties / myJudgements.length);
+    }
 
     let nextPairs = generatePairs(texts, judgements, {
       targetComparisonsPerText: targetPerText,
@@ -242,7 +266,7 @@ const Compare = () => {
     setCurrentIndex(0);
     setReplaceMode(false);
     setIsFinal(false);
-  }, [assignment, assignmentMeta]);
+  }, [assignment, assignmentMeta, raterId]);
 
   // Init load
   useEffect(() => {
@@ -285,6 +309,7 @@ const Compare = () => {
           commentB: commentB || undefined,
           createdAt: new Date(),
           raterId,
+          raterName: raterName || undefined,
           source: "human",
           isFinal: mode === "moderate" ? isFinal : false,
           supersedesJudgementId: supersedesId,
@@ -306,7 +331,7 @@ const Compare = () => {
 
         setPairCounts((prev) => {
           const updated = new Map(prev);
-          const k = key(pair.textA.id!, pair.textB.id!);
+          const k = pairKey(pair.textA.id!, pair.textB.id!);
           updated.set(k, (updated.get(k) ?? 0) + 1);
           return updated;
         });
@@ -334,6 +359,7 @@ const Compare = () => {
       saving,
       toast,
       raterId,
+      raterName,
       isFinal,
     ],
   );
@@ -355,6 +381,50 @@ const Compare = () => {
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, [handleJudgement]);
+
+  // "Wie ben je?" handler
+  const handleRaterNameSubmit = () => {
+    const name = raterNameInput.trim();
+    if (name) {
+      setRaterName(name);
+      localStorage.setItem('raterName', name);
+    } else {
+      // Solo mode — use default
+      setRaterName('Docent');
+      localStorage.setItem('raterName', 'Docent');
+    }
+    setShowRaterPrompt(false);
+  };
+
+  if (showRaterPrompt) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="shadow-lg max-w-md w-full mx-4">
+          <CardContent className="p-6 space-y-4">
+            <h2 className="text-xl font-bold">Voor we beginnen</h2>
+            <p className="text-sm text-muted-foreground">
+              Beoordeel je met meerdere collega's? Vul dan je naam in, zodat duidelijk is wie welk oordeel gaf.
+            </p>
+            <Input
+              value={raterNameInput}
+              onChange={(e) => setRaterNameInput(e.target.value)}
+              placeholder="Je naam (bijv. Jan)"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleRaterNameSubmit(); }}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <Button onClick={handleRaterNameSubmit} className="flex-1">
+                {raterNameInput.trim() ? 'Start met beoordelen' : 'Ik werk alleen — start'}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Je naam wordt alleen lokaal opgeslagen en verschijnt bij je oordelen.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -426,7 +496,8 @@ const Compare = () => {
           <div className="mb-2">
             <h1 className="text-2xl font-bold">{assignment?.title}</h1>
             <p className="text-sm text-muted-foreground">
-              {totalJudgements} vergelijkingen • doel ≈ {expectedTotal}
+              {totalJudgements} van ca. {expectedTotal} vergelijkingen gedaan
+              {raterName && <> • beoordelaar: <strong>{raterName}</strong></>}
             </p>
           </div>
 
@@ -461,11 +532,23 @@ const Compare = () => {
           </Alert>
         )}
 
+        {/* Tie rate nudge (PLAN-9) */}
+        {tieRate > 0.4 && (
+          <Alert className="mb-6 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="ml-2">
+              <div className="text-sm">
+                <strong>Tip:</strong> Je kiest vaak "Gelijkwaardig" ({Math.round(tieRate * 100)}%). Probeer vaker een keuze te maken, ook als het verschil klein is. Dat maakt de resultaten nauwkeuriger.
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Card className="shadow-lg mb-6">
           <CardContent className="p-6">
             <p className="text-lg font-medium mb-2">Welke tekst is beter?</p>
             <p className="text-sm text-muted-foreground mb-4">
-              Kies de <strong>sterkere</strong> tekst. Bij twijfel: <em>Gelijkwaardig</em> (sneltoets T).
+              Kies de <strong>betere</strong> tekst, ook als het verschil klein is. Alleen <em>Gelijkwaardig</em> (sneltoets T) als ze echt even goed zijn.
             </p>
 
             <div className="grid grid-cols-3 gap-4 mb-6">
@@ -507,7 +590,7 @@ const Compare = () => {
               </Button>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4 pt-4">
+            <div className="grid md:grid-cols-2 gap-4 pt-4 border-t">
               <div>
                 <label className="text-sm font-medium text-muted-foreground">
                   Opmerking {leftText.anonymizedName} (optioneel)
@@ -515,8 +598,8 @@ const Compare = () => {
                 <Textarea
                   value={commentLeft}
                   onChange={(e) => setCommentLeft(e.target.value)}
-                  placeholder="Opmerking voor deze tekst..."
-                  rows={3}
+                  placeholder="Bijv. 'goede opbouw' of 'veel spelfouten'..."
+                  rows={2}
                   className="mt-2"
                 />
               </div>
@@ -527,11 +610,14 @@ const Compare = () => {
                 <Textarea
                   value={commentRight}
                   onChange={(e) => setCommentRight(e.target.value)}
-                  placeholder="Opmerking voor deze tekst..."
-                  rows={3}
+                  placeholder="Bijv. 'goede opbouw' of 'veel spelfouten'..."
+                  rows={2}
                   className="mt-2"
                 />
               </div>
+              <p className="text-xs text-muted-foreground md:col-span-2">
+                Opmerkingen zijn voor jezelf — ze verschijnen later bij de resultaten per leerling. Ze tellen niet mee voor het cijfer.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -544,10 +630,17 @@ const Compare = () => {
                   {leftText.anonymizedName}
                 </span>
               </div>
-              {leftText.content ? (
-                <div className="prose prose-sm max-w-none">
-                  <div className="whitespace-pre-wrap text-foreground leading-relaxed">{leftText.content}</div>
-                </div>
+              {leftText.content || leftText.contentHtml ? (
+                leftText.contentHtml ? (
+                  <div
+                    className="docx-content prose prose-sm max-w-none text-foreground leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: leftText.contentHtml }}
+                  />
+                ) : (
+                  <div className="prose prose-sm max-w-none">
+                    <div className="whitespace-pre-wrap text-foreground leading-relaxed">{leftText.content}</div>
+                  </div>
+                )
               ) : (
                 <div className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg">
                   <p className="text-muted-foreground text-center px-4">
@@ -567,10 +660,17 @@ const Compare = () => {
                   {rightText.anonymizedName}
                 </span>
               </div>
-              {rightText.content ? (
-                <div className="prose prose-sm max-w-none">
-                  <div className="whitespace-pre-wrap text-foreground leading-relaxed">{rightText.content}</div>
-                </div>
+              {rightText.content || rightText.contentHtml ? (
+                rightText.contentHtml ? (
+                  <div
+                    className="docx-content prose prose-sm max-w-none text-foreground leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: rightText.contentHtml }}
+                  />
+                ) : (
+                  <div className="prose prose-sm max-w-none">
+                    <div className="whitespace-pre-wrap text-foreground leading-relaxed">{rightText.content}</div>
+                  </div>
+                )
               ) : (
                 <div className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg">
                   <p className="text-muted-foreground text-center px-4">

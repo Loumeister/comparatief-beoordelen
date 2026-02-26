@@ -21,6 +21,7 @@ interface JudgementDetail {
   comment?: string;
   commentStudent?: string;
   commentOpponent?: string;
+  raterName?: string;
 }
 
 export function StudentDetailsDialog({
@@ -32,6 +33,7 @@ export function StudentDetailsDialog({
   const [judgements, setJudgements] = useState<JudgementDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ wins: 0, losses: 0, ties: 0 });
+  const [hasMultipleRaters, setMultipleRaters] = useState(false);
 
   useEffect(() => {
     if (open && studentName && assignmentId) {
@@ -108,7 +110,8 @@ export function StudentDetailsDialog({
           createdAt: j.createdAt,
           comment: j.comment, // Oude algemene comment (backwards compatibility)
           commentStudent,
-          commentOpponent
+          commentOpponent,
+          raterName: j.raterName || undefined,
         });
       }
 
@@ -117,6 +120,7 @@ export function StudentDetailsDialog({
 
       setJudgements(details);
       setStats({ wins, losses, ties });
+      setMultipleRaters(new Set(details.map(d => d.raterName).filter(Boolean)).size > 1);
     } catch (error) {
       console.error('Error loading judgements:', error);
     } finally {
@@ -190,12 +194,15 @@ export function StudentDetailsDialog({
                             <div className="flex-1">
                               <div className="font-medium">vs {j.opponent}</div>
                               <div className="text-xs text-muted-foreground">
-                                {j.createdAt.toLocaleDateString('nl-NL', { 
-                                  day: 'numeric', 
-                                  month: 'short', 
-                                  hour: '2-digit', 
-                                  minute: '2-digit' 
+                                {j.createdAt.toLocaleDateString('nl-NL', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
                                 })}
+                                {j.raterName && hasMultipleRaters && (
+                                  <span className="ml-2 text-primary">• {j.raterName}</span>
+                                )}
                               </div>
                             </div>
                           </div>

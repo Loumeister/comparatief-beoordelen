@@ -86,11 +86,12 @@ const Upload = () => {
       if (mode === 'upload') {
         // Parse and store texts from files
         for (let i = 0; i < files.length; i++) {
-          const content = await parseDocument(files[i]);
-          
+          const { text, html } = await parseDocument(files[i]);
+
           await db.texts.add({
             assignmentId,
-            content,
+            content: text,
+            contentHtml: html,
             originalFilename: files[i].name,
             anonymizedName: generateAnonymizedName(i),
             createdAt: new Date()

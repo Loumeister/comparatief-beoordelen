@@ -39,6 +39,36 @@ export async function exportDataset(assignmentId: number): Promise<void> {
 }
 
 /**
+ * Exporteer alleen teksten (zonder oordelen) zodat collega's schoon kunnen starten.
+ * Gebruik: "Deel opdracht" — collega importeert het JSON-bestand en beoordeelt zelf.
+ */
+export async function exportTextsOnly(assignmentId: number): Promise<void> {
+  const assignment = await db.assignments.get(assignmentId);
+  if (!assignment) {
+    throw new Error('Opdracht niet gevonden');
+  }
+
+  const texts = await db.texts.where('assignmentId').equals(assignmentId).toArray();
+
+  const data: DatasetExport = {
+    assignment,
+    texts,
+    judgements: [], // geen oordelen — collega start blanco
+  };
+
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${assignment.title}_opdracht.json`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
  * Importeer beoordelingsdata uit een JSON-bestand
  * Retourneert stats over toegevoegde data
  */
