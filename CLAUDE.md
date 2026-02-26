@@ -12,7 +12,7 @@ All data is stored **locally in the browser** (IndexedDB via Dexie). There is no
 
 - **React 18** + **TypeScript** + **Vite 7** (SWC compiler)
 - **Tailwind CSS 3** + **shadcn-ui** (Radix primitives)
-- **Dexie 4** (IndexedDB wrapper, schema version 6)
+- **Dexie 4** (IndexedDB wrapper, schema version 9)
 - **ExcelJS**, **jsPDF**, **Mammoth** (export/import/doc parsing)
 - Deployed to **GitHub Pages** (base path `/comparatief-beoordelen/`)
 
@@ -50,11 +50,13 @@ There are **no tests yet**. No test framework is configured. See Future Plans be
 | `reliability.ts` | Cohort reliability: core SE check, ladder evidence, convergence (Kendall's tau) |
 | `constants.ts` | All thresholds (SE_RELIABLE=0.75, COHORT_MEDIAN_OK=0.80, etc.) |
 | `effective-judgements.ts` | Filters raw judgements: moderation overrides, per-rater dedup |
-| `db.ts` | Dexie schema (6 tables: assignments, texts, judgements, scores, previousFits, assignmentMeta) |
+| `db.ts` | Dexie schema v9 (6 tables: assignments, texts, judgements, scores, previousFits, assignmentMeta) |
 | `graph.ts` | DFS connectivity check |
-| `export.ts` | CSV, Excel, PDF export |
+| `export.ts` | CSV, Excel, PDF export + per-student feedback PDF |
 | `exportImport.ts` | JSON dataset export/import, CSV import, Excel import |
 | `document-parser.ts` | .docx parsing via Mammoth |
+| `rater-analysis.ts` | Per-rater agreement stats, disagreement detection, tie rate analysis (PLAN-2) |
+| `anchor-grading.ts` | Anchor-based grading: refit linear transform through teacher-set anchor points (PLAN-6) |
 | `utils.ts` | Shared utilities (pairKey, kendallTau, cn) |
 
 ### Components (src/components/)
@@ -66,16 +68,24 @@ There are **no tests yet**. No test framework is configured. See Future Plans be
 - `StudentDetailsDialog.tsx` — detailed per-student scores modal
 - `ui/` — shadcn-ui component library (do not edit directly)
 
-### Database Schema (Dexie v6)
+### Database Schema (Dexie v9)
 
 ```
 assignments:   ++id, title, createdAt
+                 fields: title, genre, numComparisons, createdAt, updatedAt
 texts:         ++id, assignmentId, anonymizedName
+                 fields: content, contentHtml?, originalFilename, anonymizedName, createdAt
 judgements:    ++id, assignmentId, pairKey, textAId, textBId, raterId, supersedesJudgementId, createdAt
+                 fields: winner, comment?, commentA?, commentB?, raterId?, raterName?,
+                         sessionId?, source?, supersedesJudgementId?, isFinal?, pairKey?
 scores:        ++id, assignmentId, textId, rank
 previousFits:  ++id, assignmentId, calculatedAt
-assignmentMeta: assignmentId (gradeBase, gradeScale, gradeMin, gradeMax, judgementMode)
+assignmentMeta: assignmentId
+                 fields: judgementMode?, seRepeatThreshold?, gradeBase?, gradeScale?,
+                         gradeMin?, gradeMax?, anchors?
 ```
+
+**Schema history**: v4 (pairKey backfill) → v5 (grading defaults) → v6 (commentA/B) → v7 (raterName for team mode) → v8 (contentHtml for Word formatting) → v9 (anchors for anchor-based grading)
 
 When changing the schema, increment the version number in `db.ts` and add an `.upgrade()` handler for backward compatibility.
 
@@ -132,81 +142,72 @@ Topgroep (top 10%), Bovengemiddeld (11-50%), Gemiddeld (51-90%), Onder gemiddeld
 
 ---
 
+## Implemented Plans
+
+The following plans from the original roadmap have been **fully implemented** and are live in the current codebase.
+
+---
+
+### PLAN-1: Team Judgement Mode (multi-rater collaboration) — IMPLEMENTED
+
+**Status**: Fully implemented across schema v7, Compare.tsx, Results.tsx, Dashboard.tsx.
+
+**What was built**:
+1. **Rater identification**: `raterName` field on Judgement (schema v7). Compare page prompts "Wie ben je?" on first visit. Name stored in `localStorage`, `raterId` generated from slugified name. Solo users click "Ik werk alleen — start" (defaults to "Docent").
+2. **Share via JSON export/import**: "Deel met collega" button exports texts-only JSON. Colleagues import, judge, export back. `importDataset()` merges with per-rater dedup.
+3. **Per-rater overview**: "Beoordelaarsoverzicht" on Results page (collapsible, only shown with >1 rater). Shows per rater: name, # judgements, model agreement %, tie rate. Flags low agreement (<60%) and high ties (>40%).
+4. **Disagreement analysis**: "Meningsverschillen" section on Results page. Lists contested pairs with vote breakdown.
+5. **Dashboard enhancements**: Assignment cards show rater count ("X beoordelaars") when >1 rater.
+6. **Solo mode preserved**: Team UI only appears when multiple raters are detected.
+
+**Key files**: `src/pages/Compare.tsx` (rater prompt), `src/pages/Results.tsx` (rater overview, disagreements), `src/lib/rater-analysis.ts` (analysis logic), `src/pages/Dashboard.tsx` (rater count display).
+
+---
+
+### PLAN-2: Judge Consistency Metrics — IMPLEMENTED
+
+**Status**: Fully implemented in `src/lib/rater-analysis.ts` and Results.tsx.
+
+**What was built**:
+- Per-judge model agreement % (flags <60%)
+- Per-judge tie rate (warns >40%)
+- Pairwise disagreement detection
+- Displayed in collapsible sections on Results page (only with >1 rater)
+- Dutch labels: "Beoordelaarsoverzicht", "Meningsverschillen"
+
+---
+
+### PLAN-6: Anchor-Based Grading — IMPLEMENTED
+
+**Status**: Fully implemented across schema v9, `src/lib/anchor-grading.ts`, Results.tsx.
+
+**What was built**:
+- Anchor icon next to each grade in Results table — click to set a fixed grade
+- `anchors` field on AssignmentMeta (schema v9)
+- Single anchor: offset shift. Multiple anchors: least-squares fit.
+- Shows both "Relatief cijfer" and "Geijkt cijfer" columns when anchors are active
+- Info card explains single vs. multiple anchor behavior
+- "Wis ijkpunten" button to clear all anchors
+- Fully documented in ReadMe.tsx
+
+---
+
+### PLAN-9: Tie Guidance in UI — IMPLEMENTED
+
+**Status**: Implemented in Compare.tsx.
+
+**What was built**:
+- Guidance text updated to: "Kies de betere tekst, ook als het verschil klein is. Alleen Gelijkwaardig als ze echt even goed zijn."
+- Per-rater tie rate tracking. When >40%, shows nudge: "Tip: probeer vaker een keuze te maken"
+- Ties are never blocked, only gently discouraged
+
+---
+
 ## Future Plans (Optional Enhancements)
 
 The features below are **optional improvements** that can increase validity, reliability, or usability. Each one should be proposed to the user for approval before implementation, since the app must remain simple and accessible for non-technical colleagues.
 
 **Always ask: "Wil je dat ik [feature X] toevoeg?" before starting work on any of these.**
-
----
-
-### PLAN-1: Team Judgement Mode (multi-rater collaboration)
-
-**What**: Allow multiple colleagues to judge the same assignment together, each on their own device, with combined results. Each rater is identified by name so differences can be traced.
-
-**Why**: Multiple independent raters dramatically improve validity and reliability. In CJ literature, 2-3 raters are sufficient for stable rankings. Inter-rater agreement provides evidence that the ranking reflects real quality differences.
-
-**Current state**: The `raterId` field exists on every Judgement but is auto-generated as a random string per page load. There is no human-readable name, no persistence across sessions, and no UI showing who judged what. This needs to be fixed first.
-
-**Implementation steps**:
-
-1. **Rater identification** (prerequisite for everything else):
-   - Add `raterName` field to Judgement interface in `db.ts` (schema v7)
-   - On Compare page, prompt "Wie ben je?" with a text input on first visit
-   - Store name in `localStorage` for persistence across sessions
-   - Generate stable `raterId` from name (slugified) instead of random string
-   - Solo users can dismiss with "Alleen ik" — default name, no team UI
-
-2. **Share via JSON export/import** (simplest, no server needed):
-   - Teacher A creates the assignment and exports a JSON dataset
-   - Colleagues B and C import the JSON, make their own comparisons, export back
-   - Teacher A imports all JSON files — `importDataset()` already merges judgements with dedup
-   - The `raterId` + `raterName` fields on each Judgement distinguish raters
-   - Results page shows combined BT fit across all raters
-   - "Deel opdracht" button exports texts-only JSON (no judgements) for clean start
-
-3. **Per-rater overview on Results page** (only shown when >1 rater):
-   - "Beoordelaarsoverzicht" card showing per rater: name, # judgements, model agreement %, tie rate
-   - Flag raters with <60% agreement or >40% ties with gentle warnings
-   - Overall inter-rater agreement percentage
-
-4. **Disagreement analysis** (the key insight feature):
-   - Detect pairs where raters explicitly disagree (A says X wins, B says Y wins)
-   - "Meningsverschillen" section: list contested pairs, sorted by disagreement count
-   - Per-text disagreement hotspots — texts involved in many disputes may be ambiguous
-   - In StudentDetailsDialog: show which rater made each judgement
-
-5. **Per-rater rank comparison** (advanced, behind "Toon achtergrondscores"):
-   - Separate BT fit per rater (only those with >10 judgements)
-   - Kendall's tau correlation between each rater's ranking and the consensus
-   - Highlight texts with largest rank difference between raters
-
-6. **Dashboard enhancements**:
-   - Show rater count on assignment cards ("2 beoordelaars")
-   - Include rater name in CSV/Excel/PDF exports and JSON dataset
-
-7. **Solo mode must always work**. Team features are additive — a teacher working alone should never see team-specific UI unless they opt in (multiple raters detected).
-
-**The existing data model mostly supports this**: `raterId` on Judgement, `getEffectiveJudgements()` handles per-rater dedup, `importDataset()` merges data. The main work is rater identification, analysis logic (`src/lib/rater-analysis.ts`), and UI.
-
----
-
-### PLAN-2: Judge Consistency Metrics
-
-**What**: Show per-rater agreement statistics and disagreement analysis when multiple raters are involved.
-
-**Why**: One inconsistent rater can silently corrupt results. Without metrics, there is no way to identify rater disagreement. Teachers need to see where colleagues' views diverge — those are the texts worth discussing.
-
-**How** (implemented as `src/lib/rater-analysis.ts`):
-- **Per-judge model agreement**: % of judgements that agree with BT predicted winner. Flag judges <60%.
-- **Per-judge tie rate**: % of EQUAL judgements. Warn if >40% (ties are half as informative).
-- **Pairwise disagreement detection**: find pairs where rater A says X wins but rater B says Y wins.
-- **Disagreement hotspots**: texts involved in the most disputes (may be genuinely ambiguous).
-- **Per-rater BT fit** (advanced): separate BT per rater, Kendall's tau vs. consensus ranking.
-- Show on Results page only when multiple raters exist, in collapsible sections.
-- Simple Dutch labels: "Beoordelaarsoverzicht", "Meningsverschillen", "Overeenstemming".
-
-**Depends on**: PLAN-1 step 1 (rater identification with `raterName` field).
 
 ---
 
@@ -254,20 +255,6 @@ The features below are **optional improvements** that can increase validity, rel
 
 ---
 
-### PLAN-6: Anchor-Based Grading (absolute calibration)
-
-**What**: Let the teacher mark one or more texts as "anchor points" with a known grade, then calibrate the rest of the scale.
-
-**Why**: Current grading is purely norm-referenced (average always gets base grade). This means a class of all excellent writers still produces low grades. Anchor points let teachers inject absolute quality standards.
-
-**How**:
-- UI: on Results page, let teacher click a text and say "this is a 6"
-- Refit the linear transformation (base + scale * z) to pass through the anchor(s)
-- If multiple anchors, use least-squares fit
-- Show both "relatief cijfer" and "geijkt cijfer" columns
-
----
-
 ### PLAN-7: Enable Strict TypeScript
 
 **What**: Enable `strict: true`, `strictNullChecks: true`, `noImplicitAny: true` in tsconfig.
@@ -294,19 +281,6 @@ The features below are **optional improvements** that can increase validity, rel
 
 ---
 
-### PLAN-9: Tie Guidance in UI
-
-**What**: Adjust the UI to gently discourage excessive use of "Gelijkwaardig" (equal/tie).
-
-**Why**: Ties contribute half the Fisher information of decisive judgements, slowing convergence. The current UI says "Bij twijfel: Gelijkwaardig" which encourages ties.
-
-**How**:
-- Change guidance text to: "Kies de betere tekst, ook als het verschil klein is. Alleen gelijkwaardig als ze echt even goed zijn."
-- Track tie rate per rater. If >40%, show a gentle nudge: "Tip: probeer vaker een keuze te maken, ook als het verschil klein is."
-- Never block ties — they are valid judgements, just less informative.
-
----
-
 ### PLAN-10: Progress Dashboard per Text
 
 **What**: Show a visual overview of which texts have been compared enough and which need more attention.
@@ -317,3 +291,30 @@ The features below are **optional improvements** that can increase validity, rel
 - Small bar chart or heat map on the Compare page showing each text's SE or comparison count
 - Color coding: green (reliable), yellow (almost), red (needs work)
 - Helps teachers decide whether to continue or stop
+
+---
+
+### PLAN-11: UX Polish for Non-Technical Teachers
+
+**What**: A set of small UX improvements to make the app more accessible for colleagues who are not comfortable with technology.
+
+**Why**: UX review revealed several friction points: confusing developer UI, missing onboarding, unclear error messages, and hidden features that teachers won't discover on their own.
+
+**How** (priority order):
+
+#### Critical
+1. **Remove "Design Mode" button** from `HeaderNav.tsx` — this is a developer tool that confuses end users and has no place in production.
+2. **Improve "Geen paren beschikbaar" message** in `Compare.tsx` — add explanation and next steps ("Je hebt alle vergelijkingen al gedaan, of het aantal leerlingen is te klein. Je kunt nu de resultaten bekijken.").
+3. **Improve "Gelijkwaardig" guidance** in `Compare.tsx` — explain *why* choosing is better: "Dat maakt de resultaten nauwkeuriger."
+4. **Add legend for Reliability column** in `Results.tsx` — explain what green/yellow/red means in terms of teacher action (stop / continue / needs more work).
+
+#### High
+5. **Expand Rater Overview by default** in `Results.tsx` when >1 rater exists — teachers won't discover it if it's collapsed.
+6. **Add first-use welcome modal** on `Dashboard.tsx` — detect no assignments in DB and show a brief introduction to comparative judgment.
+7. **Improve anchor icon tooltip** in `Results.tsx` — explain when/why to use it: "Markeer een vaste referentie-graad (bijv. 'dit essay is een 6')."
+8. **Clarify "Wie ben je?" prompt** in `Compare.tsx` — make it clearer that solo teachers can skip immediately.
+
+#### Medium
+9. **Add "(optioneel)" hint** to Genre field on `Upload.tsx`.
+10. **Add "Klik op een kolomkop om te sorteren" hint** near Results table.
+11. **Add estimated time** to ReadMe.tsx: "Dit duurt ca. 30-60 minuten voor 20 leerlingen."
