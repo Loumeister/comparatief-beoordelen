@@ -1,7 +1,5 @@
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
@@ -10,29 +8,23 @@ import Results from "./pages/Results";
 import ReadMe from "./pages/ReadMe";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
-
 // GitHub Pages serves from /comparatief-beoordelen/; dev server uses root
 const basename = import.meta.env.PROD ? "/comparatief-beoordelen" : "";
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter basename={basename}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/upload" element={<Upload />} />
-          <Route path="/compare/:assignmentId" element={<Compare />} />
-          <Route path="/results/:assignmentId" element={<Results />} />
-          <Route path="/readme" element={<ReadMe />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <TooltipProvider>
+    <Toaster />
+    <BrowserRouter basename={basename}>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/upload" element={<Upload />} />
+        <Route path="/compare/:assignmentId" element={<Compare />} />
+        <Route path="/results/:assignmentId" element={<Results />} />
+        <Route path="/readme" element={<ReadMe />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  </TooltipProvider>
 );
 
 export default App;
