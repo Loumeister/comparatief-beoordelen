@@ -103,7 +103,8 @@ Hier beoordeel je door teksten paarsgewijs te vergelijken.
 
 **Tips:**
 - Wees consistent: gebruik dezelfde criteria voor elke vergelijking
-- Twijfel je? Kies dan "gelijkwaardig"
+- Kies altijd de betere tekst, ook als het verschil klein is — dat maakt de resultaten nauwkeuriger
+- Gebruik "Gelijkwaardig" alleen als twee teksten echt even goed zijn
 - Je kunt altijd stoppen en later verder gaan
 
 ---
@@ -120,10 +121,13 @@ Bekijk de definitieve rangorde en cijfers.
   - Label (Topgroep, Bovengemiddeld, etc.)
   - Cijfer (1-10)
   - Betrouwbaarheidsindicator per tekst
+- **Beoordelaarsoverzicht** (alleen bij meerdere beoordelaars): per beoordelaar het aantal vergelijkingen, overeenstemming met het model, en gelijkwaardig-percentage
+- **Meningsverschillen** (alleen bij meerdere beoordelaars): overzicht van paren waarover beoordelaars het oneens zijn
+- **Ijkpunten** (optioneel): markeer een tekst als referentie-cijfer (bijv. "dit essay is een 6") om de cijferschaal te kalibreren. Het systeem toont dan zowel een relatief cijfer als een geijkt cijfer.
 
 **Acties:**
-- **"Toon details"**: Bekijk technische scores (theta, SE, aantal beoordelingen)
-- **"Exporteer naar CSV/Excel"**: Download resultaten voor verdere analyse
+- **"Toon technische details"**: Bekijk achtergrondscores (theta, SE, aantal beoordelingen)
+- **"Exporteer naar CSV/Excel/PDF"**: Download resultaten voor verdere analyse
 - **"Terug naar vergelijken"**: Voeg meer beoordelingen toe als resultaten nog niet betrouwbaar zijn
 - **"Terug naar Dashboard"**: Ga terug naar het overzicht
 
@@ -131,10 +135,19 @@ Bekijk de definitieve rangorde en cijfers.
 
 ## 🎯 Typische Workflow
 
+### Solo (alleen jij)
 1. **Upload** → Upload alle leerlingteksten voor een opdracht
 2. **Vergelijken** → Beoordeel door teksten te vergelijken (elk werk ~7-10x)
 3. **Resultaten** → Bekijk de rangorde en exporteer cijfers
 4. **(Optioneel) Terug naar Vergelijken** → Voeg meer beoordelingen toe als het nog niet betrouwbaar genoeg is
+
+### Team (met collega's)
+1. **Upload** → Maak de opdracht aan met alle teksten
+2. **Deel** → Exporteer de opdracht via "Deel met collega" (teksten zonder oordelen)
+3. **Collega's importeren** → Elke collega importeert het bestand en maakt eigen vergelijkingen
+4. **Collega's exporteren** → Iedereen exporteert het resultaat als JSON-bestand
+5. **Importeer alles** → Importeer alle JSON-bestanden. Het systeem combineert alle oordelen
+6. **Resultaten** → Bekijk de gecombineerde rangorde, beoordelaarsoverzicht en eventuele meningsverschillen
 
 ---
 
@@ -164,11 +177,17 @@ Bekijk de definitieve rangorde en cijfers.
 **Wat als ik een fout maak?**  
 → Geen probleem! Het model is robuust en één foutje heeft weinig impact bij voldoende vergelijkingen.
 
-**Kan ik met meerdere mensen tegelijk beoordelen?**  
-→ Ja, de app slaat alle vergelijkingen op en combineert ze in één rangorde.
+**Kan ik met meerdere mensen tegelijk beoordelen?**
+→ Ja! Exporteer de opdracht via de "Deel met collega"-knop (teksten zonder oordelen). Je collega importeert het bestand, maakt eigen vergelijkingen, en exporteert het resultaat terug. Jij importeert alle bestanden — het systeem combineert alle oordelen automatisch in één rangorde. Op de Resultaten-pagina zie je per beoordelaar hoeveel vergelijkingen zijn gemaakt en hoe goed de onderlinge overeenstemming is.
 
-**Waarom krijgen sommige teksten "Onvoldoende gegevens"?**  
+**Waarom krijgen sommige teksten "Onvoldoende gegevens"?**
 → Ze zijn nog niet vaak genoeg vergeleken. Ga terug naar "Vergelijken" om meer beoordelingen toe te voegen.
+
+**Wat zijn ijkpunten?**
+→ Met ijkpunten kun je een of meer teksten een vast cijfer geven (bijv. "dit essay is een 6"). Het systeem past de hele schaal daarop aan. Handig als je vindt dat de relatieve cijfers niet aansluiten bij je verwachtingen. Je vindt het anker-icoon naast elk cijfer in de Resultaten-tabel.
+
+**Waar wordt mijn data opgeslagen?**
+→ Alle data wordt lokaal in je browser opgeslagen (IndexedDB). Er is geen server, geen login, en niets wordt naar het internet gestuurd. Als je je browserdata wist, verdwijnen ook je opdrachten — maak dus regelmatig een export.
 
 ---
 
@@ -189,4 +208,7 @@ npm run dev
 ```
 
 ### Deployment
-Open [Lovable](https://lovable.dev/projects/6a46e496-25a4-434c-8bbe-27f6fad7edcf) en klik op Share → Publish.
+
+De app wordt automatisch gedeployed naar **GitHub Pages** via een GitHub Actions workflow. Bij elke push naar `main` wordt de app gebouwd en gepubliceerd.
+
+Base path: `/comparatief-beoordelen/`
