@@ -1,209 +1,52 @@
-import { useEffect, useState, useRef } from 'react';
+// src/pages/Dashboard.tsx
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, BarChart3, Trash2, Upload, Pencil, Download, Users, Settings, BookOpen, UserCheck } from 'lucide-react';
-import { db, Assignment } from '@/lib/db';
-import { importDataset, importCSV, importResultsFromXLSX, exportDataset } from '@/lib/exportImport';
-import { calculateBradleyTerry } from '@/lib/bradley-terry';
-import { SE_RELIABLE } from '@/lib/constants';
-import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plus, FileText, Upload, BookOpen } from 'lucide-react';
+import { Assignment } from '@/lib/db';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ManageStudentsDialog } from '@/components/ManageStudentsDialog';
 import { GradingSettingsDialog } from '@/components/GradingSettingsDialog';
 import { HeaderNav } from '@/components/HeaderNav';
+import { AssignmentCard } from '@/components/dashboard/AssignmentCard';
+import { useDashboardData } from '@/hooks/use-dashboard-data';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [stats, setStats] = useState<Map<number, { texts: number; judgements: number; reliabilityPct: number; raterCount: number }>>(new Map());
-  const [importing, setImporting] = useState(false);
+
+  const {
+    assignments,
+    stats,
+    importing,
+    fileInputRef,
+    loadAssignments,
+    handleEdit: saveEdit,
+    handleExport,
+    handleDelete,
+    handleImport,
+  } = useDashboardData();
+
+  // Edit dialog state
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [editTitle, setEditTitle] = useState('');
+
+  // Sub-dialog state
   const [managingStudents, setManagingStudents] = useState<{ id: number; title: string } | null>(null);
   const [managingGrading, setManagingGrading] = useState<{ id: number; title: string } | null>(null);
 
-  useEffect(() => {
-    loadAssignments();
-  }, []);
-
-  const loadAssignments = async () => {
-    const allAssignments = await db.assignments.orderBy('createdAt').reverse().toArray();
-    setAssignments(allAssignments);
-
-    // Load stats for each assignment
-    const statsMap = new Map();
-    for (const assign of allAssignments) {
-      const texts = await db.texts.where('assignmentId').equals(assign.id!).count();
-      const judgements = await db.judgements.where('assignmentId').equals(assign.id!).count();
-      
-      // Calculate reliability percentage and rater count if there are judgements
-      let reliabilityPct = 0;
-      let raterCount = 0;
-      if (judgements > 0 && texts > 0) {
-        const textsData = await db.texts.where('assignmentId').equals(assign.id!).toArray();
-        const judgementsData = await db.judgements.where('assignmentId').equals(assign.id!).toArray();
-
-        const results = calculateBradleyTerry(textsData, judgementsData);
-        const reliableCount = results.filter(r => r.standardError <= SE_RELIABLE).length;
-        reliabilityPct = Math.round((reliableCount / results.length) * 100);
-
-        // Count unique raters
-        const raters = new Set(judgementsData.map(j => j.raterId ?? 'unknown'));
-        raterCount = raters.size;
-      }
-
-      statsMap.set(assign.id, { texts, judgements, reliabilityPct, raterCount });
-    }
-    setStats(statsMap);
-  };
-
-  const handleEdit = (assignment: Assignment) => {
+  const handleEditClick = (assignment: Assignment) => {
     setEditingAssignment(assignment);
     setEditTitle(assignment.title);
   };
 
   const handleSaveEdit = async () => {
     if (!editingAssignment || !editTitle.trim()) return;
-
-    try {
-      await db.assignments.update(editingAssignment.id!, {
-        title: editTitle.trim(),
-        updatedAt: new Date()
-      });
-
-      toast({
-        title: 'Titel aangepast',
-        description: `Titel is bijgewerkt naar "${editTitle.trim()}"`
-      });
-
-      setEditingAssignment(null);
-      setEditTitle('');
-      loadAssignments();
-    } catch (error) {
-      console.error('Update error:', error);
-      toast({
-        title: 'Fout bij opslaan',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const handleExport = async (assignmentId: number, title: string) => {
-    try {
-      await exportDataset(assignmentId);
-      toast({
-        title: 'Export gelukt',
-        description: `"${title}" is geëxporteerd als JSON`
-      });
-    } catch (error) {
-      console.error('Export error:', error);
-      toast({
-        title: 'Fout bij exporteren',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const handleDelete = async (id: number, title: string) => {
-    if (!confirm(`Weet je zeker dat je "${title}" wilt verwijderen?`)) {
-      return;
-    }
-
-    try {
-      await db.texts.where('assignmentId').equals(id).delete();
-      await db.judgements.where('assignmentId').equals(id).delete();
-      await db.scores.where('assignmentId').equals(id).delete();
-      await db.assignments.delete(id);
-
-      toast({
-        title: 'Opdracht verwijderd',
-        description: `"${title}" is verwijderd`
-      });
-
-      loadAssignments();
-    } catch (error) {
-      console.error('Delete error:', error);
-      toast({
-        title: 'Fout bij verwijderen',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setImporting(true);
-    try {
-      const fileName = file.name.toLowerCase();
-      
-      // Determine file type and import accordingly
-      if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-        // Excel resultaten import
-        const result = await importResultsFromXLSX(file);
-        
-        toast({
-          title: 'Excel resultaten geïmporteerd',
-          description: `${result.assignmentTitle}: ${result.newTexts} teksten toegevoegd`,
-        });
-      } else if (fileName.endsWith('.csv')) {
-        // CSV dataset import
-        const result = await importCSV(file);
-        
-        toast({
-          title: 'CSV dataset geïmporteerd',
-          description: `${result.assignmentTitle}: ${result.newTexts} nieuwe teksten, ${result.newJudgements} nieuwe oordelen`,
-        });
-
-        if (!result.isConnected) {
-          toast({
-            title: 'Let op: grafiek niet verbonden',
-            description: 'Sommige teksten zijn nog niet gekoppeld – voer extra vergelijkingen uit.',
-            variant: 'default',
-          });
-        }
-      } else if (fileName.endsWith('.json')) {
-        // JSON dataset import
-        const result = await importDataset(file);
-        
-        toast({
-          title: 'JSON dataset geïmporteerd',
-          description: `${result.assignmentTitle}: ${result.newTexts} nieuwe teksten, ${result.newJudgements} nieuwe oordelen`,
-        });
-
-        if (!result.isConnected) {
-          toast({
-            title: 'Let op: grafiek niet verbonden',
-            description: 'Sommige teksten zijn nog niet gekoppeld – voer extra vergelijkingen uit.',
-            variant: 'default',
-          });
-        }
-      } else {
-        throw new Error('Ongeldig bestandsformaat. Gebruik .xlsx, .csv of .json');
-      }
-
-      // Reload assignments
-      await loadAssignments();
-    } catch (error) {
-      console.error('Import error:', error);
-      toast({
-        title: 'Import mislukt',
-        description: error instanceof Error ? error.message : 'Ongeldig bestandsformaat',
-        variant: 'destructive',
-      });
-    } finally {
-      setImporting(false);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
+    await saveEdit(editingAssignment.id!, editTitle.trim());
+    setEditingAssignment(null);
+    setEditTitle('');
   };
 
   return (
@@ -264,99 +107,18 @@ const Dashboard = () => {
           <div>
             <h2 className="text-2xl font-bold mb-6">Je beoordelingen</h2>
             <div className="grid gap-4">
-              {assignments.map((assignment) => {
-                const assignStats = stats.get(assignment.id!) || { texts: 0, judgements: 0, reliabilityPct: 0 };
-
-                return (
-                  <Card key={assignment.id} className="hover:shadow-md transition-shadow">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-xl">{assignment.title}</CardTitle>
-                          <CardDescription>{assignment.genre}</CardDescription>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(assignment)}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(assignment.id!, assignment.title)}
-                          >
-                            <Trash2 className="w-4 h-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-6 mb-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4" />
-                          <span>{assignStats.texts} teksten</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <BarChart3 className="w-4 h-4" />
-                          <span>{assignStats.judgements} vergelijkingen</span>
-                        </div>
-                        {assignStats.judgements > 0 && (
-                          <div>
-                            <span>{assignStats.reliabilityPct}% betrouwbaar</span>
-                          </div>
-                        )}
-                        {assignStats.raterCount > 1 && (
-                          <div className="flex items-center gap-2">
-                            <UserCheck className="w-4 h-4" />
-                            <span>{assignStats.raterCount} beoordelaars</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          variant="default"
-                          onClick={() => navigate(`/compare/${assignment.id}`)}
-                        >
-                          Vergelijk
-                        </Button>
-                        {assignStats.judgements > 0 && (
-                          <Button
-                            variant="outline"
-                            onClick={() => navigate(`/results/${assignment.id}`)}
-                          >
-                            Resultaten
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          onClick={() => setManagingStudents({ id: assignment.id!, title: assignment.title })}
-                        >
-                          <Users className="w-4 h-4 mr-2" />
-                          Leerlingbeheer
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => setManagingGrading({ id: assignment.id!, title: assignment.title })}
-                        >
-                          <Settings className="w-4 h-4 mr-2" />
-                          Cijferinstellingen
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => handleExport(assignment.id!, assignment.title)}
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Export
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+              {assignments.map((assignment) => (
+                <AssignmentCard
+                  key={assignment.id}
+                  assignment={assignment}
+                  stats={stats.get(assignment.id!) || { texts: 0, judgements: 0, reliabilityPct: 0, raterCount: 0 }}
+                  onEdit={handleEditClick}
+                  onDelete={handleDelete}
+                  onExport={handleExport}
+                  onManageStudents={(id, title) => setManagingStudents({ id, title })}
+                  onManageGrading={(id, title) => setManagingGrading({ id, title })}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -408,8 +170,8 @@ const Dashboard = () => {
 
         {/* README Link */}
         <div className="mt-8 text-center">
-          <Button 
-            variant="link" 
+          <Button
+            variant="link"
             onClick={() => navigate('/readme')}
             className="text-muted-foreground"
           >
@@ -433,11 +195,7 @@ const Dashboard = () => {
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
                 placeholder="Voer een nieuwe titel in"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSaveEdit();
-                  }
-                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(); }}
               />
             </div>
           </div>
