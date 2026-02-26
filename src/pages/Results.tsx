@@ -666,11 +666,6 @@ const Results = () => {
             </Button>
           </CardHeader>
           <CardContent>
-            {anchors.length === 0 && (
-              <p className="text-sm text-muted-foreground mb-4">
-                Tip: klik op het ankertje naast een cijfer om dat cijfer vast te zetten. De overige cijfers worden dan automatisch herschaald.
-              </p>
-            )}
             <Table>
               <TableHeader>
                 <TableRow>
