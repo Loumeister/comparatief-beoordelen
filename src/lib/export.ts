@@ -154,10 +154,15 @@ export interface StudentFeedback {
 
 /**
  * Export per-student feedback as a PDF — one section per student.
- * Designed to be handed to students: shows grade, label, and all
- * collected comments as bullet points. No technical details.
+ * Designed to be handed to students: shows collected comments as
+ * bullet points. Grade/label/rank are optional (showGrades flag).
  */
-export function exportFeedbackPDF(students: StudentFeedback[], assignmentTitle: string, hasMultipleRaters: boolean) {
+export function exportFeedbackPDF(
+  students: StudentFeedback[],
+  assignmentTitle: string,
+  hasMultipleRaters: boolean,
+  showGrades: boolean = true,
+) {
   // Only include students that have at least one comment
   const withFeedback = students.filter(s => s.comments.length > 0);
 
@@ -188,12 +193,14 @@ export function exportFeedbackPDF(students: StudentFeedback[], assignmentTitle: 
     doc.text(`Feedback: ${s.anonymizedName}`, margin, y);
     y += 10;
 
-    // Grade + label line
-    const displayGrade = s.anchoredGrade != null ? s.anchoredGrade : s.grade;
-    doc.setFontSize(13);
-    doc.setTextColor(60, 60, 60);
-    doc.text(`Cijfer: ${displayGrade.toFixed(1)}     ${s.label}     (rang ${s.rank} van ${students.length})`, margin, y);
-    y += 4;
+    // Grade + label line (optional)
+    if (showGrades) {
+      const displayGrade = s.anchoredGrade != null ? s.anchoredGrade : s.grade;
+      doc.setFontSize(13);
+      doc.setTextColor(60, 60, 60);
+      doc.text(`Cijfer: ${displayGrade.toFixed(1)}     ${s.label}     (rang ${s.rank} van ${students.length})`, margin, y);
+      y += 4;
+    }
 
     // Divider
     doc.setDrawColor(200, 200, 200);

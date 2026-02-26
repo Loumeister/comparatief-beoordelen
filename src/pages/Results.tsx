@@ -13,6 +13,8 @@ import { calculateBradleyTerry } from "@/lib/bradley-terry";
 import { calculateAnchoredGrades } from "@/lib/anchor-grading";
 import { exportToCSV, exportToXLSX, exportToPDF, exportFeedbackPDF, ExportData, StudentFeedback } from "@/lib/export";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { exportDataset, exportTextsOnly } from "@/lib/exportImport";
@@ -44,6 +46,8 @@ const Results = () => {
   const [anchorDialogOpen, setAnchorDialogOpen] = useState(false);
   const [anchorTarget, setAnchorTarget] = useState<{ textId: number; name: string; currentGrade: number } | null>(null);
   const [anchorGradeInput, setAnchorGradeInput] = useState("");
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [feedbackShowGrades, setFeedbackShowGrades] = useState(true);
   // BT results + grading config needed for anchor recalculation
   const [btResults, setBtResults] = useState<{ textId: number; theta: number }[]>([]);
   const [gradingConfig, setGradingConfig] = useState<{ scale: number; sigma: number; min: number; max: number }>({ scale: 1.2, sigma: 1, min: 1, max: 10 });
@@ -281,7 +285,7 @@ const Results = () => {
     }
   };
 
-  const handleExportFeedback = () => {
+  const handleExportFeedback = (showGrades: boolean) => {
     if (!assignment) return;
 
     const students: StudentFeedback[] = results.map(r => ({
@@ -294,7 +298,7 @@ const Results = () => {
     }));
 
     const hasMultipleRaters = (raterAnalysis?.uniqueRaterCount ?? 0) > 1;
-    const success = exportFeedbackPDF(students, assignment.title, hasMultipleRaters);
+    const success = exportFeedbackPDF(students, assignment.title, hasMultipleRaters, showGrades);
 
     if (success) {
       toast({
@@ -459,7 +463,7 @@ const Results = () => {
                 <Download className="w-4 h-4 mr-2" />
                 CSV
               </Button>
-              <Button variant="outline" onClick={handleExportFeedback} title="Download feedback per leerling als PDF (voor leerlingen)">
+              <Button variant="outline" onClick={() => setFeedbackDialogOpen(true)} title="Download feedback per leerling als PDF (voor leerlingen)">
                 <MessageSquare className="w-4 h-4 mr-2" />
                 Leerlingfeedback
               </Button>
@@ -825,6 +829,42 @@ const Results = () => {
         open={!!selectedStudent}
         onOpenChange={(open) => !open && setSelectedStudent(null)}
       />
+
+      {/* Feedback Export Dialog */}
+      <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Leerlingfeedback exporteren</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Exporteer per leerling alle verzamelde opmerkingen als PDF.
+            </p>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="feedback-grades"
+                checked={feedbackShowGrades}
+                onCheckedChange={(checked) => setFeedbackShowGrades(checked === true)}
+              />
+              <Label htmlFor="feedback-grades" className="text-sm cursor-pointer">
+                Toon cijfer, label en rang
+              </Label>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setFeedbackDialogOpen(false)}>
+                Annuleren
+              </Button>
+              <Button onClick={() => {
+                handleExportFeedback(feedbackShowGrades);
+                setFeedbackDialogOpen(false);
+              }}>
+                <Download className="w-4 h-4 mr-2" />
+                Exporteer PDF
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Anchor Setting Dialog */}
       <Dialog open={anchorDialogOpen} onOpenChange={setAnchorDialogOpen}>
