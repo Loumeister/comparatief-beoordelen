@@ -58,6 +58,11 @@ export interface PreviousFit {
   calculatedAt: Date;
 }
 
+export interface Anchor {
+  textId: number;
+  grade: number;
+}
+
 export interface AssignmentMeta {
   assignmentId: number;
   judgementMode?: 'accumulate' | 'replace' | 'moderate';
@@ -66,6 +71,7 @@ export interface AssignmentMeta {
   gradeScale?: number;  // default 1.2
   gradeMin?: number;    // default 1
   gradeMax?: number;    // default 10
+  anchors?: Anchor[];   // ijkpunten: tekst X → vast cijfer Y
 }
 
 export class AssessmentDB extends Dexie {
@@ -146,6 +152,16 @@ export class AssessmentDB extends Dexie {
 
     // Version 8: add contentHtml field to texts (preserve Word document formatting)
     this.version(8).stores({
+      assignments: '++id, title, createdAt',
+      texts: '++id, assignmentId, anonymizedName',
+      judgements: '++id, assignmentId, pairKey, textAId, textBId, raterId, supersedesJudgementId, createdAt',
+      scores: '++id, assignmentId, textId, rank',
+      previousFits: '++id, assignmentId, calculatedAt',
+      assignmentMeta: 'assignmentId'
+    });
+
+    // Version 9: add anchors field to assignmentMeta (anchor-based grading, PLAN-6)
+    this.version(9).stores({
       assignments: '++id, title, createdAt',
       texts: '++id, assignmentId, anonymizedName',
       judgements: '++id, assignmentId, pairKey, textAId, textBId, raterId, supersedesJudgementId, createdAt',

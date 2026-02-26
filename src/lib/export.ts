@@ -4,10 +4,12 @@ import autoTable from 'jspdf-autotable';
 import { Score, Text } from './db';
 
 export interface ExportData {
+  textId?: number;          // intern, niet geëxporteerd
   anonymizedName: string;
   rank: number;
   label: string;
   grade: number;
+  anchoredGrade?: number;  // geijkt cijfer (PLAN-6)
   theta: number;
   standardError: number;
   reliability: string;
@@ -21,12 +23,18 @@ export interface ExportData {
  * Export results to CSV
  */
 export function exportToCSV(data: ExportData[], assignmentTitle: string) {
-  const headers = ['Tekst', 'Rang', 'Label', 'Cijfer', 'Theta', 'SE', 'Betrouwbaarheid', 'Aantal beoordelingen', 'Opmerkingen'];
+  const hasAnchored = data.some(d => d.anchoredGrade != null);
+  const headers = [
+    'Tekst', 'Rang', 'Label', 'Cijfer',
+    ...(hasAnchored ? ['Geijkt cijfer'] : []),
+    'Theta', 'SE', 'Betrouwbaarheid', 'Aantal beoordelingen', 'Opmerkingen'
+  ];
   const rows = data.map(d => [
     d.anonymizedName,
     d.rank,
     d.label,
     d.grade.toFixed(1),
+    ...(hasAnchored ? [d.anchoredGrade != null ? d.anchoredGrade.toFixed(1) : ''] : []),
     d.theta.toFixed(3),
     d.standardError.toFixed(3),
     d.reliability,
@@ -48,11 +56,13 @@ export async function exportToXLSX(data: ExportData[], assignmentTitle: string, 
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Resultaten');
 
+  const hasAnchored = data.some(d => d.anchoredGrade != null);
   worksheet.columns = [
     { header: 'Tekst', key: 'tekst', width: 20 },
     { header: 'Rang', key: 'rang', width: 10 },
     { header: 'Label', key: 'label', width: 15 },
     { header: 'Cijfer', key: 'cijfer', width: 10 },
+    ...(hasAnchored ? [{ header: 'Geijkt cijfer', key: 'geijktCijfer', width: 12 }] : []),
     { header: 'Theta', key: 'theta', width: 10 },
     { header: 'SE', key: 'se', width: 10 },
     { header: 'Betrouwbaarheid', key: 'betrouwbaarheid', width: 20 },
@@ -66,6 +76,7 @@ export async function exportToXLSX(data: ExportData[], assignmentTitle: string, 
       rang: d.rank,
       label: d.label,
       cijfer: d.grade.toFixed(1),
+      ...(hasAnchored ? { geijktCijfer: d.anchoredGrade != null ? d.anchoredGrade.toFixed(1) : '' } : {}),
       theta: d.theta.toFixed(3),
       se: d.standardError.toFixed(3),
       betrouwbaarheid: d.reliability,
@@ -98,21 +109,29 @@ export function exportToPDF(data: ExportData[], assignmentTitle: string) {
   doc.text('Vergelijkende beoordeling - Resultaten', 14, 28);
 
   // Table
+  const hasAnchored = data.some(d => d.anchoredGrade != null);
+  const pdfHeaders = ['Tekst', 'Rang', 'Label', 'Cijfer'];
+  if (hasAnchored) pdfHeaders.push('Geijkt cijfer');
+  pdfHeaders.push('Betrouwbaarheid', 'Opmerkingen');
+
   autoTable(doc, {
     startY: 35,
-    head: [['Tekst', 'Rang', 'Label', 'Cijfer', 'Betrouwbaarheid', 'Opmerkingen']],
-    body: data.map(d => [
-      d.anonymizedName,
-      d.rank.toString(),
-      d.label,
-      d.grade.toFixed(1),
-      d.reliability,
-      d.comments || ''
-    ]),
+    head: [pdfHeaders],
+    body: data.map(d => {
+      const row = [
+        d.anonymizedName,
+        d.rank.toString(),
+        d.label,
+        d.grade.toFixed(1),
+      ];
+      if (hasAnchored) row.push(d.anchoredGrade != null ? d.anchoredGrade.toFixed(1) : '–');
+      row.push(d.reliability, d.comments || '');
+      return row;
+    }),
     theme: 'striped',
     headStyles: { fillColor: [37, 99, 235] },
     styles: { fontSize: 8 },
-    columnStyles: { 5: { cellWidth: 50 } }
+    columnStyles: { [pdfHeaders.length - 1]: { cellWidth: 50 } }
   });
 
   doc.save(`${assignmentTitle}_resultaten.pdf`);
