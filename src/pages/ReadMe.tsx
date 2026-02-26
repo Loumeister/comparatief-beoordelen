@@ -281,6 +281,20 @@ const ReadMe = () => {
             <p className="text-sm bg-muted/50 p-3 rounded-lg">
               <strong>Let op:</strong> omdat de cijfers relatief zijn, krijgt een klas met alleen uitstekende schrijvers dezelfde verdeling als een zwakke klas. Dit is inherent aan vergelijkende beoordeling — het systeem kan alleen zeggen wie <em>beter</em> is, niet hoe goed iemand in absolute zin is.
             </p>
+
+            <div>
+              <h4 className="font-semibold mb-2">Ijkpunten (vast cijfer instellen)</h4>
+              <p className="text-muted-foreground mb-2">
+                Wil je dat een specifieke tekst een bepaald cijfer krijgt? Klik op het <strong>ankertje</strong> naast het cijfer in de resultatentabel. Je kunt dan een vast cijfer invoeren — de overige cijfers worden automatisch herschaald.
+              </p>
+              <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                <li><strong>Eén ijkpunt</strong> — het hele cijferbereik verschuift, de onderlinge verhoudingen blijven gelijk.</li>
+                <li><strong>Meerdere ijkpunten</strong> — de schaal wordt zo goed mogelijk door alle ijkpunten gefit.</li>
+              </ul>
+              <p className="text-muted-foreground mt-2">
+                Zodra er ijkpunten actief zijn, zie je twee kolommen: het <strong>relatieve cijfer</strong> (normreferentie) en het <strong>geijkte cijfer</strong> (gekalibreerd). Ijkpunten kun je altijd weer verwijderen.
+              </p>
+            </div>
           </CardContent>
         </Card>
 

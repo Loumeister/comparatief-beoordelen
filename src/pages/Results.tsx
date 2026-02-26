@@ -14,6 +14,7 @@ import { calculateAnchoredGrades } from "@/lib/anchor-grading";
 import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from "@/lib/export";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { exportDataset, exportTextsOnly } from "@/lib/exportImport";
 import { getEffectiveJudgements } from "@/lib/effective-judgements";
 import { analyzeRaters, RaterAnalysis } from "@/lib/rater-analysis";
@@ -718,16 +719,24 @@ const Results = () => {
                           <span className={`font-bold text-lg ${anchors.length > 0 ? 'text-muted-foreground' : ''}`}>
                             {r.grade.toFixed(1)}
                           </span>
-                          <button
-                            className={`p-1 rounded hover:bg-muted transition-colors ${isAnchor ? 'text-primary' : 'text-muted-foreground/40 hover:text-muted-foreground'}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (r.textId != null) openAnchorDialog(r.textId, r.anonymizedName, r.grade);
-                            }}
-                            title={isAnchor ? "Ijkpunt aanpassen" : "Stel in als ijkpunt"}
-                          >
-                            <Anchor className="w-3.5 h-3.5" />
-                          </button>
+                          <TooltipProvider delayDuration={200}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className={`p-1 rounded hover:bg-muted transition-colors ${isAnchor ? 'text-primary' : 'text-muted-foreground/40 hover:text-muted-foreground'}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (r.textId != null) openAnchorDialog(r.textId, r.anonymizedName, r.grade);
+                                  }}
+                                >
+                                  <Anchor className="w-3.5 h-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="left">
+                                <p>{isAnchor ? "Ijkpunt aanpassen" : "Stel vast cijfer in"}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </TableCell>
                       {anchors.length > 0 && (
