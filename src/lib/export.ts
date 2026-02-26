@@ -1,4 +1,3 @@
-import ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Score, Text } from './db';
@@ -53,6 +52,7 @@ export function exportToCSV(data: ExportData[], assignmentTitle: string) {
  * Export results to Excel
  */
 export async function exportToXLSX(data: ExportData[], assignmentTitle: string, numComparisons?: number) {
+  const ExcelJS = (await import('exceljs')).default;
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Resultaten');
 
