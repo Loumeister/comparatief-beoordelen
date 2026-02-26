@@ -11,7 +11,7 @@ import { db, Assignment, Judgement } from "@/lib/db";
 import type { Anchor } from "@/lib/db";
 import { calculateBradleyTerry } from "@/lib/bradley-terry";
 import { calculateAnchoredGrades } from "@/lib/anchor-grading";
-import { exportToCSV, exportToXLSX, exportToPDF, ExportData } from "@/lib/export";
+import { exportToCSV, exportToXLSX, exportToPDF, exportFeedbackPDF, ExportData, StudentFeedback } from "@/lib/export";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -47,6 +47,7 @@ const Results = () => {
   // BT results + grading config needed for anchor recalculation
   const [btResults, setBtResults] = useState<{ textId: number; theta: number }[]>([]);
   const [gradingConfig, setGradingConfig] = useState<{ scale: number; sigma: number; min: number; max: number }>({ scale: 1.2, sigma: 1, min: 1, max: 10 });
+  const [feedbackData, setFeedbackData] = useState<Map<number, { text: string; raterName?: string }[]>>(new Map());
 
   useEffect(() => {
     loadResults();
@@ -106,6 +107,7 @@ const Results = () => {
       // Bereken aantal beoordelingen en opmerkingen per tekst in één pass (O(m))
       const judgementCounts = new Map<number, number>();
       const commentsMap = new Map<number, string[]>();
+      const feedbackMap = new Map<number, { text: string; raterName?: string }[]>();
       for (const j of judgements) {
         judgementCounts.set(j.textAId, (judgementCounts.get(j.textAId) ?? 0) + 1);
         judgementCounts.set(j.textBId, (judgementCounts.get(j.textBId) ?? 0) + 1);
@@ -113,19 +115,27 @@ const Results = () => {
         if (j.commentA?.trim()) {
           if (!commentsMap.has(j.textAId)) commentsMap.set(j.textAId, []);
           commentsMap.get(j.textAId)!.push(j.commentA.trim());
+          if (!feedbackMap.has(j.textAId)) feedbackMap.set(j.textAId, []);
+          feedbackMap.get(j.textAId)!.push({ text: j.commentA.trim(), raterName: j.raterName || undefined });
         }
         if (j.commentB?.trim()) {
           if (!commentsMap.has(j.textBId)) commentsMap.set(j.textBId, []);
           commentsMap.get(j.textBId)!.push(j.commentB.trim());
+          if (!feedbackMap.has(j.textBId)) feedbackMap.set(j.textBId, []);
+          feedbackMap.get(j.textBId)!.push({ text: j.commentB.trim(), raterName: j.raterName || undefined });
         }
         // Backwards compatibility: oude comment veld
         if (j.comment?.trim() && !j.commentA && !j.commentB) {
           for (const tid of [j.textAId, j.textBId]) {
             if (!commentsMap.has(tid)) commentsMap.set(tid, []);
             commentsMap.get(tid)!.push(j.comment.trim());
+            if (!feedbackMap.has(tid)) feedbackMap.set(tid, []);
+            feedbackMap.get(tid)!.push({ text: j.comment.trim(), raterName: j.raterName || undefined });
           }
         }
       }
+
+      setFeedbackData(feedbackMap);
 
       // Bewaar BT-resultaten en sigma voor ankerberekening
       const thetas = btResults.map(r => r.theta);
@@ -268,6 +278,35 @@ const Results = () => {
     } catch (error) {
       console.error("Export dataset error:", error);
       toast({ title: "Export mislukt", variant: "destructive" });
+    }
+  };
+
+  const handleExportFeedback = () => {
+    if (!assignment) return;
+
+    const students: StudentFeedback[] = results.map(r => ({
+      anonymizedName: r.anonymizedName,
+      grade: r.grade,
+      anchoredGrade: r.anchoredGrade,
+      label: r.label,
+      rank: r.rank,
+      comments: r.textId != null ? (feedbackData.get(r.textId) ?? []) : [],
+    }));
+
+    const hasMultipleRaters = (raterAnalysis?.uniqueRaterCount ?? 0) > 1;
+    const success = exportFeedbackPDF(students, assignment.title, hasMultipleRaters);
+
+    if (success) {
+      toast({
+        title: "Feedback geëxporteerd",
+        description: "PDF met leerlingfeedback gedownload",
+      });
+    } else {
+      toast({
+        title: "Geen feedback beschikbaar",
+        description: "Er zijn nog geen opmerkingen gemaakt bij de vergelijkingen",
+        variant: "destructive",
+      });
     }
   };
 
@@ -419,6 +458,10 @@ const Results = () => {
               <Button variant="outline" onClick={() => handleExport("csv")} title="Download als CSV (voor eigen verwerking)">
                 <Download className="w-4 h-4 mr-2" />
                 CSV
+              </Button>
+              <Button variant="outline" onClick={handleExportFeedback} title="Download feedback per leerling als PDF (voor leerlingen)">
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Leerlingfeedback
               </Button>
               <Button variant="outline" onClick={handleShareAssignment} title="Exporteer alleen de teksten zodat een collega zelf kan beoordelen">
                 <Share2 className="w-4 h-4 mr-2" />

@@ -140,6 +140,113 @@ export function exportToPDF(data: ExportData[], assignmentTitle: string) {
 /**
  * Export results to JSON
  */
+/**
+ * Per-student feedback data for the feedback PDF
+ */
+export interface StudentFeedback {
+  anonymizedName: string;
+  grade: number;
+  anchoredGrade?: number;
+  label: string;
+  rank: number;
+  comments: { text: string; raterName?: string }[];
+}
+
+/**
+ * Export per-student feedback as a PDF — one section per student.
+ * Designed to be handed to students: shows grade, label, and all
+ * collected comments as bullet points. No technical details.
+ */
+export function exportFeedbackPDF(students: StudentFeedback[], assignmentTitle: string, hasMultipleRaters: boolean) {
+  // Only include students that have at least one comment
+  const withFeedback = students.filter(s => s.comments.length > 0);
+
+  if (withFeedback.length === 0) {
+    return false; // signal: nothing to export
+  }
+
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 14;
+  const usable = pageWidth - 2 * margin;
+
+  for (let i = 0; i < withFeedback.length; i++) {
+    const s = withFeedback[i];
+    if (i > 0) doc.addPage();
+
+    let y = 20;
+
+    // Assignment title
+    doc.setFontSize(11);
+    doc.setTextColor(120, 120, 120);
+    doc.text(assignmentTitle, margin, y);
+    y += 10;
+
+    // Student name
+    doc.setFontSize(20);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Feedback: ${s.anonymizedName}`, margin, y);
+    y += 10;
+
+    // Grade + label line
+    const displayGrade = s.anchoredGrade != null ? s.anchoredGrade : s.grade;
+    doc.setFontSize(13);
+    doc.setTextColor(60, 60, 60);
+    doc.text(`Cijfer: ${displayGrade.toFixed(1)}     ${s.label}     (rang ${s.rank} van ${students.length})`, margin, y);
+    y += 4;
+
+    // Divider
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, y, margin + usable, y);
+    y += 8;
+
+    // Feedback section heading
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Feedback van beoordelaars:', margin, y);
+    y += 8;
+
+    // Deduplicate comments (same text from same rater = duplicate)
+    const seen = new Set<string>();
+    const unique: { text: string; raterName?: string }[] = [];
+    for (const c of s.comments) {
+      const key = `${c.raterName ?? ''}::${c.text}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(c);
+      }
+    }
+
+    // Render comments as bullet points
+    doc.setFontSize(10);
+    for (const c of unique) {
+      // Wrap long comments
+      const prefix = hasMultipleRaters && c.raterName ? `${c.raterName}: ` : '';
+      const fullText = `${prefix}${c.text}`;
+      const lines = doc.splitTextToSize(fullText, usable - 8);
+
+      // Check page overflow
+      if (y + lines.length * 5 + 4 > doc.internal.pageSize.getHeight() - 15) {
+        doc.addPage();
+        y = 20;
+      }
+
+      // Bullet
+      doc.setTextColor(100, 100, 100);
+      doc.text('•', margin, y);
+      doc.setTextColor(40, 40, 40);
+      doc.text(lines, margin + 6, y);
+      y += lines.length * 5 + 3;
+    }
+  }
+
+  doc.save(`${assignmentTitle}_feedback.pdf`);
+  return true;
+}
+
+/**
+ * Export results to JSON
+ */
 export function exportToJSON(data: ExportData[], assignmentTitle: string) {
   const json = JSON.stringify(data, null, 2);
   downloadFile(json, `${assignmentTitle}_resultaten.json`, 'application/json');

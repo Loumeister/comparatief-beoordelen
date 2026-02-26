@@ -128,6 +128,7 @@ Bekijk de definitieve rangorde en cijfers.
 **Acties:**
 - **"Toon technische details"**: Bekijk achtergrondscores (theta, SE, aantal beoordelingen)
 - **"Exporteer naar CSV/Excel/PDF"**: Download resultaten voor verdere analyse
+- **"Leerlingfeedback"**: Download een PDF met per leerling alle verzamelde opmerkingen — handig om uit te delen als feedback
 - **"Terug naar vergelijken"**: Voeg meer beoordelingen toe als resultaten nog niet betrouwbaar zijn
 - **"Terug naar Dashboard"**: Ga terug naar het overzicht
 
@@ -185,6 +186,9 @@ Bekijk de definitieve rangorde en cijfers.
 
 **Wat zijn ijkpunten?**
 → Met ijkpunten kun je een of meer teksten een vast cijfer geven (bijv. "dit essay is een 6"). Het systeem past de hele schaal daarop aan. Handig als je vindt dat de relatieve cijfers niet aansluiten bij je verwachtingen. Je vindt het anker-icoon naast elk cijfer in de Resultaten-tabel.
+
+**Kan ik feedback aan leerlingen geven?**
+→ Ja! Tijdens het vergelijken kun je per tekst een korte opmerking invoeren (bijv. "goede opbouw" of "veel spelfouten"). Op de Resultaten-pagina kun je via de knop "Leerlingfeedback" een PDF downloaden met per leerling alle verzamelde opmerkingen — klaar om uit te delen.
 
 **Waar wordt mijn data opgeslagen?**
 → Alle data wordt lokaal in je browser opgeslagen (IndexedDB). Er is geen server, geen login, en niets wordt naar het internet gestuurd. Als je je browserdata wist, verdwijnen ook je opdrachten — maak dus regelmatig een export.

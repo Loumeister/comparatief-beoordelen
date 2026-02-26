@@ -52,7 +52,7 @@ There are **no tests yet**. No test framework is configured. See Future Plans be
 | `effective-judgements.ts` | Filters raw judgements: moderation overrides, per-rater dedup |
 | `db.ts` | Dexie schema v9 (6 tables: assignments, texts, judgements, scores, previousFits, assignmentMeta) |
 | `graph.ts` | DFS connectivity check |
-| `export.ts` | CSV, Excel, PDF export |
+| `export.ts` | CSV, Excel, PDF export + per-student feedback PDF |
 | `exportImport.ts` | JSON dataset export/import, CSV import, Excel import |
 | `document-parser.ts` | .docx parsing via Mammoth |
 | `rater-analysis.ts` | Per-rater agreement stats, disagreement detection, tie rate analysis (PLAN-2) |
