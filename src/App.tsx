@@ -12,7 +12,7 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Only use basename in production (GitHub Pages), not in development (Lovable preview)
+// GitHub Pages serves from /comparatief-beoordelen/; dev server uses root
 const basename = import.meta.env.PROD ? "/comparatief-beoordelen" : "";
 
 const App = () => (
