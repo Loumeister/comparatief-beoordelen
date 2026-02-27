@@ -10,6 +10,7 @@ import { calculateBradleyTerry } from "@/lib/bradley-terry";
 import { calculateAnchoredGrades } from "@/lib/anchor-grading";
 import { getEffectiveJudgements } from "@/lib/effective-judgements";
 import { analyzeRaters, RaterAnalysis } from "@/lib/rater-analysis";
+import { calculateSplitHalfReliability, SplitHalfResult } from "@/lib/split-half";
 import { isConnected } from "@/lib/graph";
 import { ExportData, StudentFeedback, exportToCSV, exportToXLSX, exportToPDF, exportFeedbackPDF } from "@/lib/export";
 import { exportDataset, exportTextsOnly } from "@/lib/exportImport";
@@ -28,6 +29,7 @@ export interface ResultsDataState {
   loading: boolean;
   connected: boolean | null;
   raterAnalysis: RaterAnalysis | null;
+  splitHalf: SplitHalfResult | null;
   anchors: Anchor[];
   btResults: { textId: number; theta: number }[];
   gradingConfig: GradingConfig;
@@ -44,6 +46,7 @@ export function useResultsData() {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState<boolean | null>(null);
   const [raterAnalysis, setRaterAnalysis] = useState<RaterAnalysis | null>(null);
+  const [splitHalf, setSplitHalf] = useState<SplitHalfResult | null>(null);
   const [anchors, setAnchors] = useState<Anchor[]>([]);
   const [btResults, setBtResults] = useState<{ textId: number; theta: number }[]>([]);
   const [gradingConfig, setGradingConfig] = useState<GradingConfig>({ scale: 1.2, sigma: 1, min: 1, max: 10 });
@@ -96,6 +99,9 @@ export function useResultsData() {
       } else {
         setRaterAnalysis(null);
       }
+
+      // PLAN-13: Split-half reliability
+      setSplitHalf(calculateSplitHalfReliability(texts, judgements, 20, 0.1));
 
       // Count judgements + aggregate comments/feedback per text (single pass)
       const judgementCounts = new Map<number, number>();
@@ -290,6 +296,7 @@ export function useResultsData() {
     loading,
     connected,
     raterAnalysis,
+    splitHalf,
     anchors,
     btResults,
     gradingConfig,

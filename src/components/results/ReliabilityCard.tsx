@@ -3,12 +3,14 @@ import { CheckCircle, AlertCircle, XCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { SE_RELIABLE, SE_MAX_EDGE, COHORT_PCT_RELIABLE, COHORT_MEDIAN_OK } from "@/lib/constants";
 import { ExportData } from "@/lib/export";
+import type { SplitHalfResult } from "@/lib/split-half";
 
 interface ReliabilityCardProps {
   results: ExportData[];
+  splitHalf?: SplitHalfResult | null;
 }
 
-export function ReliabilityCard({ results }: ReliabilityCardProps) {
+export function ReliabilityCard({ results, splitHalf }: ReliabilityCardProps) {
   const n = results.length;
   if (n === 0) return null;
 
@@ -105,6 +107,31 @@ export function ReliabilityCard({ results }: ReliabilityCardProps) {
                 />
               )}
             </div>
+          </div>
+        )}
+
+        {/* PLAN-13: Split-half reliability coefficient */}
+        {splitHalf && (
+          <div className="mt-4 pt-3 border-t">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Betrouwbaarheidscoëfficiënt (split-half)</span>
+              <span className={`text-sm font-semibold ${
+                splitHalf.coefficient >= 0.8
+                  ? 'text-secondary'
+                  : splitHalf.coefficient >= 0.6
+                    ? 'text-primary'
+                    : 'text-destructive'
+              }`}>
+                {splitHalf.coefficient.toFixed(2)}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {splitHalf.coefficient >= 0.8
+                ? 'Hoge betrouwbaarheid — de rangorde is stabiel over verschillende deelverzamelingen.'
+                : splitHalf.coefficient >= 0.6
+                  ? 'Redelijke betrouwbaarheid — meer vergelijkingen zullen de rangorde stabieler maken.'
+                  : 'Lage betrouwbaarheid — de rangorde verandert nog sterk bij andere deelverzamelingen.'}
+            </p>
           </div>
         )}
       </CardContent>

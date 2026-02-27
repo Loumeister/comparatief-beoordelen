@@ -11,6 +11,8 @@ export interface RaterStats {
   judgementCount: number;
   tieRate: number;          // fraction of EQUAL judgements
   modelAgreement: number;   // fraction that agree with BT predicted winner
+  infit?: number;           // infit mean-square (1.0 = perfect fit); undefined if <10 judgements
+  infitLabel?: string;      // "Goed consistent" / "Inconsistent patroon" / "Mogelijk onzorgvuldig"
 }
 
 /** A pair where raters explicitly disagree */
@@ -72,6 +74,32 @@ export function analyzeRaters(
     }
     const modelAgreement = decisive > 0 ? agreements / decisive : 1;
 
+    // PLAN-12: Judge infit mean-square
+    // infit_j = Σ(observed - expected)² / Σ var_ij
+    // Only meaningful with ≥10 judgements
+    let infit: number | undefined;
+    let infitLabel: string | undefined;
+    if (total >= 10) {
+      let infitNum = 0;
+      let infitDen = 0;
+      for (const j of raterJudgements) {
+        const thetaA = btPredictions.get(j.textAId) ?? 0;
+        const thetaB = btPredictions.get(j.textBId) ?? 0;
+        const pAB = 1 / (1 + Math.exp(thetaB - thetaA)); // P(A wins)
+        const v = pAB * (1 - pAB);
+        const obs = j.winner === 'A' ? 1 : j.winner === 'B' ? 0 : 0.5;
+        const r2 = (obs - pAB) ** 2;
+        infitNum += r2;
+        infitDen += v;
+      }
+      infit = infitDen > 0 ? infitNum / infitDen : 1.0;
+      infitLabel = infit > 1.5
+        ? 'Mogelijk onzorgvuldig'
+        : infit > 1.2
+          ? 'Inconsistent patroon'
+          : 'Goed consistent';
+    }
+
     // Determine display name
     const sampleJ = raterJudgements[0];
     const name = sampleJ?.raterName || rid;
@@ -82,6 +110,8 @@ export function analyzeRaters(
       judgementCount: total,
       tieRate,
       modelAgreement,
+      infit,
+      infitLabel,
     });
   }
 
