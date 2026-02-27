@@ -10,7 +10,8 @@ interface RaterOverviewCardProps {
 }
 
 export function RaterOverviewCard({ raterAnalysis }: RaterOverviewCardProps) {
-  const [expanded, setExpanded] = useState(false);
+  // Expanded by default when there are multiple raters — teachers should see this
+  const [expanded, setExpanded] = useState(raterAnalysis.uniqueRaterCount > 1);
 
   if (raterAnalysis.uniqueRaterCount <= 1) return null;
 

@@ -93,6 +93,7 @@ export function ResultsTable({ results, anchors, onSelectStudent, onOpenAnchorDi
         </Button>
       </CardHeader>
       <CardContent>
+        <p className="text-xs text-muted-foreground mb-3">Klik op een kolomkop om te sorteren. Klik op een tekst voor meer details.</p>
         <Table>
           <TableHeader>
             <TableRow>
@@ -173,7 +174,26 @@ export function ResultsTable({ results, anchors, onSelectStudent, onOpenAnchorDi
                   </TableHead>
                 </>
               )}
-              <TableHead>Betrouwbaarheid</TableHead>
+              <TableHead>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center gap-1 cursor-help">
+                        Betrouwbaarheid
+                        <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <div className="max-w-xs space-y-1">
+                        <p>Hoe zeker de score van deze tekst is, op basis van het aantal vergelijkingen:</p>
+                        <p className="text-secondary">Groen = betrouwbaar</p>
+                        <p className="text-primary">Geel = bijna klaar, nog een paar vergelijkingen nodig</p>
+                        <p className="text-destructive">Rood = meer vergelijkingen nodig</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -211,7 +231,11 @@ export function ResultsTable({ results, anchors, onSelectStudent, onOpenAnchorDi
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="left">
-                            <p>{isAnchor ? "Ijkpunt aanpassen" : "Stel vast cijfer in"}</p>
+                            <p className="max-w-xs">
+                              {isAnchor
+                                ? "Ijkpunt aanpassen — dit cijfer is vastgezet en wordt gebruikt om de rest te kalibreren"
+                                : "Stel een vast cijfer in voor deze tekst. De andere cijfers worden daarop afgestemd. Handig als je weet welk cijfer een tekst verdient."}
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>

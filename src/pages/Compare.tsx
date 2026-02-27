@@ -76,24 +76,26 @@ const Compare = () => {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="shadow-lg max-w-md w-full mx-4">
           <CardContent className="p-6 space-y-4">
-            <h2 className="text-xl font-bold">Voor we beginnen</h2>
+            <h2 className="text-xl font-bold">Wie beoordeelt er?</h2>
             <p className="text-sm text-muted-foreground">
-              Beoordeel je met meerdere collega's? Vul dan je naam in, zodat duidelijk is wie welk oordeel gaf.
+              Beoordeel je <strong>alleen</strong>? Klik dan direct op de knop hieronder — je hoeft niets in te vullen.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Beoordelen jullie met <strong>meerdere collega's</strong>? Vul dan je naam in, zodat de app bijhoudt wie welk oordeel gaf.
             </p>
             <Input
               value={raterNameInput}
               onChange={(e) => setRaterNameInput(e.target.value)}
-              placeholder="Je naam (bijv. Jan)"
+              placeholder="Alleen nodig bij meerdere beoordelaars"
               onKeyDown={(e) => { if (e.key === 'Enter') handleRaterNameSubmit(); }}
-              autoFocus
             />
             <div className="flex gap-2">
-              <Button onClick={handleRaterNameSubmit} className="flex-1">
-                {raterNameInput.trim() ? 'Start met beoordelen' : 'Ik werk alleen — start'}
+              <Button onClick={handleRaterNameSubmit} className="flex-1" size="lg">
+                {raterNameInput.trim() ? 'Start met beoordelen' : 'Start met beoordelen'}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Je naam wordt alleen lokaal opgeslagen en verschijnt bij je oordelen.
+              Je naam wordt alleen lokaal op deze computer opgeslagen.
             </p>
           </CardContent>
         </Card>
@@ -129,14 +131,23 @@ const Compare = () => {
         <div className="max-w-3xl mx-auto p-8">
           <Card className="shadow-lg">
             <CardContent className="p-6 space-y-4">
-              <p className="text-lg font-medium">Geen paren beschikbaar</p>
-              <p className="text-sm text-muted-foreground">Er zijn momenteel geen vergelijkingsparen beschikbaar.</p>
+              <p className="text-lg font-medium">Alle teksten zijn vergeleken</p>
+              <p className="text-sm text-muted-foreground">
+                Er zijn geen nieuwe vergelijkingen meer nodig. Dit kan betekenen:
+              </p>
+              <ul className="text-sm text-muted-foreground list-disc ml-5 space-y-1">
+                <li>Alle teksten zijn voldoende met elkaar vergeleken</li>
+                <li>Of er zijn nog maar 1 of 0 teksten — voeg er meer toe via het dashboard</li>
+              </ul>
+              <p className="text-sm text-muted-foreground">
+                Je kunt nu de resultaten bekijken, of probeer opnieuw te laden als je denkt dat er nog vergelijkingen open staan.
+              </p>
               <div className="flex gap-2">
-                <Button variant="default" onClick={loadData}>
-                  Opnieuw laden
-                </Button>
-                <Button variant="outline" onClick={() => navigate(`/results/${assignment?.id}`)}>
+                <Button variant="default" onClick={() => navigate(`/results/${assignment?.id}`)}>
                   Bekijk resultaten
+                </Button>
+                <Button variant="outline" onClick={loadData}>
+                  Opnieuw laden
                 </Button>
               </div>
             </CardContent>
