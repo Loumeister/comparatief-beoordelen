@@ -57,7 +57,18 @@ There are **no tests yet**. No test framework is configured. See Future Plans be
 | `document-parser.ts` | .docx parsing via Mammoth |
 | `rater-analysis.ts` | Per-rater agreement stats, disagreement detection, tie rate analysis (PLAN-2) |
 | `anchor-grading.ts` | Anchor-based grading: refit linear transform through teacher-set anchor points (PLAN-6) |
+| `reliability-status.ts` | Derive cohort reliability status (reliable/moderate/insufficient) from ExportData |
 | `utils.ts` | Shared utilities (pairKey, kendallTau, cn) |
+
+### Custom Hooks (src/hooks/)
+
+| Hook | Used by | Responsibility |
+|------|---------|----------------|
+| `use-assignment-data.ts` | (shared) | Load assignment + texts + judgements + meta from IndexedDB |
+| `use-results-data.ts` | Results | BT calculation, rater analysis, anchor management, all exports |
+| `use-compare-data.ts` | Compare | BT maps, pair generation with fallback, judgement saving |
+| `use-compare-data.ts` (useRaterIdentification) | Compare | Rater name/id, localStorage persistence |
+| `use-dashboard-data.ts` | Dashboard | Assignment stats, CRUD, file import (JSON/CSV/XLSX) |
 
 ### Components (src/components/)
 
@@ -66,6 +77,16 @@ There are **no tests yet**. No test framework is configured. See Future Plans be
 - `GradingSettingsDialog.tsx` — configure base grade, scale, min/max
 - `ManageStudentsDialog.tsx` — edit student list for an assignment
 - `StudentDetailsDialog.tsx` — detailed per-student scores modal
+- `results/` — extracted Results page subcomponents:
+  - `ReliabilityCard.tsx` — cohort reliability progress bar with stop advice
+  - `RaterOverviewCard.tsx` — collapsible per-rater stats table
+  - `DisagreementsCard.tsx` — collapsible list of contested pairs
+  - `AnchorInfoCard.tsx` — anchor status banner with clear-all button
+  - `ResultsTable.tsx` — sortable results table with anchor/detail toggle
+  - `AnchorDialog.tsx` — set/edit/remove anchor grade for a text
+  - `FeedbackDialog.tsx` — configure and trigger per-student feedback PDF export
+- `compare/TextCard.tsx` — reusable text display card (handles plain text, HTML, and paper-only)
+- `dashboard/AssignmentCard.tsx` — per-assignment card with stats and action buttons
 - `ui/` — shadcn-ui component library (do not edit directly)
 
 ### Database Schema (Dexie v9)
@@ -203,33 +224,83 @@ The following plans from the original roadmap have been **fully implemented** an
 
 ---
 
-## Future Plans (Optional Enhancements)
+### PLAN-3: Infit/Outfit Statistics (Item Fit) — IMPLEMENTED
 
-The features below are **optional improvements** that can increase validity, reliability, or usability. Each one should be proposed to the user for approval before implementation, since the app must remain simple and accessible for non-technical colleagues.
+**Status**: Fully implemented in `src/lib/bradley-terry.ts` and `src/components/results/ResultsTable.tsx`.
+
+**What was built**:
+- Infit mean-square computed per text during BT fitting: `infit_i = Σ(observed - expected)² / Σ var_ij`
+- Texts flagged with infit > 1.3 (underfit: noisy) or < 0.7 (overfit: too predictable)
+- Shown as an optional column in the Results table behind the "Toon achtergrondscores" toggle
+- Dutch labels: "Goed passend" / "Afwijkend patroon (overfit)" / "Afwijkend patroon (onderfit)"
+- Highlighted in amber when outside the 0.7–1.3 range
+
+---
+
+## Competitive Landscape
+
+This section maps features from professional CJ platforms to identify what we have, what we lack, and what's worth building. The goal is **not** to replicate enterprise SaaS — we stay local-first and simple — but to cherry-pick the high-impact features that teachers actually benefit from.
+
+### Platforms Analyzed
+
+| Platform | Focus | Key Differentiator |
+|----------|-------|--------------------|
+| [**No More Marking**](https://www.nomoremarking.com/) | K-12 writing assessment (UK) | National benchmarking, AI judges (90% AI / 10% human), personalised student feedback reports, Writing Progression framework |
+| [**RM Compare**](https://compare.rm.com/) (formerly CompareAssess) | Enterprise ACJ across sectors | Multi-media support (text, image, video, audio, webpages), adaptive algorithm, mobile companion app, 0.9+ SSR, hiring/awarding use cases |
+| [**Comproved**](https://comproved.com/en/) | Higher ed + secondary (Flanders/NL) | Peer assessment with student-as-judge, feedback questions on submission, action plans, benchmark-based grading, LMS integration (LTI) |
+| [**D-PAC**](https://www.uantwerpen.be/en/research/info-for-companies/offer-for-companies/licence-offers/human-and-social-sci/dpac/) | Research platform (U. Antwerp / Ghent) | Academic focus, competence assessment, feedback loop research |
+
+### Feature Comparison Matrix
+
+| Feature | NMM | RM | Comproved | D-PAC | **Us** | Gap? |
+|---------|:---:|:--:|:---------:|:-----:|:------:|:----:|
+| Pairwise comparison | yes | yes | yes | yes | **yes** | -- |
+| Bradley-Terry / BT-L model | yes | yes | yes | yes | **yes** | -- |
+| Adaptive pairing | yes | yes | partial | yes | **yes** | -- |
+| Multi-rater collaboration | yes | yes | yes | yes | **yes** | -- |
+| Per-rater agreement/misfit | yes | yes | yes | yes | **yes** | -- |
+| Anchor/benchmark grading | -- | -- | yes | -- | **yes** | -- |
+| Per-student feedback PDF | yes | -- | -- | -- | **yes** | -- |
+| Tie handling & guidance | -- | -- | -- | -- | **yes** | -- |
+| Item infit/misfit flags | yes | yes | -- | yes | **yes** | -- |
+| **Judge infit** (per-rater misfit) | yes | yes | yes | yes | **no** | **PLAN-12** |
+| **Split-half reliability** (alongside SSR) | yes | yes | -- | -- | **no** | **PLAN-13** |
+| **Time per judgement tracking** | yes | yes | yes | -- | **no** | **PLAN-14** |
+| **Student-as-judge** (peer assessment) | -- | yes | yes | yes | **no** | **PLAN-15** |
+| **Feedback questions on submission** | -- | -- | yes | -- | **no** | **PLAN-16** |
+| **Multi-media support** (images, video, audio) | -- | yes | yes | yes | **no** | **PLAN-18** |
+| **Undo / review previous judgements** | -- | -- | -- | -- | **no** | **PLAN-19** |
+| **National / cross-school benchmarking** | yes | yes | -- | -- | **no** | out of scope (requires server) |
+| **AI judges** (LLM-assisted) | yes | -- | -- | -- | **no** | **PLAN-20** |
+| **LMS integration** (LTI) | -- | -- | yes | -- | **no** | out of scope (requires server) |
+| **Mobile companion app** | -- | yes | -- | -- | **no** | low priority (PWA possible) |
+| **Exemplar / training round** | yes | -- | -- | -- | **no** | **PLAN-21** |
+| Per-text progress dashboard | -- | -- | -- | -- | **no** | PLAN-10 |
+| Decision trail (why this score?) | yes | yes | -- | -- | **no** | **PLAN-22** |
+
+### Strategic Takeaways
+
+1. **Our strongest differentiator**: Local-first, zero-config, free, Dutch-language. No account, no server, no subscription. This matters for teachers who can't get IT approval for cloud tools.
+2. **Biggest reliability gap**: Professional tools show **judge infit** and **split-half reliability** alongside SSR. We have item infit (PLAN-3) but lack judge-level infit and split-half. Adding these (PLAN-12, PLAN-13) would bring us to parity on psychometric quality.
+3. **Biggest UX gap**: **Time per judgement** tracking is standard — it catches careless judging (fast + high misfit = low quality). Easy to add (PLAN-14).
+4. **Biggest pedagogical gap**: **Peer assessment** (students as judges) is a major use case in Comproved and RM Compare. It's powerful for formative learning but requires careful UX (PLAN-15).
+5. **Out of scope**: National benchmarking and LMS integration require a server. We deliberately stay local-first. AI judges (PLAN-20) could work client-side via a user-provided API key.
+
+---
+
+## Short-Term Roadmap
+
+These plans are easy to implement, run entirely locally, and require minimal ongoing maintenance. Each is self-contained — no external dependencies, no schema migrations (except PLAN-14), and limited blast radius.
 
 **Always ask: "Wil je dat ik [feature X] toevoeg?" before starting work on any of these.**
 
 ---
 
-### PLAN-3: Infit/Outfit Statistics (item fit)
-
-**What**: Detect texts that don't fit the Bradley-Terry model (e.g., a text that beats strong texts but loses to weak ones).
-
-**Why**: Standard ACJ implementations (Pollitt 2012) include fit statistics. Without them, model violations go undetected.
-
-**How**:
-- Compute infit mean-square per text: `infit_i = sum(z_ij^2 * w_ij) / sum(w_ij)`
-- Flag texts with infit > 1.3 (underfit: noisy) or < 0.7 (overfit: too predictable)
-- Show as an optional column in the Results table behind the "Toon achtergrondscores" toggle
-- Keep the label simple: "Goed passend" / "Afwijkend patroon"
-
----
-
 ### PLAN-4: Unit Tests for Core Algorithms
 
-**What**: Add Vitest test suites for bradley-terry.ts, pairing.ts, reliability.ts, effective-judgements.ts.
+**Effort**: Small (dev tooling only, no runtime impact)
 
-**Why**: The mathematical algorithms are complex and subtle bugs (like the Hessian double-counting bug that was found and fixed) can go undetected without tests.
+**What**: Add Vitest test suites for bradley-terry.ts, pairing.ts, reliability.ts, effective-judgements.ts.
 
 **How**:
 - Add `vitest` as dev dependency
@@ -241,51 +312,11 @@ The features below are **optional improvements** that can increase validity, rel
 
 ---
 
-### PLAN-5: Smarter Labels (theta-gap aware)
-
-**What**: Instead of fixed percentile labels (10/50/90), detect natural gaps in the theta distribution.
-
-**Why**: In a homogeneous class, two students with near-identical ability can get different labels just because they straddle a percentile boundary.
-
-**How**:
-- After computing theta values, look for gaps > 1 SE between adjacent items
-- Use these gaps to define natural groups
-- Fall back to percentile labels when no clear gaps exist
-- Show confidence intervals: "Tekst A: Bovengemiddeld (range: Topgroep - Gemiddeld)"
-
----
-
-### PLAN-7: Enable Strict TypeScript
-
-**What**: Enable `strict: true`, `strictNullChecks: true`, `noImplicitAny: true` in tsconfig.
-
-**Why**: Current config has these disabled, which undermines type safety and lets null-reference bugs slip through.
-
-**How**: Incremental migration:
-1. Enable `strictNullChecks` first, fix resulting errors (mostly adding null guards)
-2. Enable `noImplicitAny`, add type annotations
-3. Enable full `strict` mode
-
----
-
-### PLAN-8: Improved Reference Node SE
-
-**What**: Replace the average-variance approximation for the reference node's SE with a proper computation.
-
-**Why**: The current code picks the last text as reference and approximates its variance as the average of all other variances. This can be wrong if the reference is unusually well- or poorly-connected.
-
-**How**:
-- Choose the most-connected text (highest exposure) as reference — minimizes approximation error
-- Or use Moore-Penrose pseudoinverse with sum-to-zero constraint for exact computation
-- Validate with unit tests (PLAN-4)
-
----
-
 ### PLAN-10: Progress Dashboard per Text
 
-**What**: Show a visual overview of which texts have been compared enough and which need more attention.
+**Effort**: Small (~50 lines of UI, uses existing data)
 
-**Why**: Teachers currently only see overall cohort reliability. A per-text view helps them understand where to focus remaining effort.
+**What**: Show a visual overview of which texts have been compared enough and which need more attention.
 
 **How**:
 - Small bar chart or heat map on the Compare page showing each text's SE or comparison count
@@ -296,25 +327,170 @@ The features below are **optional improvements** that can increase validity, rel
 
 ### PLAN-11: UX Polish for Non-Technical Teachers
 
-**What**: A set of small UX improvements to make the app more accessible for colleagues who are not comfortable with technology.
+**Effort**: Small (text/tooltip changes, no new logic)
 
-**Why**: UX review revealed several friction points: confusing developer UI, missing onboarding, unclear error messages, and hidden features that teachers won't discover on their own.
+**What**: A set of small UX improvements to make the app more accessible for colleagues who are not comfortable with technology.
 
 **How** (priority order):
 
 #### Critical
-1. **Remove "Design Mode" button** from `HeaderNav.tsx` — this is a developer tool that confuses end users and has no place in production.
-2. **Improve "Geen paren beschikbaar" message** in `Compare.tsx` — add explanation and next steps ("Je hebt alle vergelijkingen al gedaan, of het aantal leerlingen is te klein. Je kunt nu de resultaten bekijken.").
-3. **Improve "Gelijkwaardig" guidance** in `Compare.tsx` — explain *why* choosing is better: "Dat maakt de resultaten nauwkeuriger."
-4. **Add legend for Reliability column** in `Results.tsx` — explain what green/yellow/red means in terms of teacher action (stop / continue / needs more work).
+1. **Remove "Design Mode" button** from `HeaderNav.tsx` — developer tool that confuses end users.
+2. **Improve "Geen paren beschikbaar" message** in `Compare.tsx` — add explanation and next steps.
+3. **Add legend for Reliability column** in `Results.tsx` — explain what green/yellow/red means.
 
 #### High
-5. **Expand Rater Overview by default** in `Results.tsx` when >1 rater exists — teachers won't discover it if it's collapsed.
-6. **Add first-use welcome modal** on `Dashboard.tsx` — detect no assignments in DB and show a brief introduction to comparative judgment.
-7. **Improve anchor icon tooltip** in `Results.tsx` — explain when/why to use it: "Markeer een vaste referentie-graad (bijv. 'dit essay is een 6')."
-8. **Clarify "Wie ben je?" prompt** in `Compare.tsx` — make it clearer that solo teachers can skip immediately.
+4. **Expand Rater Overview by default** in `Results.tsx` when >1 rater exists.
+5. **Improve anchor icon tooltip** in `Results.tsx` — explain when/why to use it.
+6. **Clarify "Wie ben je?" prompt** in `Compare.tsx` — clearer that solo teachers can skip.
 
 #### Medium
-9. **Add "(optioneel)" hint** to Genre field on `Upload.tsx`.
-10. **Add "Klik op een kolomkop om te sorteren" hint** near Results table.
-11. **Add estimated time** to ReadMe.tsx: "Dit duurt ca. 30-60 minuten voor 20 leerlingen."
+7. **Add "(optioneel)" hint** to Genre field on `Upload.tsx`.
+8. **Add "Klik op een kolomkop om te sorteren" hint** near Results table.
+
+---
+
+### PLAN-12: Judge Infit Statistics (per-rater misfit)
+
+**Effort**: Small (~30 lines in rater-analysis.ts, pure math)
+
+**What**: Compute infit mean-square per judge. Flag judges whose decisions are statistically inconsistent with the group consensus.
+
+**How**:
+- For each judge, compute infit: `infit_j = sum(z_ij^2 * w_ij) / sum(w_ij)` where `z_ij` is the standardized residual of each judgement
+- Flag judges with infit > 1.2 as inconsistent (NoMoreMarking's threshold)
+- Show in "Beoordelaarsoverzicht" alongside existing agreement % and tie rate
+- Dutch labels: "Goed consistent" / "Inconsistent patroon" / "Mogelijk onzorgvuldig"
+- Only meaningful with >10 judgements per rater
+
+---
+
+### PLAN-13: Split-Half Reliability
+
+**Effort**: Small (~50 lines pure math, no schema change)
+
+**What**: Add a split-half reliability coefficient alongside the current SE-based cohort reliability.
+
+**How**:
+- Randomly split judgements into two halves
+- Run BT independently on each half → get two rankings
+- Compute Spearman rank correlation between the two rankings
+- Apply Spearman-Brown correction: `r_full = 2 * r_half / (1 + r_half)`
+- Show as "Betrouwbaarheidscoëfficiënt" (e.g., "0.87") in the reliability card
+- Run multiple random splits and average (Monte Carlo split-half)
+
+---
+
+### PLAN-14: Time per Judgement Tracking
+
+**Effort**: Small (one schema field + few UI lines, schema v10)
+
+**What**: Record and display how long each comparison takes. Flag suspiciously fast judgements.
+
+**How**:
+- Record `startedAt` timestamp when a pair is displayed, save `duration_ms` on the judgement (schema v10)
+- Show median time per rater in "Beoordelaarsoverzicht"
+- Flag raters with median < 5 seconds as potentially careless ("Mogelijk te snel")
+- Show overall average time on Compare progress bar
+- Existing judgements get `null` duration (no migration needed)
+
+---
+
+### PLAN-16: Feedback Questions on Submission
+
+**Effort**: Small (one field on assignmentMeta + display in Compare)
+
+**What**: Let teachers define a feedback question that judges see during comparison.
+
+**How**:
+- Add optional `feedbackPrompt` field on assignment creation (teacher sets a guiding question)
+- Display the prompt above the comment fields during comparison: e.g., "Waar kan de leerling verbeteren?"
+- Store on `assignmentMeta` table
+
+---
+
+### PLAN-19: Undo / Review Previous Judgements
+
+**Effort**: Small-medium (UI only — `supersedesJudgementId` already exists in schema)
+
+**What**: Let judges review and optionally revise their past judgements.
+
+**How**:
+- "Mijn oordelen" section accessible from the Compare page header
+- Shows past judgements with: text A name, text B name, winner, timestamp, comments
+- "Herzie" button marks old judgement as superseded and opens fresh comparison (uses existing `supersedesJudgementId` field)
+- Optional "Ongedaan maken" (undo) button immediately after a judgement (within 5 seconds)
+
+---
+
+### PLAN-22: Decision Trail (Why This Score?)
+
+**Effort**: Small (extends existing StudentDetailsDialog)
+
+**What**: For any text in the results, show the chain of comparisons that led to its ranking.
+
+**How**:
+- Click on any text in Results table → show "Vergelijkingsoverzicht" panel
+- List all comparisons: opponent, winner, predicted probability, actual outcome
+- Highlight "surprising" results (actual outcome differs from model prediction by >0.8 probability)
+- Extends the existing `StudentDetailsDialog` with richer statistical context
+
+---
+
+## Long-Term / Nice-to-Have
+
+These features are valuable but require significant effort, complex UX design, or introduce new paradigms. They should only be pursued when the short-term roadmap is complete and there is explicit user demand.
+
+---
+
+### PLAN-15: Student-as-Judge (Peer Assessment Mode)
+
+**Complexity**: High (new UX flow, sharing mechanism, role separation)
+
+**What**: Allow students to act as judges — they compare peer work and learn from the process.
+
+**Why**: Both RM Compare and Comproved offer this. Research shows CJ-based peer feedback improves student understanding of quality criteria.
+
+**How**: Start simple with "Leerlingen als beoordelaar" mode where students export/import JSONs like team mode. Students get a simplified Compare interface (no reliability stats). Teacher sees aggregated student-judge data separately in Results.
+
+---
+
+### PLAN-18: Multi-Media Support (Images, Audio, Video)
+
+**Complexity**: High (IndexedDB storage limits, big UX overhaul, media playback)
+
+**What**: Support comparing non-text artefacts: images, audio files, and video.
+
+**How**: Extend `texts` table with `mediaType` field. Side-by-side display with `<img>`, `<audio>`, `<video>` elements. Accept `.jpg`, `.png`, `.mp3`, `.mp4`, `.webm` uploads. Watch for IndexedDB storage limits (~50-100MB per origin).
+
+---
+
+### PLAN-20: AI-Assisted Judging
+
+**Complexity**: High (external API dependency, ongoing API maintenance, prompt engineering)
+
+**What**: Optionally use an LLM to generate additional judgements via user-provided API key.
+
+**Why**: NoMoreMarking's AI-enhanced CJ uses 90% AI / 10% human split, cutting marking time by 95%.
+
+**How**: User provides API key (stored in `localStorage`). AI judges marked with `source: "ai"`. Start with 50% AI / 50% human split. Must be fully opt-in, work without it.
+
+---
+
+### PLAN-21: Exemplar / Training Round
+
+**Complexity**: Medium (new assignment setup step, training flow, localStorage tracking)
+
+**What**: Before real judging, show a brief training round with pre-scored exemplar texts to calibrate judgement.
+
+**How**: Teacher uploads 2-4 exemplar texts with quality labels. Judges see 3-5 training pairs before real comparisons, with feedback on "expected" answers. Training judgements not counted in BT model. Optional: "Wil je eerst een oefenronde?"
+
+---
+
+## Removed Plans
+
+These plans were evaluated and removed from the roadmap:
+
+- **PLAN-5 (Smarter Labels)**: Over-engineering. Theta-gap detection is fragile and produces inconsistent results across cohort sizes. Fixed percentile labels are simple and predictable.
+- **PLAN-7 (Strict TypeScript)**: Not a feature — just enable strictness incrementally as files are touched. No need for a dedicated plan.
+- **PLAN-8 (Improved Reference Node SE)**: Micro-optimization with negligible real-world impact. The current average-variance approximation works well enough for educational assessment.
+- **PLAN-17 (Student Self-Review & Action Plans)**: Requires a new route, new DB table, and complex UX for a niche use case. Better served by exporting feedback PDF and letting students use existing tools.

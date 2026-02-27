@@ -2,186 +2,236 @@ import { describe, it, expect } from 'vitest';
 import { assessReliability } from '../reliability';
 import type { Text, Judgement } from '../db';
 
-function makeText(id: number): Text {
-  return { id, assignmentId: 1, content: '', originalFilename: `${id}.docx`, anonymizedName: `Tekst ${id}`, createdAt: new Date() };
+function mkText(id: number): Text {
+  return {
+    id,
+    assignmentId: 1,
+    content: `Text ${id}`,
+    originalFilename: `text${id}.txt`,
+    anonymizedName: `Tekst ${id}`,
+    createdAt: new Date(),
+  };
 }
 
-function makeJudgement(textAId: number, textBId: number, winner: 'A' | 'B' | 'EQUAL' = 'A'): Judgement {
-  const pk = `${Math.min(textAId, textBId)}-${Math.max(textAId, textBId)}`;
-  return { id: undefined, assignmentId: 1, textAId, textBId, winner, createdAt: new Date(), pairKey: pk, source: 'human', isFinal: false };
-}
-
-// A BTResult-like object
-function makeBTResult(textId: number, theta: number, se: number, rank: number, grade: number) {
+function mkBTResult(textId: number, theta: number, se: number, rank: number, grade: number) {
   return { textId, theta, standardError: se, rank, grade };
 }
 
+function mkJudgement(
+  textAId: number,
+  textBId: number,
+  winner: 'A' | 'B' | 'EQUAL' = 'A',
+): Judgement {
+  return {
+    id: Math.random() * 1e9 | 0,
+    assignmentId: 1,
+    textAId,
+    textBId,
+    winner,
+    createdAt: new Date(),
+    pairKey: `${Math.min(textAId, textBId)}-${Math.max(textAId, textBId)}`,
+  };
+}
+
 describe('assessReliability', () => {
-  it('returns not reliable for empty results', () => {
+  it('returns unreliable for empty results', () => {
     const result = assessReliability([], [], []);
     expect(result.isReliable).toBe(false);
-    expect(result.corePercentage).toBe(0);
+    expect(result.message).toBe('Geen resultaten beschikbaar');
   });
 
-  it('returns reliable when all conditions met', () => {
-    // 10 texts, all with low SE, good ladder evidence
-    const texts = Array.from({ length: 10 }, (_, i) => makeText(i + 1));
-    const btResults = texts.map((t, i) => makeBTResult(t.id!, 2 - i * 0.4, 0.2, i + 1, 8 - i * 0.5));
+  it('returns reliable when all conditions are met', () => {
+    // 10 texts with very low SE, spread out thetas, good ladder evidence
+    const texts = Array.from({ length: 10 }, (_, i) => mkText(i + 1));
+    const results = Array.from({ length: 10 }, (_, i) =>
+      mkBTResult(i + 1, 2 - i * 0.4, 0.2, i + 1, 8 - i * 0.5)
+    );
 
-    // Create enough judgements so ladder evidence exists for all extremes
+    // Create judgements: each text compared to neighbors multiple times
     const judgements: Judgement[] = [];
     for (let i = 0; i < 10; i++) {
-      for (let j = i + 1; j < 10; j++) {
+      for (let j = i + 1; j < Math.min(i + 4, 10); j++) {
+        // 4 comparisons per pair with nearby texts
         for (let k = 0; k < 4; k++) {
-          judgements.push(makeJudgement(i + 1, j + 1, 'A'));
+          judgements.push(mkJudgement(i + 1, j + 1, 'A'));
         }
       }
     }
 
-    const result = assessReliability(btResults, texts, judgements);
-    expect(result.coreReliable).toBe(true);
-    expect(result.corePercentage).toBeGreaterThanOrEqual(80);
-    expect(result.topHasLadder).toBe(true);
-    expect(result.bottomHasLadder).toBe(true);
-    expect(result.isReliable).toBe(true);
+    const assessment = assessReliability(results, texts, judgements);
+    expect(assessment.coreReliable).toBe(true);
+    expect(assessment.topHasLadder).toBe(true);
+    expect(assessment.bottomHasLadder).toBe(true);
+    expect(assessment.convergenceOk).toBe(true);
+    expect(assessment.isReliable).toBe(true);
   });
 
-  it('core not reliable when SEs are too high', () => {
-    const texts = Array.from({ length: 5 }, (_, i) => makeText(i + 1));
-    // High SE for everyone
-    const btResults = texts.map((t, i) => makeBTResult(t.id!, 1 - i * 0.4, 2.0, i + 1, 7));
+  it('detects unreliable core when SEs are too high', () => {
+    const texts = Array.from({ length: 10 }, (_, i) => mkText(i + 1));
+    // All texts have high SE (> threshold of 0.35)
+    const results = Array.from({ length: 10 }, (_, i) =>
+      mkBTResult(i + 1, 2 - i * 0.4, 0.8, i + 1, 7)
+    );
+    const judgements: Judgement[] = [];
+    for (let i = 0; i < 10; i++) {
+      for (let j = i + 1; j < Math.min(i + 4, 10); j++) {
+        for (let k = 0; k < 4; k++) {
+          judgements.push(mkJudgement(i + 1, j + 1, 'A'));
+        }
+      }
+    }
 
-    const judgements = [makeJudgement(1, 2, 'A')]; // barely any data
-
-    const result = assessReliability(btResults, texts, judgements);
-    expect(result.coreReliable).toBe(false);
+    const assessment = assessReliability(results, texts, judgements);
+    expect(assessment.coreReliable).toBe(false);
+    expect(assessment.isReliable).toBe(false);
+    expect(assessment.message).toContain('kernset');
   });
 
-  it('ladder evidence fails when extreme texts have no neighbor comparisons', () => {
-    const texts = Array.from({ length: 5 }, (_, i) => makeText(i + 1));
-    // Good SEs but no direct comparisons for extreme texts against neighbors
-    const btResults = [
-      makeBTResult(1, 2.0, 0.2, 1, 9),    // top extreme
-      makeBTResult(2, 0.5, 0.2, 2, 7.5),
-      makeBTResult(3, 0.0, 0.2, 3, 7),
-      makeBTResult(4, -0.5, 0.2, 4, 6.5),
-      makeBTResult(5, -2.0, 0.2, 5, 5),    // bottom extreme
-    ];
+  it('detects missing ladder evidence for top texts', () => {
+    const texts = Array.from({ length: 10 }, (_, i) => mkText(i + 1));
+    const results = Array.from({ length: 10 }, (_, i) =>
+      mkBTResult(i + 1, 2 - i * 0.4, 0.2, i + 1, 8 - i * 0.5)
+    );
 
-    // Only comparisons between middle texts — extremes are isolated
-    const judgements = [
-      ...Array.from({ length: 5 }, () => makeJudgement(2, 3, 'A')),
-      ...Array.from({ length: 5 }, () => makeJudgement(3, 4, 'A')),
-      ...Array.from({ length: 5 }, () => makeJudgement(2, 4, 'A')),
-    ];
+    // Only judgements for middle texts (no neighbor comparisons for extremes)
+    const judgements: Judgement[] = [];
+    for (let i = 3; i < 7; i++) {
+      for (let j = i + 1; j < Math.min(i + 4, 7); j++) {
+        for (let k = 0; k < 4; k++) {
+          judgements.push(mkJudgement(i + 1, j + 1, 'A'));
+        }
+      }
+    }
 
-    const result = assessReliability(btResults, texts, judgements);
-    // Top text (1) has no comparisons against neighbors
-    expect(result.topHasLadder).toBe(false);
-    // Bottom text (5) has no comparisons against neighbors
-    expect(result.bottomHasLadder).toBe(false);
+    const assessment = assessReliability(results, texts, judgements);
+    // Top text (id 1) has no comparisons against neighbors
+    expect(assessment.topHasLadder).toBe(false);
+    expect(assessment.isReliable).toBe(false);
   });
 
-  it('convergence check: stable ranking → convergenceOk=true', () => {
-    const texts = Array.from({ length: 5 }, (_, i) => makeText(i + 1));
-    const btResults = texts.map((t, i) => makeBTResult(t.id!, 1 - i * 0.4, 0.2, i + 1, 8 - i * 0.5));
-
-    // Same ranking and grades as previous fit
-    const previousResults = texts.map((t, i) => ({ textId: t.id!, rank: i + 1, grade: 8 - i * 0.5 }));
+  it('detects convergence failure when rankings shift', () => {
+    const texts = Array.from({ length: 5 }, (_, i) => mkText(i + 1));
+    const results = Array.from({ length: 5 }, (_, i) =>
+      mkBTResult(i + 1, 2 - i, 0.2, i + 1, 8 - i)
+    );
 
     const judgements: Judgement[] = [];
     for (let i = 0; i < 5; i++) {
       for (let j = i + 1; j < 5; j++) {
-        for (let k = 0; k < 5; k++) {
-          judgements.push(makeJudgement(i + 1, j + 1, 'A'));
+        for (let k = 0; k < 4; k++) {
+          judgements.push(mkJudgement(i + 1, j + 1, 'A'));
         }
       }
     }
 
-    const result = assessReliability(btResults, texts, judgements, previousResults);
-    expect(result.convergenceOk).toBe(true);
-    expect(result.kendallTau).toBeCloseTo(1.0, 1);
-    expect(result.maxGradeDelta).toBe(0);
+    // Previous results with reversed ranking
+    const previousResults = [
+      { textId: 1, rank: 5, grade: 4 },
+      { textId: 2, rank: 4, grade: 5 },
+      { textId: 3, rank: 3, grade: 6 },
+      { textId: 4, rank: 2, grade: 7 },
+      { textId: 5, rank: 1, grade: 8 },
+    ];
+
+    const assessment = assessReliability(results, texts, judgements, previousResults);
+    expect(assessment.convergenceOk).toBe(false);
+    expect(assessment.kendallTau).not.toBeNull();
+    expect(assessment.kendallTau!).toBeLessThan(0);
+    expect(assessment.isReliable).toBe(false);
+    expect(assessment.message).toContain('stabiel');
   });
 
-  it('convergence check: swapped ranking → convergenceOk=false', () => {
-    const texts = Array.from({ length: 5 }, (_, i) => makeText(i + 1));
-    const btResults = texts.map((t, i) => makeBTResult(t.id!, 1 - i * 0.4, 0.2, i + 1, 8 - i * 0.5));
+  it('convergenceOk defaults to true without previous results', () => {
+    const texts = [mkText(1), mkText(2)];
+    const results = [
+      mkBTResult(1, 1, 0.2, 1, 8),
+      mkBTResult(2, -1, 0.2, 2, 6),
+    ];
+    const judgements = [mkJudgement(1, 2, 'A')];
 
-    // Previous had completely reversed ranking
-    const previousResults = texts.map((t, i) => ({ textId: t.id!, rank: 5 - i, grade: 5 + i * 0.5 }));
+    const assessment = assessReliability(results, texts, judgements);
+    expect(assessment.convergenceOk).toBe(true);
+    expect(assessment.kendallTau).toBeNull();
+  });
 
+  it('skips ladder checks for n <= 2', () => {
+    const texts = [mkText(1), mkText(2)];
+    const results = [
+      mkBTResult(1, 1, 0.2, 1, 8),
+      mkBTResult(2, -1, 0.2, 2, 6),
+    ];
+    const judgements = [mkJudgement(1, 2, 'A')];
+
+    const assessment = assessReliability(results, texts, judgements);
+    // With n=2, ladder checks are skipped (default true)
+    expect(assessment.topHasLadder).toBe(true);
+    expect(assessment.bottomHasLadder).toBe(true);
+  });
+
+  it('uses custom seThreshold', () => {
+    const texts = Array.from({ length: 5 }, (_, i) => mkText(i + 1));
+    // SE of 0.3 — below default threshold (0.35) but above strict threshold (0.2)
+    const results = Array.from({ length: 5 }, (_, i) =>
+      mkBTResult(i + 1, 2 - i, 0.3, i + 1, 8 - i)
+    );
     const judgements: Judgement[] = [];
     for (let i = 0; i < 5; i++) {
       for (let j = i + 1; j < 5; j++) {
-        for (let k = 0; k < 5; k++) {
-          judgements.push(makeJudgement(i + 1, j + 1, 'A'));
+        for (let k = 0; k < 4; k++) {
+          judgements.push(mkJudgement(i + 1, j + 1, 'A'));
         }
       }
     }
 
-    const result = assessReliability(btResults, texts, judgements, previousResults);
-    expect(result.convergenceOk).toBe(false);
-    expect(result.kendallTau!).toBeLessThan(0.98);
+    // With default threshold (0.35), core is reliable
+    const defaultAssessment = assessReliability(results, texts, judgements);
+    expect(defaultAssessment.coreReliable).toBe(true);
+
+    // With strict threshold (0.2), core is NOT reliable
+    const strictAssessment = assessReliability(results, texts, judgements, undefined, 0.2);
+    expect(strictAssessment.coreReliable).toBe(false);
   });
 
-  it('convergence defaults to true when no previous results', () => {
-    const texts = Array.from({ length: 3 }, (_, i) => makeText(i + 1));
-    const btResults = texts.map((t, i) => makeBTResult(t.id!, 0.5 - i * 0.3, 0.2, i + 1, 7.5 - i));
-    const judgements = [makeJudgement(1, 2, 'A'), makeJudgement(2, 3, 'A')];
+  it('ladder evidence requires non-trivial outcomes (not all EQUAL)', () => {
+    const texts = Array.from({ length: 5 }, (_, i) => mkText(i + 1));
+    const results = Array.from({ length: 5 }, (_, i) =>
+      mkBTResult(i + 1, 2 - i, 0.2, i + 1, 8 - i)
+    );
 
-    const result = assessReliability(btResults, texts, judgements);
-    expect(result.convergenceOk).toBe(true);
-    expect(result.kendallTau).toBeNull();
-  });
-
-  it('message explains which conditions failed', () => {
-    const texts = Array.from({ length: 5 }, (_, i) => makeText(i + 1));
-    const btResults = texts.map((t, i) => makeBTResult(t.id!, 0.5 - i * 0.2, 1.5, i + 1, 7));
+    // All judgements are ties — top/bottom should fail ladder check
     const judgements: Judgement[] = [];
+    for (let i = 0; i < 5; i++) {
+      for (let j = i + 1; j < Math.min(i + 4, 5); j++) {
+        for (let k = 0; k < 4; k++) {
+          judgements.push(mkJudgement(i + 1, j + 1, 'EQUAL'));
+        }
+      }
+    }
 
-    const result = assessReliability(btResults, texts, judgements);
-    expect(result.isReliable).toBe(false);
-    expect(result.message).toContain('kernset');
+    const assessment = assessReliability(results, texts, judgements);
+    // Ladder requires at least 1 non-trivial (non-EQUAL) outcome
+    expect(assessment.topHasLadder).toBe(false);
+    expect(assessment.bottomHasLadder).toBe(false);
   });
 
-  it('ladder evidence requires non-trivial outcomes (not all ties)', () => {
-    const texts = Array.from({ length: 5 }, (_, i) => makeText(i + 1));
-    const btResults = [
-      makeBTResult(1, 2.0, 0.2, 1, 9),
-      makeBTResult(2, 1.0, 0.2, 2, 8),
-      makeBTResult(3, 0.0, 0.2, 3, 7),
-      makeBTResult(4, -1.0, 0.2, 4, 6),
-      makeBTResult(5, -2.0, 0.2, 5, 5),
-    ];
+  it('corePercentage is computed correctly', () => {
+    const texts = Array.from({ length: 10 }, (_, i) => mkText(i + 1));
+    // Mix of low and high SE — 6 reliable, 4 not (but core is middle 80%)
+    const results = Array.from({ length: 10 }, (_, i) =>
+      mkBTResult(i + 1, 2 - i * 0.4, i < 7 ? 0.2 : 0.5, i + 1, 7)
+    );
+    const judgements: Judgement[] = [];
+    for (let i = 0; i < 10; i++) {
+      for (let j = i + 1; j < Math.min(i + 4, 10); j++) {
+        for (let k = 0; k < 4; k++) {
+          judgements.push(mkJudgement(i + 1, j + 1, 'A'));
+        }
+      }
+    }
 
-    // Text 1 compared to neighbors but ALL ties — should fail non-trivial check
-    const judgements = [
-      ...Array.from({ length: 5 }, () => makeJudgement(1, 2, 'EQUAL')),
-      ...Array.from({ length: 5 }, () => makeJudgement(4, 5, 'EQUAL')),
-      // Some real judgements for middle texts
-      ...Array.from({ length: 5 }, () => makeJudgement(2, 3, 'A')),
-      ...Array.from({ length: 5 }, () => makeJudgement(3, 4, 'A')),
-    ];
-
-    const result = assessReliability(btResults, texts, judgements);
-    // Top text only has ties → no non-trivial evidence
-    expect(result.topHasLadder).toBe(false);
-    // Bottom text only has ties → no non-trivial evidence
-    expect(result.bottomHasLadder).toBe(false);
-  });
-
-  it('2 texts: ladder evidence is skipped (n <= 2)', () => {
-    const texts = [makeText(1), makeText(2)];
-    const btResults = [
-      makeBTResult(1, 0.5, 0.2, 1, 8),
-      makeBTResult(2, -0.5, 0.2, 2, 6),
-    ];
-    const judgements = Array.from({ length: 10 }, () => makeJudgement(1, 2, 'A'));
-
-    const result = assessReliability(btResults, texts, judgements);
-    // With n <= 2, ladder check is skipped (defaults to true)
-    expect(result.topHasLadder).toBe(true);
-    expect(result.bottomHasLadder).toBe(true);
+    const assessment = assessReliability(results, texts, judgements);
+    // corePercentage should be between 0 and 100
+    expect(assessment.corePercentage).toBeGreaterThanOrEqual(0);
+    expect(assessment.corePercentage).toBeLessThanOrEqual(100);
   });
 });

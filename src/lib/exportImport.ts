@@ -1,6 +1,5 @@
 import { db, Assignment, Text, Judgement } from './db';
 import { isConnected } from './graph';
-import ExcelJS from 'exceljs';
 
 export interface DatasetExport {
   assignment: Assignment;
@@ -437,6 +436,7 @@ export async function importResultsFromXLSX(file: File): Promise<{
     reader.onload = async (e) => {
       try {
         const buffer = e.target?.result as ArrayBuffer;
+        const ExcelJS = (await import('exceljs')).default;
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(buffer);
         

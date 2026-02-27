@@ -195,6 +195,38 @@ Bekijk de definitieve rangorde en cijfers.
 
 ---
 
+## 🏫 Vergelijking met professionele tools
+
+Er bestaan commerciële platforms voor vergelijkend beoordelen. Deze app is een **gratis, lokaal alternatief** zonder account of server.
+
+| | No More Marking | RM Compare | Comproved | **Deze app** |
+|---|---|---|---|---|
+| **Prijs** | Betaald (abonnement) | Betaald (enterprise) | Betaald (licentie) | **Gratis** |
+| **Data** | Cloud (UK) | Cloud (UK) | Cloud (BE/NL) | **Lokaal in browser** |
+| **Account nodig** | Ja | Ja | Ja | **Nee** |
+| **Taal** | Engels | Engels | Nederlands/Engels | **Nederlands** |
+| **AI-beoordelaar** | Ja (90% AI) | Nee | Nee | Nee (gepland) |
+| **Peer assessment** | Nee | Ja | Ja | Nee (gepland) |
+| **Multi-media** | Nee | Ja (video, audio, beeld) | Ja | Nee (gepland) |
+| **Nationaal ijkpunt** | Ja (UK-scholen) | Ja | Nee | Nee (n.v.t.) |
+| **LMS-koppeling** | Nee | Nee | Ja (LTI) | Nee (n.v.t.) |
+| **Anker-/ijkpuntcijfers** | Nee | Nee | Ja | **Ja** |
+| **Leerlingfeedback PDF** | Ja | Nee | Nee | **Ja** |
+
+**Wanneer kies je deze app?**
+- Je wilt snel starten zonder IT-afdeling of schoollicentie
+- Leerlingdata mag je apparaat niet verlaten (AVG/privacy)
+- Je zoekt een gratis tool voor een vakgroep of individueel gebruik
+- Je werkt met schriftelijke teksten (geen video/audio nodig)
+
+**Wanneer kies je een commercieel platform?**
+- Je wilt nationale benchmarks of vergelijking tussen scholen
+- Je hebt AI-ondersteuning nodig om beoordelingstijd te halveren
+- Je wilt leerlingen als beoordelaars inzetten (peer assessment)
+- Je beoordeelt video's, audio, of beeldend werk
+
+---
+
 ## 🛠️ Technische Informatie (voor ontwikkelaars)
 
 Dit project is gebouwd met:
@@ -202,7 +234,6 @@ Dit project is gebouwd met:
 - **Vite** (build tool)
 - **Dexie** (IndexedDB voor lokale opslag)
 - **Tailwind CSS** + **shadcn-ui** (design system)
-- **Recharts** (data visualisatie)
 
 ### Lokaal draaien
 
