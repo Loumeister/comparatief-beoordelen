@@ -151,7 +151,7 @@ export function ResultsTable({ results, anchors, onSelectStudent, onOpenAnchorDi
                           </span>
                         </TooltipTrigger>
                         <TooltipContent side="top">
-                          <p className="max-w-xs">Hoe goed de tekst past in het verwachte patroon. Rond 1.0 is ideaal. Boven 1.3 of onder 0.7 wijst op een afwijkend patroon.</p>
+                          <p className="max-w-xs">Meet of beoordelaars het eens zijn over deze tekst. Rond 1.0 is normaal. Boven 1.3: beoordelaars twijfelen — bekijk de oordelen en overweeg extra vergelijkingen. Onder 0.7: iedereen is het opvallend eens, geen actie nodig.</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
