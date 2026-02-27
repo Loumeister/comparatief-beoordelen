@@ -25,6 +25,7 @@ const Results = () => {
     loading,
     connected,
     raterAnalysis,
+    splitHalf,
     anchors,
     gradingConfig,
     // Anchor management
@@ -129,7 +130,7 @@ const Results = () => {
           </Card>
         )}
 
-        <ReliabilityCard results={results} />
+        <ReliabilityCard results={results} splitHalf={splitHalf} />
 
         {raterAnalysis && <RaterOverviewCard raterAnalysis={raterAnalysis} />}
         {raterAnalysis && <DisagreementsCard raterAnalysis={raterAnalysis} />}

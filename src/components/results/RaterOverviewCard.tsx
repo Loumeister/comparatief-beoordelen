@@ -37,6 +37,7 @@ export function RaterOverviewCard({ raterAnalysis }: RaterOverviewCardProps) {
                   <TableHead className="text-right">Oordelen</TableHead>
                   <TableHead className="text-right">Overeenstemming</TableHead>
                   <TableHead className="text-right">Gelijkwaardig-rate</TableHead>
+                  <TableHead className="text-right">Consistentie</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -60,12 +61,26 @@ export function RaterOverviewCard({ raterAnalysis }: RaterOverviewCardProps) {
                         <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">(hoog)</span>
                       )}
                     </TableCell>
+                    <TableCell className="text-right">
+                      {r.infit != null ? (
+                        <>
+                          <span className={r.infit > 1.2 ? 'text-destructive font-medium' : ''}>
+                            {r.infit.toFixed(2)}
+                          </span>
+                          <span className={`text-xs ml-1 ${r.infit > 1.2 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                            ({r.infitLabel})
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">te weinig data</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
             <p className="text-xs text-muted-foreground mt-3">
-              Overeenstemming = % oordelen dat overeenkomt met de gezamenlijke rangorde. Gelijkwaardig boven 40% kan de nauwkeurigheid verlagen.
+              Overeenstemming = % oordelen dat overeenkomt met de gezamenlijke rangorde. Gelijkwaardig boven 40% kan de nauwkeurigheid verlagen. Consistentie (infit) meet hoe voorspelbaar de oordelen zijn — waarden boven 1.2 wijzen op onregelmatige patronen.
             </p>
           </div>
         )}

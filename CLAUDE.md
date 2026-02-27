@@ -55,7 +55,8 @@ There are **no tests yet**. No test framework is configured. See Future Plans be
 | `export.ts` | CSV, Excel, PDF export + per-student feedback PDF |
 | `exportImport.ts` | JSON dataset export/import, CSV import, Excel import |
 | `document-parser.ts` | .docx parsing via Mammoth |
-| `rater-analysis.ts` | Per-rater agreement stats, disagreement detection, tie rate analysis (PLAN-2) |
+| `rater-analysis.ts` | Per-rater agreement stats, disagreement detection, tie rate analysis (PLAN-2), judge infit (PLAN-12) |
+| `split-half.ts` | Monte Carlo split-half reliability coefficient with Spearman-Brown correction (PLAN-13) |
 | `anchor-grading.ts` | Anchor-based grading: refit linear transform through teacher-set anchor points (PLAN-6) |
 | `reliability-status.ts` | Derive cohort reliability status (reliable/moderate/insufficient) from ExportData |
 | `utils.ts` | Shared utilities (pairKey, kendallTau, cn) |
@@ -65,7 +66,7 @@ There are **no tests yet**. No test framework is configured. See Future Plans be
 | Hook | Used by | Responsibility |
 |------|---------|----------------|
 | `use-assignment-data.ts` | (shared) | Load assignment + texts + judgements + meta from IndexedDB |
-| `use-results-data.ts` | Results | BT calculation, rater analysis, anchor management, all exports |
+| `use-results-data.ts` | Results | BT calculation, rater analysis, split-half reliability, anchor management, all exports |
 | `use-compare-data.ts` | Compare | BT maps, pair generation with fallback, judgement saving |
 | `use-compare-data.ts` (useRaterIdentification) | Compare | Rater name/id, localStorage persistence |
 | `use-dashboard-data.ts` | Dashboard | Assignment stats, CRUD, file import (JSON/CSV/XLSX) |
@@ -78,8 +79,8 @@ There are **no tests yet**. No test framework is configured. See Future Plans be
 - `ManageStudentsDialog.tsx` — edit student list for an assignment
 - `StudentDetailsDialog.tsx` — detailed per-student scores modal
 - `results/` — extracted Results page subcomponents:
-  - `ReliabilityCard.tsx` — cohort reliability progress bar with stop advice
-  - `RaterOverviewCard.tsx` — collapsible per-rater stats table
+  - `ReliabilityCard.tsx` — cohort reliability progress bar with stop advice + split-half coefficient (PLAN-13)
+  - `RaterOverviewCard.tsx` — collapsible per-rater stats table with judge infit (PLAN-12)
   - `DisagreementsCard.tsx` — collapsible list of contested pairs
   - `AnchorInfoCard.tsx` — anchor status banner with clear-all button
   - `ResultsTable.tsx` — sortable results table with anchor/detail toggle
@@ -237,6 +238,40 @@ The following plans from the original roadmap have been **fully implemented** an
 
 ---
 
+### PLAN-12: Judge Infit Statistics (per-rater misfit) — IMPLEMENTED
+
+**Status**: Fully implemented in `src/lib/rater-analysis.ts` and `src/components/results/RaterOverviewCard.tsx`.
+
+**What was built**:
+- Infit mean-square computed per judge: `infit_j = Σ(observed - expected)² / Σ var_ij` using BT model predictions
+- Judges flagged with infit > 1.2 as inconsistent, > 1.5 as potentially careless
+- Shown as "Consistentie" column in "Beoordelaarsoverzicht" alongside existing agreement % and tie rate
+- Only computed for raters with ≥10 judgements (shows "te weinig data" otherwise)
+- Dutch labels: "Goed consistent" / "Inconsistent patroon" / "Mogelijk onzorgvuldig"
+- Explanation added to the footer text of the rater overview card
+
+**Key files**: `src/lib/rater-analysis.ts` (computation), `src/components/results/RaterOverviewCard.tsx` (display).
+
+---
+
+### PLAN-13: Split-Half Reliability — IMPLEMENTED
+
+**Status**: Fully implemented in `src/lib/split-half.ts`, `src/hooks/use-results-data.ts`, and `src/components/results/ReliabilityCard.tsx`.
+
+**What was built**:
+- Monte Carlo split-half reliability (20 random splits by default)
+- Each split: randomly halve judgements → run lightweight BT on each half → Spearman rank correlation
+- Spearman-Brown correction applied: `r_full = 2 * r_half / (1 + r_half)`
+- Shown as "Betrouwbaarheidscoëfficiënt (split-half)" in the reliability card below the progress bar
+- Color-coded: green (≥0.80), amber (0.60–0.79), red (<0.60)
+- Dutch interpretation text adapts to coefficient level
+- Seeded PRNG (xorshift32) for reproducible results across reloads
+- Minimum 6 judgements and 3 texts required; returns null otherwise
+
+**Key files**: `src/lib/split-half.ts` (all computation), `src/hooks/use-results-data.ts` (integration), `src/components/results/ReliabilityCard.tsx` (display).
+
+---
+
 ## Competitive Landscape
 
 This section maps features from professional CJ platforms to identify what we have, what we lack, and what's worth building. The goal is **not** to replicate enterprise SaaS — we stay local-first and simple — but to cherry-pick the high-impact features that teachers actually benefit from.
@@ -263,8 +298,8 @@ This section maps features from professional CJ platforms to identify what we ha
 | Per-student feedback PDF | yes | -- | -- | -- | **yes** | -- |
 | Tie handling & guidance | -- | -- | -- | -- | **yes** | -- |
 | Item infit/misfit flags | yes | yes | -- | yes | **yes** | -- |
-| **Judge infit** (per-rater misfit) | yes | yes | yes | yes | **no** | **PLAN-12** |
-| **Split-half reliability** (alongside SSR) | yes | yes | -- | -- | **no** | **PLAN-13** |
+| Judge infit (per-rater misfit) | yes | yes | yes | yes | **yes** | -- |
+| Split-half reliability (alongside SSR) | yes | yes | -- | -- | **yes** | -- |
 | **Time per judgement tracking** | yes | yes | yes | -- | **no** | **PLAN-14** |
 | **Student-as-judge** (peer assessment) | -- | yes | yes | yes | **no** | **PLAN-15** |
 | **Feedback questions on submission** | -- | -- | yes | -- | **no** | **PLAN-16** |
@@ -281,7 +316,7 @@ This section maps features from professional CJ platforms to identify what we ha
 ### Strategic Takeaways
 
 1. **Our strongest differentiator**: Local-first, zero-config, free, Dutch-language. No account, no server, no subscription. This matters for teachers who can't get IT approval for cloud tools.
-2. **Biggest reliability gap**: Professional tools show **judge infit** and **split-half reliability** alongside SSR. We have item infit (PLAN-3) but lack judge-level infit and split-half. Adding these (PLAN-12, PLAN-13) would bring us to parity on psychometric quality.
+2. **Psychometric parity achieved**: With item infit (PLAN-3), judge infit (PLAN-12), and split-half reliability (PLAN-13), we now match professional tools on statistical quality metrics.
 3. **Biggest UX gap**: **Time per judgement** tracking is standard — it catches careless judging (fast + high misfit = low quality). Easy to add (PLAN-14).
 4. **Biggest pedagogical gap**: **Peer assessment** (students as judges) is a major use case in Comproved and RM Compare. It's powerful for formative learning but requires careful UX (PLAN-15).
 5. **Out of scope**: National benchmarking and LMS integration require a server. We deliberately stay local-first. AI judges (PLAN-20) could work client-side via a user-provided API key.
@@ -346,37 +381,6 @@ These plans are easy to implement, run entirely locally, and require minimal ong
 #### Medium
 7. **Add "(optioneel)" hint** to Genre field on `Upload.tsx`.
 8. **Add "Klik op een kolomkop om te sorteren" hint** near Results table.
-
----
-
-### PLAN-12: Judge Infit Statistics (per-rater misfit)
-
-**Effort**: Small (~30 lines in rater-analysis.ts, pure math)
-
-**What**: Compute infit mean-square per judge. Flag judges whose decisions are statistically inconsistent with the group consensus.
-
-**How**:
-- For each judge, compute infit: `infit_j = sum(z_ij^2 * w_ij) / sum(w_ij)` where `z_ij` is the standardized residual of each judgement
-- Flag judges with infit > 1.2 as inconsistent (NoMoreMarking's threshold)
-- Show in "Beoordelaarsoverzicht" alongside existing agreement % and tie rate
-- Dutch labels: "Goed consistent" / "Inconsistent patroon" / "Mogelijk onzorgvuldig"
-- Only meaningful with >10 judgements per rater
-
----
-
-### PLAN-13: Split-Half Reliability
-
-**Effort**: Small (~50 lines pure math, no schema change)
-
-**What**: Add a split-half reliability coefficient alongside the current SE-based cohort reliability.
-
-**How**:
-- Randomly split judgements into two halves
-- Run BT independently on each half → get two rankings
-- Compute Spearman rank correlation between the two rankings
-- Apply Spearman-Brown correction: `r_full = 2 * r_half / (1 + r_half)`
-- Show as "Betrouwbaarheidscoëfficiënt" (e.g., "0.87") in the reliability card
-- Run multiple random splits and average (Monte Carlo split-half)
 
 ---
 
