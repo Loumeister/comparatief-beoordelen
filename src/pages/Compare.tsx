@@ -10,6 +10,7 @@ import { ArrowLeft, Info, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { HeaderNav } from "@/components/HeaderNav";
 import { TextCard } from "@/components/compare/TextCard";
+import { TextProgressCard } from "@/components/compare/TextProgressCard";
 import { useCompareData, useRaterIdentification } from "@/hooks/use-compare-data";
 
 const Compare = () => {
@@ -29,6 +30,7 @@ const Compare = () => {
     expectedTotal,
     reliabilityAdvice,
     tieRate,
+    textProgress,
     handleJudgement: rawHandleJudgement,
     loadData,
   } = useCompareData(raterId, raterName);
@@ -216,6 +218,9 @@ const Compare = () => {
             </AlertDescription>
           </Alert>
         )}
+
+        {/* Per-text progress (PLAN-10) */}
+        {textProgress.length > 0 && <TextProgressCard items={textProgress} />}
 
         {/* Choice buttons + comments */}
         <Card className="shadow-lg mb-6">

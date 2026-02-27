@@ -134,6 +134,13 @@ export function useCompareData(raterId: string, raterName: string) {
   const [textCounts, setTextCounts] = useState<Map<number, number>>(new Map());
   const [reliabilityAdvice, setReliabilityAdvice] = useState<ReliabilityAssessment | null>(null);
   const [tieRate, setTieRate] = useState(0);
+  const [textProgress, setTextProgress] = useState<Array<{
+    textId: number;
+    name: string;
+    comparisons: number;
+    se: number;
+    status: 'reliable' | 'almost' | 'needsWork';
+  }>>([]);
 
   // Shared logic for loading BT maps, reliability, tie rate, and generating pairs
   const loadPairsFromBT = useCallback(async (id: number, assign: Assignment) => {
@@ -154,6 +161,21 @@ export function useCompareData(raterId: string, raterName: string) {
 
     const batch = calculateDynamicBatchSize(texts, se, exposures);
     setReliabilityAdvice(assessReliability(btResults, texts, judgements));
+
+    // Per-text progress (PLAN-10)
+    const id2idx = new Map<number, number>(texts.map((t, i) => [t.id!, i]));
+    setTextProgress(
+      texts.map((t) => {
+        const tSE = se.get(t.id!) ?? Infinity;
+        const idx = id2idx.get(t.id!)!;
+        const comps = exposures[idx] ?? 0;
+        let status: 'reliable' | 'almost' | 'needsWork';
+        if (Number.isFinite(tSE) && tSE <= SE_RELIABLE) status = 'reliable';
+        else if (Number.isFinite(tSE) && tSE <= 1.0) status = 'almost';
+        else status = 'needsWork';
+        return { textId: t.id!, name: t.anonymizedName, comparisons: comps, se: tSE, status };
+      }).sort((a, b) => b.se - a.se) // worst first
+    );
 
     // Tie rate for current rater (PLAN-9)
     const myJudgements = all.filter(j => j.raterId === raterId);
@@ -296,6 +318,7 @@ export function useCompareData(raterId: string, raterName: string) {
     expectedTotal,
     reliabilityAdvice,
     tieRate,
+    textProgress,
     handleJudgement,
     loadData,
   };
