@@ -300,7 +300,7 @@ This section maps features from professional CJ platforms to identify what we ha
 | Item infit/misfit flags | yes | yes | -- | yes | **yes** | -- |
 | Judge infit (per-rater misfit) | yes | yes | yes | yes | **yes** | -- |
 | Split-half reliability (alongside SSR) | yes | yes | -- | -- | **yes** | -- |
-| **Time per judgement tracking** | yes | yes | yes | -- | **no** | **PLAN-14** |
+| **Time per judgement tracking** | yes | yes | yes | -- | **no** | **PLAN-14** (deferred) |
 | **Student-as-judge** (peer assessment) | -- | yes | yes | yes | **no** | **PLAN-15** |
 | **Feedback questions on submission** | -- | -- | yes | -- | **no** | **PLAN-16** |
 | **Multi-media support** (images, video, audio) | -- | yes | yes | yes | **no** | **PLAN-18** |
@@ -317,7 +317,7 @@ This section maps features from professional CJ platforms to identify what we ha
 
 1. **Our strongest differentiator**: Local-first, zero-config, free, Dutch-language. No account, no server, no subscription. This matters for teachers who can't get IT approval for cloud tools.
 2. **Psychometric parity achieved**: With item infit (PLAN-3), judge infit (PLAN-12), and split-half reliability (PLAN-13), we now match professional tools on statistical quality metrics.
-3. **Biggest UX gap**: **Time per judgement** tracking is standard — it catches careless judging (fast + high misfit = low quality). Easy to add (PLAN-14).
+3. **Time per judgement** tracking exists in professional tools, but how they surface it is unclear. Needs research into whether it's used internally (algorithm tuning) or shown to users. Showing per-rater timing risks being confrontational in a collegial setting — deferred to nice-to-have (PLAN-14).
 4. **Biggest pedagogical gap**: **Peer assessment** (students as judges) is a major use case in Comproved and RM Compare. It's powerful for formative learning but requires careful UX (PLAN-15).
 5. **Out of scope**: National benchmarking and LMS integration require a server. We deliberately stay local-first. AI judges (PLAN-20) could work client-side via a user-provided API key.
 
@@ -325,7 +325,7 @@ This section maps features from professional CJ platforms to identify what we ha
 
 ## Short-Term Roadmap
 
-These plans are easy to implement, run entirely locally, and require minimal ongoing maintenance. Each is self-contained — no external dependencies, no schema migrations (except PLAN-14), and limited blast radius.
+These plans are easy to implement, run entirely locally, and require minimal ongoing maintenance. Each is self-contained — no external dependencies, no schema migrations, and limited blast radius.
 
 **Always ask: "Wil je dat ik [feature X] toevoeg?" before starting work on any of these.**
 
@@ -381,21 +381,6 @@ These plans are easy to implement, run entirely locally, and require minimal ong
 #### Medium
 7. **Add "(optioneel)" hint** to Genre field on `Upload.tsx`.
 8. **Add "Klik op een kolomkop om te sorteren" hint** near Results table.
-
----
-
-### PLAN-14: Time per Judgement Tracking
-
-**Effort**: Small (one schema field + few UI lines, schema v10)
-
-**What**: Record and display how long each comparison takes. Flag suspiciously fast judgements.
-
-**How**:
-- Record `startedAt` timestamp when a pair is displayed, save `duration_ms` on the judgement (schema v10)
-- Show median time per rater in "Beoordelaarsoverzicht"
-- Flag raters with median < 5 seconds as potentially careless ("Mogelijk te snel")
-- Show overall average time on Compare progress bar
-- Existing judgements get `null` duration (no migration needed)
 
 ---
 
@@ -487,6 +472,18 @@ These features are valuable but require significant effort, complex UX design, o
 **What**: Before real judging, show a brief training round with pre-scored exemplar texts to calibrate judgement.
 
 **How**: Teacher uploads 2-4 exemplar texts with quality labels. Judges see 3-5 training pairs before real comparisons, with feedback on "expected" answers. Training judgements not counted in BT model. Optional: "Wil je eerst een oefenronde?"
+
+---
+
+### PLAN-14: Time per Judgement Tracking
+
+**Complexity**: Medium (schema migration + unresolved UX questions)
+
+**What**: Record how long each comparison takes. Potentially flag suspiciously fast judgements.
+
+**Open questions**: Professional tools (NMM, RM Compare, Comproved) all track timing, but it's unclear how they surface it — internally for algorithm tuning, or visible to coordinators? Showing per-rater timing in a shared overview risks feeling like surveillance in a collegial setting. The existing judge infit metric already catches poor-quality judging without timing data. More research is needed before implementing.
+
+**How (if pursued)**: Record `startedAt`/`duration_ms` on judgements (schema v10). Show timing only to the individual rater as a private nudge, similar to the existing tie-rate nudge. Do not show per-rater timing in the shared Beoordelaarsoverzicht.
 
 ---
 
