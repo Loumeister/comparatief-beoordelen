@@ -85,6 +85,8 @@ export function useResultsData() {
         min: meta?.gradeMin ?? 1,
         max: meta?.gradeMax ?? 10,
       };
+      const roundingStep = meta?.gradeRounding ?? 0.1;
+      const roundGrade = (g: number) => Math.round(g * (1 / roundingStep)) / (1 / roundingStep);
       const loadedAnchors = meta?.anchors ?? [];
       setAnchors(loadedAnchors);
 
@@ -158,13 +160,14 @@ export function useResultsData() {
       const exportData: ExportData[] = bt.map((r) => {
         const text = texts.find((t) => t.id === r.textId)!;
         const comments = commentsMap.get(text.id!);
+        const anchoredRaw = anchoredMap.get(r.textId);
         return {
           textId: r.textId,
           anonymizedName: text.anonymizedName,
           rank: r.rank,
           label: r.label,
-          grade: r.grade,
-          anchoredGrade: anchoredMap.get(r.textId),
+          grade: roundGrade(r.grade),
+          anchoredGrade: anchoredRaw !== undefined ? roundGrade(anchoredRaw) : undefined,
           theta: r.theta,
           standardError: r.standardError,
           reliability: r.reliability,

@@ -22,6 +22,7 @@ export const GradingSettingsDialog = ({
   const { toast } = useToast();
   const [gradeBase, setGradeBase] = useState(7.0);
   const [gradeScale, setGradeScale] = useState(1.2);
+  const [gradeRounding, setGradeRounding] = useState<0.1 | 0.5 | 1>(0.1);
 
   useEffect(() => {
     if (open) {
@@ -34,6 +35,7 @@ export const GradingSettingsDialog = ({
     if (meta) {
       setGradeBase(meta.gradeBase ?? 7.0);
       setGradeScale(meta.gradeScale ?? 1.2);
+      setGradeRounding(meta.gradeRounding ?? 0.1);
     }
   };
 
@@ -42,6 +44,7 @@ export const GradingSettingsDialog = ({
       await db.assignmentMeta.update(assignmentId, {
         gradeBase,
         gradeScale,
+        gradeRounding,
       });
 
       toast({
@@ -100,6 +103,27 @@ export const GradingSettingsDialog = ({
             />
             <p className="text-sm text-muted-foreground">
               Hoe ver liggen de cijfers uit elkaar? Hoger = meer verschil tussen leerlingen. (standaard: 1,2)
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Afronden op</Label>
+            <div className="flex gap-1">
+              {([0.1, 0.5, 1] as const).map((opt) => (
+                <Button
+                  key={opt}
+                  type="button"
+                  variant={gradeRounding === opt ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setGradeRounding(opt)}
+                  className="flex-1"
+                >
+                  {opt === 1 ? '1' : opt === 0.5 ? '0,5' : '0,1'}
+                </Button>
+              ))}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Op welk getal worden de cijfers afgerond? (standaard: 0,1)
             </p>
           </div>
 

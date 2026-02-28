@@ -351,7 +351,7 @@ Search input above the results table with `Search` icon. Filters by `anonymizedN
 
 ---
 
-### UI-3: Grade Rounding Toggle
+### UI-3: Grade Rounding Toggle — IMPLEMENTED
 
 **Location**: `src/components/GradingSettingsDialog.tsx` + `src/lib/db.ts` + `src/hooks/use-results-data.ts`
 **What**: Add an "Afronden op" segmented control in `GradingSettingsDialog` with three options: `0.1` (default, current behavior) / `0.5` / `1`. Stored on `assignmentMeta` as a new optional field `gradeRounding?: 0.1 | 0.5 | 1`. Applied when computing displayed grades in `use-results-data.ts`.

@@ -71,6 +71,7 @@ export interface AssignmentMeta {
   gradeScale?: number;  // default 1.2
   gradeMin?: number;    // default 1
   gradeMax?: number;    // default 10
+  gradeRounding?: 0.1 | 0.5 | 1; // default 0.1 (round to 1 decimal)
   anchors?: Anchor[];   // ijkpunten: tekst X → vast cijfer Y
 }
 
