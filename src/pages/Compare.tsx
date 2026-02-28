@@ -262,22 +262,23 @@ const Compare = () => {
       <div className="min-h-screen bg-background">
         <div className="border-b bg-card">
           <div className="max-w-7xl mx-auto p-4">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 gap-2">
               <Button variant="ghost" onClick={() => navigate("/")}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Terug
               </Button>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {myJudgements.length > 0 && (
                   <Button variant="outline" size="sm" onClick={() => setMyJudgementsOpen(true)}>
                     <ClipboardList className="w-4 h-4 mr-1" />
-                    Mijn oordelen ({myJudgements.length})
+                    <span className="hidden sm:inline">Mijn oordelen </span>
+                    ({myJudgements.length})
                   </Button>
                 )}
                 <HeaderNav />
               </div>
             </div>
-            <h1 className="text-2xl font-bold">{assignment?.title}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">{assignment?.title}</h1>
           </div>
         </div>
         <div className="max-w-3xl mx-auto p-8">
@@ -361,23 +362,24 @@ const Compare = () => {
       {/* Header */}
       <div className="border-b bg-card">
         <div className="max-w-7xl mx-auto p-4">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 gap-2">
             <Button variant="ghost" onClick={() => navigate("/")}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Terug
             </Button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               {myJudgements.length > 0 && (
                 <Button variant="outline" size="sm" onClick={() => setMyJudgementsOpen(true)}>
                   <ClipboardList className="w-4 h-4 mr-1" />
-                  Mijn oordelen ({myJudgements.length})
+                  <span className="hidden sm:inline">Mijn oordelen </span>
+                  ({myJudgements.length})
                 </Button>
               )}
               <HeaderNav />
             </div>
           </div>
           <div className="mb-2">
-            <h1 className="text-2xl font-bold">{assignment?.title}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">{assignment?.title}</h1>
             <p className="text-sm text-muted-foreground">
               {totalJudgements} van ca. {expectedTotal} vergelijkingen gedaan
               {raterName && <> • beoordelaar: <strong>{raterName}</strong></>}
@@ -388,7 +390,7 @@ const Compare = () => {
       </div>
 
       {/* Comparison Area */}
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-6">
         {/* Reliability advice */}
         {reliabilityAdvice && reliabilityAdvice.corePercentage > 80 && (
           <Alert
@@ -462,16 +464,16 @@ const Compare = () => {
               Kies de <strong>betere</strong> tekst, ook als het verschil klein is. Alleen <em>Gelijkwaardig</em> (sneltoets T) als ze echt even goed zijn.
             </p>
 
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
               <Button
                 size="lg"
                 onClick={() => activeHandler(leftIsA ? "A" : "B")}
                 disabled={saving}
-                className="h-20 text-lg bg-primary hover:bg-primary/90"
+                className="h-16 sm:h-20 text-base sm:text-lg bg-primary hover:bg-primary/90"
               >
                 <div>
                   <div className="font-bold">{leftText.anonymizedName}</div>
-                  <div className="text-xs opacity-80">Sneltoets: A</div>
+                  <div className="text-xs opacity-80 hidden sm:block">Sneltoets: A</div>
                 </div>
               </Button>
 
@@ -480,11 +482,11 @@ const Compare = () => {
                 variant="outline"
                 onClick={() => activeHandler("EQUAL")}
                 disabled={saving}
-                className="h-20 text-lg"
+                className="h-14 sm:h-20 text-base sm:text-lg order-last sm:order-none"
               >
                 <div>
                   <div className="font-bold">Gelijkwaardig</div>
-                  <div className="text-xs opacity-80">Sneltoets: T</div>
+                  <div className="text-xs opacity-80 hidden sm:block">Sneltoets: T</div>
                 </div>
               </Button>
 
@@ -492,11 +494,11 @@ const Compare = () => {
                 size="lg"
                 onClick={() => activeHandler(leftIsA ? "B" : "A")}
                 disabled={saving}
-                className="h-20 text-lg bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+                className="h-16 sm:h-20 text-base sm:text-lg bg-secondary hover:bg-secondary/90 text-secondary-foreground"
               >
                 <div>
                   <div className="font-bold">{rightText.anonymizedName}</div>
-                  <div className="text-xs opacity-80">Sneltoets: B</div>
+                  <div className="text-xs opacity-80 hidden sm:block">Sneltoets: B</div>
                 </div>
               </Button>
             </div>
