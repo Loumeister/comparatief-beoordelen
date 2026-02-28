@@ -390,7 +390,7 @@ Button shows "Ga verder →" when `stats.judgements > 0 && stats.reliabilityPct 
 
 ---
 
-### UI-8: Fullscreen Text Reader
+### UI-8: Fullscreen Text Reader — IMPLEMENTED
 
 **Location**: `src/components/compare/TextCard.tsx`
 **What**: A small `Maximize2` icon button (lucide, already a dependency) in the top-right corner of each `TextCard`. Clicking it opens a full-screen `<Dialog>` showing the complete text with comfortable reading width and line height. Supports plain text, `contentHtml`, and shows "Fysiek exemplaar" for paper-only texts.
