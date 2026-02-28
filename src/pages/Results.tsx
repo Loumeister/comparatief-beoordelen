@@ -80,7 +80,7 @@ const Results = () => {
 
           <div className="mt-4">
             <p className="text-sm text-muted-foreground mb-2">Exporteer resultaten:</p>
-            <div className="flex flex-wrap gap-2">
+            <div className="bg-muted/40 rounded-lg p-3 flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => handleExport("xlsx")} title="Download als Excel-bestand">
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
                 Excel

@@ -52,7 +52,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-primary/10 to-[hsl(var(--choice-b))]/10 border-b">
+      <div className="bg-gradient-to-br from-primary/[0.14] via-primary/[0.07] to-[hsl(var(--choice-b))]/[0.12] border-b">
         <div className="max-w-6xl mx-auto p-8">
           <div className="flex items-start justify-between mb-4">
             <h1 className="text-5xl font-bold">Vergelijkende Beoordeling</h1>
@@ -92,7 +92,7 @@ const Dashboard = () => {
         {assignments.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">
-              <FileText className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+              <FileText className="w-16 h-16 mx-auto mb-4 text-primary/40" />
               <h3 className="text-xl font-semibold mb-2">Nog geen opdrachten</h3>
               <p className="text-muted-foreground mb-6">
                 Begin met het uploaden van leerlingteksten om te vergelijken
@@ -131,8 +131,8 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <span className="font-bold text-primary">1</span>
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+                <span className="font-bold text-sm text-white">1</span>
               </div>
               <div>
                 <h4 className="font-semibold mb-1">Upload teksten</h4>
@@ -143,8 +143,8 @@ const Dashboard = () => {
             </div>
 
             <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <span className="font-bold text-primary">2</span>
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+                <span className="font-bold text-sm text-white">2</span>
               </div>
               <div>
                 <h4 className="font-semibold mb-1">Vergelijk steeds twee teksten</h4>
@@ -155,8 +155,8 @@ const Dashboard = () => {
             </div>
 
             <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <span className="font-bold text-primary">3</span>
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+                <span className="font-bold text-sm text-white">3</span>
               </div>
               <div>
                 <h4 className="font-semibold mb-1">Bekijk rangorde en cijfers</h4>

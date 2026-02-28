@@ -28,7 +28,7 @@ export function AssignmentCard({
   const navigate = useNavigate();
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="hover:shadow-lg transition-shadow border-l-[3px] border-l-primary/40">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -46,23 +46,23 @@ export function AssignmentCard({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center gap-6 mb-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4" />
+        <div className="flex items-center gap-2 flex-wrap mb-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-1.5 bg-muted/60 rounded px-2 py-0.5">
+            <FileText className="w-3.5 h-3.5" />
             <span>{stats.texts} teksten</span>
           </div>
-          <div className="flex items-center gap-2">
-            <BarChart3 className="w-4 h-4" />
+          <div className="flex items-center gap-1.5 bg-muted/60 rounded px-2 py-0.5">
+            <BarChart3 className="w-3.5 h-3.5" />
             <span>{stats.judgements} vergelijkingen</span>
           </div>
           {stats.judgements > 0 && (
-            <div>
+            <div className="flex items-center gap-1.5 bg-muted/60 rounded px-2 py-0.5">
               <span>{stats.reliabilityPct}% betrouwbaar</span>
             </div>
           )}
           {stats.raterCount > 1 && (
-            <div className="flex items-center gap-2">
-              <UserCheck className="w-4 h-4" />
+            <div className="flex items-center gap-1.5 bg-muted/60 rounded px-2 py-0.5">
+              <UserCheck className="w-3.5 h-3.5" />
               <span>{stats.raterCount} beoordelaars</span>
             </div>
           )}

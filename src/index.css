@@ -60,8 +60,8 @@ All colors MUST be HSL.
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(262 83% 58%));
     
     /* Shadows */
-    --shadow-soft: 0 2px 8px -2px hsl(222 47% 11% / 0.08);
-    --shadow-medium: 0 4px 16px -4px hsl(222 47% 11% / 0.12);
+    --shadow-soft: 0 2px 10px -2px hsl(222 47% 11% / 0.10);
+    --shadow-medium: 0 4px 20px -4px hsl(222 47% 11% / 0.16);
     
     /* Animations */
     --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -122,8 +122,8 @@ All colors MUST be HSL.
     --label-onvoldoende: 8 42% 51%;
     --label-onvoldoende-fg: 210 40% 98%;
     
-    --shadow-soft: 0 2px 8px -2px hsl(0 0% 0% / 0.3);
-    --shadow-medium: 0 4px 16px -4px hsl(0 0% 0% / 0.4);
+    --shadow-soft: 0 2px 10px -2px hsl(0 0% 0% / 0.35);
+    --shadow-medium: 0 4px 20px -4px hsl(0 0% 0% / 0.50);
 
     --sidebar-background: 240 6% 10%;
     --sidebar-foreground: 240 5% 96%;
@@ -144,6 +144,8 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
     transition: background-color 0.3s ease, color 0.3s ease;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
