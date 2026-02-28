@@ -110,6 +110,22 @@ export function ReliabilityCard({ results, splitHalf }: ReliabilityCardProps) {
           </div>
         )}
 
+        {/* Legend for progress bar colors */}
+        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-sm bg-secondary" />
+            Betrouwbaar
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-sm bg-primary" />
+            Bijna klaar
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-sm bg-destructive" />
+            Meer nodig
+          </span>
+        </div>
+
         {/* PLAN-13: Split-half reliability coefficient */}
         {splitHalf && (
           <div className="mt-4 pt-3 border-t">

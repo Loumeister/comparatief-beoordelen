@@ -170,7 +170,7 @@ const Upload = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="genre">Genre</Label>
+                <Label htmlFor="genre">Genre <span className="text-muted-foreground font-normal">(optioneel)</span></Label>
                 <Input
                   id="genre"
                   value={genre}

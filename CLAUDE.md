@@ -27,7 +27,7 @@ npm run lint         # ESLint
 npm run preview      # preview production build
 ```
 
-There are **no tests yet**. No test framework is configured. See Future Plans below.
+**Testing**: Vitest is configured with 113 tests across 10 test files in `src/lib/__tests__/`. Run with `npx vitest run`.
 
 ## Architecture
 
@@ -67,7 +67,7 @@ There are **no tests yet**. No test framework is configured. See Future Plans be
 |------|---------|----------------|
 | `use-assignment-data.ts` | (shared) | Load assignment + texts + judgements + meta from IndexedDB |
 | `use-results-data.ts` | Results | BT calculation, rater analysis, split-half reliability, anchor management, all exports |
-| `use-compare-data.ts` | Compare | BT maps, pair generation with fallback, judgement saving |
+| `use-compare-data.ts` | Compare | BT maps, pair generation with fallback, judgement saving, manual pair selection, undo/review (PLAN-19) |
 | `use-compare-data.ts` (useRaterIdentification) | Compare | Rater name/id, localStorage persistence |
 | `use-dashboard-data.ts` | Dashboard | Assignment stats, CRUD, file import (JSON/CSV/XLSX) |
 
@@ -87,6 +87,8 @@ There are **no tests yet**. No test framework is configured. See Future Plans be
   - `AnchorDialog.tsx` — set/edit/remove anchor grade for a text
   - `FeedbackDialog.tsx` — configure and trigger per-student feedback PDF export
 - `compare/TextCard.tsx` — reusable text display card (handles plain text, HTML, and paper-only)
+- `compare/TextProgressCard.tsx` — per-text SE/comparison progress overview (PLAN-10)
+- `compare/MyJudgementsDialog.tsx` — review/revise past judgements dialog (PLAN-19)
 - `dashboard/AssignmentCard.tsx` — per-assignment card with stats and action buttons
 - `ui/` — shadcn-ui component library (do not edit directly)
 
@@ -272,6 +274,63 @@ The following plans from the original roadmap have been **fully implemented** an
 
 ---
 
+### PLAN-4: Unit Tests for Core Algorithms — IMPLEMENTED
+
+**Status**: Fully implemented. Vitest configured with 113 tests across 10 test files.
+
+**What was built**:
+- Vitest dev dependency added with `src/lib/__tests__/` convention
+- Test suites for: `bradley-terry.ts` (17 tests), `pairing.ts` (10 tests), `reliability.ts` (10 tests), `effective-judgements.ts` (9 tests), `graph.ts` (8 tests), `utils.ts` (10 tests), `anchor-grading.ts` (11 tests), `split-half.ts` (8 tests), `rater-analysis.ts` (20 tests), `reliability-status.ts` (10 tests)
+- Tests cover BT convergence, SE computation, pair generation bridging, effective judgement dedup, split-half reproducibility, judge infit, and more
+
+**Key files**: `src/lib/__tests__/*.test.ts`, `vitest.config.ts`.
+
+---
+
+### PLAN-10: Progress Dashboard per Text — IMPLEMENTED
+
+**Status**: Fully implemented in `src/components/compare/TextProgressCard.tsx` and `src/hooks/use-compare-data.ts`.
+
+**What was built**:
+- Collapsible card on Compare page showing per-text SE and comparison count
+- Color-coded status: green (reliable, SE ≤ 0.75), yellow (almost, SE ≤ 1.0), red (needs work)
+- Sorted worst-first so teachers see which texts need more comparisons
+- Uses existing BT computation data, no extra queries
+
+---
+
+### PLAN-11: UX Polish for Non-Technical Teachers — IMPLEMENTED
+
+**Status**: All 8 items fully implemented.
+
+**What was built**:
+1. Removed "Design Mode" button from `HeaderNav.tsx`
+2. Improved "Geen paren beschikbaar" message with explanation and next steps
+3. Added legend for Reliability column in Results table
+4. Rater Overview expanded by default when >1 rater
+5. Improved anchor icon tooltip with contextual explanation
+6. Clarified "Wie ben je?" prompt — clearer that solo teachers can skip
+7. Added "(optioneel)" hint to Genre field on Upload page
+8. Added "Klik op een kolomkop om te sorteren" hint near Results table
+
+---
+
+### PLAN-19: Undo / Review Previous Judgements — IMPLEMENTED
+
+**Status**: Fully implemented in `src/components/compare/MyJudgementsDialog.tsx`, `src/hooks/use-compare-data.ts`, and `src/pages/Compare.tsx`.
+
+**What was built**:
+- "Mijn oordelen" button in Compare header showing count of past judgements
+- Dialog listing current rater's judgements (deduplicated per pair, newest first) with text names, winner badge, timestamp
+- "Herzie" button per judgement opens the pair in manual comparison mode with `supersedesJudgementId` tracked
+- 5-second undo toast after each judgement with "Ongedaan maken" action button
+- `undoLastJudgement()` deletes the record from IndexedDB and reloads
+- No schema migration needed — `supersedesJudgementId` already existed, `getEffectiveJudgements` already handles dedup
+
+**Key files**: `src/components/compare/MyJudgementsDialog.tsx` (dialog), `src/hooks/use-compare-data.ts` (myJudgements state, undo logic), `src/pages/Compare.tsx` (UI wiring).
+
+---
+
 ## Competitive Landscape
 
 This section maps features from professional CJ platforms to identify what we have, what we lack, and what's worth building. The goal is **not** to replicate enterprise SaaS — we stay local-first and simple — but to cherry-pick the high-impact features that teachers actually benefit from.
@@ -300,24 +359,24 @@ This section maps features from professional CJ platforms to identify what we ha
 | Item infit/misfit flags | yes | yes | -- | yes | **yes** | -- |
 | Judge infit (per-rater misfit) | yes | yes | yes | yes | **yes** | -- |
 | Split-half reliability (alongside SSR) | yes | yes | -- | -- | **yes** | -- |
-| **Time per judgement tracking** | yes | yes | yes | -- | **no** | **PLAN-14** |
+| **Time per judgement tracking** | yes | yes | yes | -- | **no** | **PLAN-14** (deferred) |
 | **Student-as-judge** (peer assessment) | -- | yes | yes | yes | **no** | **PLAN-15** |
 | **Feedback questions on submission** | -- | -- | yes | -- | **no** | **PLAN-16** |
 | **Multi-media support** (images, video, audio) | -- | yes | yes | yes | **no** | **PLAN-18** |
-| **Undo / review previous judgements** | -- | -- | -- | -- | **no** | **PLAN-19** |
+| Undo / review previous judgements | -- | -- | -- | -- | **yes** | -- |
 | **National / cross-school benchmarking** | yes | yes | -- | -- | **no** | out of scope (requires server) |
 | **AI judges** (LLM-assisted) | yes | -- | -- | -- | **no** | **PLAN-20** |
 | **LMS integration** (LTI) | -- | -- | yes | -- | **no** | out of scope (requires server) |
 | **Mobile companion app** | -- | yes | -- | -- | **no** | low priority (PWA possible) |
 | **Exemplar / training round** | yes | -- | -- | -- | **no** | **PLAN-21** |
-| Per-text progress dashboard | -- | -- | -- | -- | **no** | PLAN-10 |
-| Decision trail (why this score?) | yes | yes | -- | -- | **no** | **PLAN-22** |
+| Per-text progress dashboard | -- | -- | -- | -- | **yes** | -- |
+| Decision trail (why this score?) | yes | yes | -- | -- | **no** | nice-to-have (PLAN-22) |
 
 ### Strategic Takeaways
 
 1. **Our strongest differentiator**: Local-first, zero-config, free, Dutch-language. No account, no server, no subscription. This matters for teachers who can't get IT approval for cloud tools.
 2. **Psychometric parity achieved**: With item infit (PLAN-3), judge infit (PLAN-12), and split-half reliability (PLAN-13), we now match professional tools on statistical quality metrics.
-3. **Biggest UX gap**: **Time per judgement** tracking is standard — it catches careless judging (fast + high misfit = low quality). Easy to add (PLAN-14).
+3. **Time per judgement** tracking exists in professional tools, but how they surface it is unclear. Needs research into whether it's used internally (algorithm tuning) or shown to users. Showing per-rater timing risks being confrontational in a collegial setting — deferred to nice-to-have (PLAN-14).
 4. **Biggest pedagogical gap**: **Peer assessment** (students as judges) is a major use case in Comproved and RM Compare. It's powerful for formative learning but requires careful UX (PLAN-15).
 5. **Out of scope**: National benchmarking and LMS integration require a server. We deliberately stay local-first. AI judges (PLAN-20) could work client-side via a user-provided API key.
 
@@ -325,77 +384,9 @@ This section maps features from professional CJ platforms to identify what we ha
 
 ## Short-Term Roadmap
 
-These plans are easy to implement, run entirely locally, and require minimal ongoing maintenance. Each is self-contained — no external dependencies, no schema migrations (except PLAN-14), and limited blast radius.
+The short-term roadmap is now **complete**. All planned features (PLAN-4, PLAN-10, PLAN-11, PLAN-19) have been implemented. The remaining plan below is optional and low-priority.
 
 **Always ask: "Wil je dat ik [feature X] toevoeg?" before starting work on any of these.**
-
----
-
-### PLAN-4: Unit Tests for Core Algorithms
-
-**Effort**: Small (dev tooling only, no runtime impact)
-
-**What**: Add Vitest test suites for bradley-terry.ts, pairing.ts, reliability.ts, effective-judgements.ts.
-
-**How**:
-- Add `vitest` as dev dependency
-- Create `src/lib/__tests__/` directory
-- Test BT with known hand-computed examples (3-5 texts, known comparisons, verify theta convergence and SE)
-- Test pairing: verify bridging connects components, no opposite-wings in intra phase
-- Test reliability: ladder evidence with ties, convergence detection
-- Test effective-judgements: moderation overrides, per-rater dedup
-
----
-
-### PLAN-10: Progress Dashboard per Text
-
-**Effort**: Small (~50 lines of UI, uses existing data)
-
-**What**: Show a visual overview of which texts have been compared enough and which need more attention.
-
-**How**:
-- Small bar chart or heat map on the Compare page showing each text's SE or comparison count
-- Color coding: green (reliable), yellow (almost), red (needs work)
-- Helps teachers decide whether to continue or stop
-
----
-
-### PLAN-11: UX Polish for Non-Technical Teachers
-
-**Effort**: Small (text/tooltip changes, no new logic)
-
-**What**: A set of small UX improvements to make the app more accessible for colleagues who are not comfortable with technology.
-
-**How** (priority order):
-
-#### Critical
-1. **Remove "Design Mode" button** from `HeaderNav.tsx` — developer tool that confuses end users.
-2. **Improve "Geen paren beschikbaar" message** in `Compare.tsx` — add explanation and next steps.
-3. **Add legend for Reliability column** in `Results.tsx` — explain what green/yellow/red means.
-
-#### High
-4. **Expand Rater Overview by default** in `Results.tsx` when >1 rater exists.
-5. **Improve anchor icon tooltip** in `Results.tsx` — explain when/why to use it.
-6. **Clarify "Wie ben je?" prompt** in `Compare.tsx` — clearer that solo teachers can skip.
-
-#### Medium
-7. **Add "(optioneel)" hint** to Genre field on `Upload.tsx`.
-8. **Add "Klik op een kolomkop om te sorteren" hint** near Results table.
-
----
-
-### PLAN-14: Time per Judgement Tracking
-
-**Effort**: Small (one schema field + few UI lines, schema v10)
-
-**What**: Record and display how long each comparison takes. Flag suspiciously fast judgements.
-
-**How**:
-- Record `startedAt` timestamp when a pair is displayed, save `duration_ms` on the judgement (schema v10)
-- Show median time per rater in "Beoordelaarsoverzicht"
-- Flag raters with median < 5 seconds as potentially careless ("Mogelijk te snel")
-- Show overall average time on Compare progress bar
-- Existing judgements get `null` duration (no migration needed)
 
 ---
 
@@ -409,34 +400,6 @@ These plans are easy to implement, run entirely locally, and require minimal ong
 - Add optional `feedbackPrompt` field on assignment creation (teacher sets a guiding question)
 - Display the prompt above the comment fields during comparison: e.g., "Waar kan de leerling verbeteren?"
 - Store on `assignmentMeta` table
-
----
-
-### PLAN-19: Undo / Review Previous Judgements
-
-**Effort**: Small-medium (UI only — `supersedesJudgementId` already exists in schema)
-
-**What**: Let judges review and optionally revise their past judgements.
-
-**How**:
-- "Mijn oordelen" section accessible from the Compare page header
-- Shows past judgements with: text A name, text B name, winner, timestamp, comments
-- "Herzie" button marks old judgement as superseded and opens fresh comparison (uses existing `supersedesJudgementId` field)
-- Optional "Ongedaan maken" (undo) button immediately after a judgement (within 5 seconds)
-
----
-
-### PLAN-22: Decision Trail (Why This Score?)
-
-**Effort**: Small (extends existing StudentDetailsDialog)
-
-**What**: For any text in the results, show the chain of comparisons that led to its ranking.
-
-**How**:
-- Click on any text in Results table → show "Vergelijkingsoverzicht" panel
-- List all comparisons: opponent, winner, predicted probability, actual outcome
-- Highlight "surprising" results (actual outcome differs from model prediction by >0.8 probability)
-- Extends the existing `StudentDetailsDialog` with richer statistical context
 
 ---
 
@@ -487,6 +450,28 @@ These features are valuable but require significant effort, complex UX design, o
 **What**: Before real judging, show a brief training round with pre-scored exemplar texts to calibrate judgement.
 
 **How**: Teacher uploads 2-4 exemplar texts with quality labels. Judges see 3-5 training pairs before real comparisons, with feedback on "expected" answers. Training judgements not counted in BT model. Optional: "Wil je eerst een oefenronde?"
+
+---
+
+### PLAN-22: Decision Trail (Why This Score?)
+
+**Complexity**: Low (extends existing StudentDetailsDialog)
+
+**What**: For any text in the results, show predicted probability per comparison and highlight "surprising" outcomes.
+
+**Why deferred**: The existing `StudentDetailsDialog` already shows the win/loss/tie record. The main added value (surprise highlighting) is modest — most teachers trust the ranking without needing to inspect statistical reasoning. PLAN-19's revision feature already handles the use case of fixing problematic judgements.
+
+---
+
+### PLAN-14: Time per Judgement Tracking
+
+**Complexity**: Medium (schema migration + unresolved UX questions)
+
+**What**: Record how long each comparison takes. Potentially flag suspiciously fast judgements.
+
+**Open questions**: Professional tools (NMM, RM Compare, Comproved) all track timing, but it's unclear how they surface it — internally for algorithm tuning, or visible to coordinators? Showing per-rater timing in a shared overview risks feeling like surveillance in a collegial setting. The existing judge infit metric already catches poor-quality judging without timing data. More research is needed before implementing.
+
+**How (if pursued)**: Record `startedAt`/`duration_ms` on judgements (schema v10). Show timing only to the individual rater as a private nudge, similar to the existing tie-rate nudge. Do not show per-rater timing in the shared Beoordelaarsoverzicht.
 
 ---
 
