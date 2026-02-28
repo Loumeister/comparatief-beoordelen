@@ -6,7 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Info, AlertTriangle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Info, AlertTriangle, ChevronDown, ChevronRight, Shuffle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { HeaderNav } from "@/components/HeaderNav";
 import { TextCard } from "@/components/compare/TextCard";
@@ -22,6 +23,7 @@ const Compare = () => {
   // Core data + logic
   const {
     assignment,
+    allTexts,
     pairs,
     currentIndex,
     loading,
@@ -32,6 +34,7 @@ const Compare = () => {
     tieRate,
     textProgress,
     handleJudgement: rawHandleJudgement,
+    saveManualJudgement,
     loadData,
   } = useCompareData(raterId, raterName);
 
@@ -39,6 +42,12 @@ const Compare = () => {
   const [commentLeft, setCommentLeft] = useState("");
   const [commentRight, setCommentRight] = useState("");
   const [isFinal, setIsFinal] = useState(false);
+
+  // Manual pair selection state
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualTextAId, setManualTextAId] = useState<string>("");
+  const [manualTextBId, setManualTextBId] = useState<string>("");
+  const [manualActive, setManualActive] = useState(false);
 
   // Wrap handleJudgement to include local comment state
   const handleJudgement = useCallback(
@@ -51,24 +60,55 @@ const Compare = () => {
     [rawHandleJudgement, commentLeft, commentRight, isFinal],
   );
 
+  // Handle manual pair judgement
+  const handleManualJudgement = useCallback(
+    async (winner: "A" | "B" | "EQUAL") => {
+      const aId = Number(manualTextAId);
+      const bId = Number(manualTextBId);
+      if (!aId || !bId || aId === bId) return;
+
+      // Map winner relative to display order (left/right sorted alphabetically)
+      const textA = allTexts.find(t => t.id === aId);
+      const textB = allTexts.find(t => t.id === bId);
+      if (!textA || !textB) return;
+
+      const sorted = [textA, textB].sort((a, b) => a.anonymizedName.localeCompare(b.anonymizedName));
+      const leftIsA = sorted[0].id === aId;
+
+      // Comments are always left/right in display; map to A/B
+      const commentA = leftIsA ? commentLeft.trim() : commentRight.trim();
+      const commentB = leftIsA ? commentRight.trim() : commentLeft.trim();
+
+      await saveManualJudgement(aId, bId, winner, commentA, commentB, isFinal);
+      setCommentLeft("");
+      setCommentRight("");
+      setIsFinal(false);
+      setManualActive(false);
+      setManualTextAId("");
+      setManualTextBId("");
+    },
+    [manualTextAId, manualTextBId, allTexts, commentLeft, commentRight, isFinal, saveManualJudgement],
+  );
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.tagName === "SELECT") return;
 
+      const handler = manualActive ? handleManualJudgement : handleJudgement;
       if (e.key === "a" || e.key === "A") {
-        void handleJudgement("A");
+        void handler("A");
       } else if (e.key === "b" || e.key === "B") {
-        void handleJudgement("B");
+        void handler("B");
       } else if (e.key === "t" || e.key === "T") {
-        void handleJudgement("EQUAL");
+        void handler("EQUAL");
       }
     };
 
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [handleJudgement]);
+  }, [handleJudgement, handleManualJudgement, manualActive]);
 
   // ─── Rater prompt ───
   if (showRaterPrompt) {
@@ -112,8 +152,73 @@ const Compare = () => {
     );
   }
 
+  // ─── Manual pair selector (shared component) ───
+  const sortedTexts = [...allTexts].sort((a, b) => a.anonymizedName.localeCompare(b.anonymizedName));
+  const manualPairValid = manualTextAId && manualTextBId && manualTextAId !== manualTextBId;
+
+  const manualPairSelector = allTexts.length >= 2 && (
+    <Card className="mb-6">
+      <CardContent className="p-4">
+        <button
+          onClick={() => setManualOpen(!manualOpen)}
+          className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground w-full"
+        >
+          {manualOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          <Shuffle className="w-4 h-4" />
+          Kies zelf een paar
+        </button>
+        {manualOpen && (
+          <div className="mt-3 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Kies twee teksten om handmatig te vergelijken. Het oordeel telt gewoon mee voor de ranglijst.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-end">
+              <div className="flex-1 w-full">
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Tekst A</label>
+                <Select value={manualTextAId} onValueChange={setManualTextAId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Kies een tekst..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sortedTexts.map(t => (
+                      <SelectItem key={t.id} value={String(t.id!)} disabled={String(t.id!) === manualTextBId}>
+                        {t.anonymizedName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-1 w-full">
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Tekst B</label>
+                <Select value={manualTextBId} onValueChange={setManualTextBId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Kies een tekst..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sortedTexts.map(t => (
+                      <SelectItem key={t.id} value={String(t.id!)} disabled={String(t.id!) === manualTextAId}>
+                        {t.anonymizedName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={() => setManualActive(true)}
+                disabled={!manualPairValid}
+                className="shrink-0"
+              >
+                Vergelijk
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
   // ─── No pairs ───
-  if (pairs.length === 0) {
+  if (pairs.length === 0 && !manualActive) {
     return (
       <div className="min-h-screen bg-background">
         <div className="border-b bg-card">
@@ -152,20 +257,42 @@ const Compare = () => {
               </div>
             </CardContent>
           </Card>
+          <div className="mt-6">{manualPairSelector}</div>
         </div>
       </div>
     );
   }
 
   // ─── Main comparison UI ───
-  const currentPair = pairs[currentIndex];
-  const sortedAlphabetically = [currentPair.textA, currentPair.textB].sort((a, b) =>
+  // Determine which pair to show: manual or algorithm
+  let displayTextA: typeof allTexts[0];
+  let displayTextB: typeof allTexts[0];
+  let isManualPair = false;
+
+  if (manualActive && manualPairValid) {
+    const a = allTexts.find(t => t.id === Number(manualTextAId));
+    const b = allTexts.find(t => t.id === Number(manualTextBId));
+    if (a && b) {
+      displayTextA = a;
+      displayTextB = b;
+      isManualPair = true;
+    } else {
+      displayTextA = pairs[currentIndex].textA;
+      displayTextB = pairs[currentIndex].textB;
+    }
+  } else {
+    displayTextA = pairs[currentIndex].textA;
+    displayTextB = pairs[currentIndex].textB;
+  }
+
+  const sortedAlphabetically = [displayTextA, displayTextB].sort((a, b) =>
     a.anonymizedName.localeCompare(b.anonymizedName),
   );
   const leftText = sortedAlphabetically[0];
   const rightText = sortedAlphabetically[1];
-  const leftIsA = leftText.id === currentPair.textA.id;
+  const leftIsA = leftText.id === displayTextA.id;
   const progress = expectedTotal > 0 ? Math.min((totalJudgements / expectedTotal) * 100, 100) : 0;
+  const activeHandler = isManualPair ? handleManualJudgement : handleJudgement;
 
   return (
     <div className="min-h-screen bg-background">
@@ -230,8 +357,30 @@ const Compare = () => {
           </Alert>
         )}
 
+        {/* Manual pair selector */}
+        {!isManualPair && manualPairSelector}
+
         {/* Per-text progress (PLAN-10) */}
-        {textProgress.length > 0 && <TextProgressCard items={textProgress} />}
+        {textProgress.length > 0 && !isManualPair && <TextProgressCard items={textProgress} />}
+
+        {/* Manual pair indicator */}
+        {isManualPair && (
+          <Alert className="mb-6 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+            <Shuffle className="h-4 w-4" />
+            <AlertDescription className="ml-2 flex items-center justify-between">
+              <span className="text-sm">
+                Je vergelijkt nu een <strong>zelf gekozen paar</strong>. Het oordeel telt gewoon mee.
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setManualActive(false); setManualTextAId(""); setManualTextBId(""); }}
+              >
+                Terug naar suggesties
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Choice buttons + comments */}
         <Card className="shadow-lg mb-6">
@@ -244,7 +393,7 @@ const Compare = () => {
             <div className="grid grid-cols-3 gap-4 mb-6">
               <Button
                 size="lg"
-                onClick={() => handleJudgement(leftIsA ? "A" : "B")}
+                onClick={() => activeHandler(leftIsA ? "A" : "B")}
                 disabled={saving}
                 className="h-20 text-lg bg-primary hover:bg-primary/90"
               >
@@ -257,7 +406,7 @@ const Compare = () => {
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => handleJudgement("EQUAL")}
+                onClick={() => activeHandler("EQUAL")}
                 disabled={saving}
                 className="h-20 text-lg"
               >
@@ -269,7 +418,7 @@ const Compare = () => {
 
               <Button
                 size="lg"
-                onClick={() => handleJudgement(leftIsA ? "B" : "A")}
+                onClick={() => activeHandler(leftIsA ? "B" : "A")}
                 disabled={saving}
                 className="h-20 text-lg bg-secondary hover:bg-secondary/90 text-secondary-foreground"
               >

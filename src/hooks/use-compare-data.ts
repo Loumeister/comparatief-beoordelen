@@ -124,6 +124,7 @@ export function useCompareData(raterId: string, raterName: string) {
 
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [assignmentMeta, setAssignmentMeta] = useState<AssignmentMeta | null>(null);
+  const [allTexts, setAllTexts] = useState<Text[]>([]);
   const [pairs, setPairs] = useState<ReturnType<typeof generatePairs>>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -145,6 +146,7 @@ export function useCompareData(raterId: string, raterName: string) {
   // Shared logic for loading BT maps, reliability, tie rate, and generating pairs
   const loadPairsFromBT = useCallback(async (id: number, assign: Assignment) => {
     const { texts, judgements, all, theta, se, judgedPairsCounts, exposures, btResults } = await buildBTMaps(id);
+    setAllTexts(texts);
     setPairCounts(judgedPairsCounts);
 
     // Text counts
@@ -308,8 +310,51 @@ export function useCompareData(raterId: string, raterName: string) {
     [assignment, assignmentMeta, currentIndex, pairs, reloadPairs, saving, toast, raterId, raterName],
   );
 
+  // Save a manually chosen pair judgement
+  const saveManualJudgement = useCallback(
+    async (
+      textAId: number,
+      textBId: number,
+      winner: "A" | "B" | "EQUAL",
+      commentA: string,
+      commentB: string,
+      isFinal: boolean,
+    ) => {
+      if (!assignment || !assignmentMeta || saving) return;
+      try {
+        setSaving(true);
+        const pk = pairKey(textAId, textBId);
+
+        await db.judgements.add({
+          assignmentId: assignment.id!,
+          textAId,
+          textBId,
+          winner,
+          commentA: commentA.trim() || undefined,
+          commentB: commentB.trim() || undefined,
+          createdAt: new Date(),
+          raterId,
+          raterName: raterName || undefined,
+          source: "human",
+          isFinal: assignmentMeta.judgementMode === "moderate" ? isFinal : false,
+          pairKey: pk,
+        });
+
+        setTotalJudgements((prev) => prev + 1);
+        await reloadPairs();
+      } catch (error) {
+        console.error("Save manual judgement error:", error);
+        toast({ title: "Fout bij opslaan", variant: "destructive" });
+      } finally {
+        setSaving(false);
+      }
+    },
+    [assignment, assignmentMeta, saving, reloadPairs, toast, raterId, raterName],
+  );
+
   return {
     assignment,
+    allTexts,
     pairs,
     currentIndex,
     loading,
@@ -320,6 +365,7 @@ export function useCompareData(raterId: string, raterName: string) {
     tieRate,
     textProgress,
     handleJudgement,
+    saveManualJudgement,
     loadData,
   };
 }
