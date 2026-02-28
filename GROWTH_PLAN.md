@@ -445,3 +445,173 @@ Once the automation stack is live, the **steady-state maintenance per month** is
 | **Total non-feature work** | **~3h/month** |
 
 New translations, billing, renewals, key delivery, CI, and deploy all run without human action.
+
+---
+
+## 11. Marketing: Getting Schools to Onboard
+
+### 11.1 The Funnel
+
+School adoption always follows the same three stages. Each stage has different bottlenecks.
+
+```
+Discovery          → teacher finds the tool
+  ↓
+Conviction         → teacher uses it, is convinced
+  ↓
+School onboarding  → school adopts officially (pays School Plan)
+```
+
+Most ed-tech tools fail at the third stage. Teachers love the tool but can't get school approval without a formal invoice, a privacy statement, and sometimes an IT sign-off. The architecture of this app makes the third stage unusually easy — see §11.4.
+
+---
+
+### 11.2 Discovery Channels
+
+Priority order: set-once channels first, recurring effort last.
+
+#### Set once, works forever (highest ROI)
+
+| Channel | Action | Effort |
+|---|---|---|
+| **SEO** | 3–5 short blog posts on the GitHub Pages site: "Wat is vergelijkend beoordelen?", "Hoe gebruik je BT-modellen in de klas?", "Free comparative judgment tool" | 1 day |
+| **GitHub README** | Screenshots, 30-second GIF demo, "Used by X schools" badge once data exists | 2h |
+| **Kennisnet** | Submit to [Kennisnet Wikiwijs](https://www.wikiwijs.nl/) — the Dutch national ed-tech catalogue. Free listing, permanent, high trust with Dutch schools | 1h |
+| **Ed-tech directories** | EduApps.nl, Edshelf, AlternativeTo (list as free alternative to No More Marking) | 2h |
+| **Research papers** | Reach out to 2–3 Dutch educational researchers who publish on CJ — offer the tool for their studies. One citation = permanent credibility | 2h outreach |
+| **Teacher training institutes** | Email the methodology coordinators at 5–10 Dutch lerarenopleidingen (Fontys, HAN, Thomas More BE, etc.). If they recommend it in their curriculum, that's a pipeline of new teachers every year | 3h |
+
+#### Periodic effort (medium ROI)
+
+| Channel | Action | Frequency |
+|---|---|---|
+| **LinkedIn** | Short posts showing results screenshots, "Hoe weet je of een tekst echt beter is?" type questions. Teachers are very active on LinkedIn in NL. | 1 post/week, 20 min |
+| **Facebook groups** | "Docenten Nederlands", "AVO docenten", "Leraren Taal & Tekst" — post a genuine tip about CJ, tool as natural conclusion | 1x per launch, then 1x per major feature |
+| **Twitter/X #EduTwitter** | Tag Dutch ed researchers, post data screenshots | Occasional |
+| **Onderwijsdagen / VO-congres** | Submit a 20-minute workshop proposal. One good demo in front of 50 teachers = 5–10 school adoptions | 1x/year |
+
+#### One-time launch boosts
+
+| Channel | When |
+|---|---|
+| **ProductHunt** | On English launch (Phase 2). Schedule for a Tuesday morning US time. |
+| **Hacker News "Show HN"** | Same week as ProductHunt. HN has many developer-teachers. |
+| **Reddit r/edtech, r/Teachers** | English launch |
+| **Flemish equivalent** | Klasse.be (largest BE teacher platform) has a "tools" section — submit there for Flanders |
+
+---
+
+### 11.3 The Email List: The One Marketing Automation That Matters
+
+Since the app has no login, there's no natural way to follow up with users. Solve this with a single opt-in inside the app:
+
+**Placement**: on the Dashboard, below the first assignment — a dismissable banner:
+
+> "Ontvang maandelijkse tips over vergelijkend beoordelen. Geen spam."
+> `[email input]` `[Aanmelden]`
+
+**What it enables:**
+
+```
+User signs up → Brevo (free up to 300 emails/day)
+  → Welcome email: "Zo haal je meer uit vergelijkend beoordelen" (3 tips)
+  → Day 7: "Wat zeggen de betrouwbaarheidsscores?"
+  → Day 30: "Is uw school klaar voor een schoollicentie?" → link to /pricing
+  → Ongoing: monthly newsletter (new features, CJ research, teacher tips)
+```
+
+The nurture sequence runs fully automatically in Brevo after initial setup (~3h to write and configure). New subscribers get the same sequence regardless of when they join.
+
+**For English/French users**: same flow, different Brevo list, translated emails. Brevo supports multiple lists and sends the right language automatically based on signup source (add `?lang=en` to the signup form embed).
+
+---
+
+### 11.4 The School Onboarding Pitch: Use the Architecture
+
+The three typical objections schools raise about adopting an ed-tech tool are:
+
+| Objection | Standard tool answer | This app's answer |
+|---|---|---|
+| "Is leerlingdata veilig?" | "We are GDPR-compliant, data stored on our EU servers" | **"Alle data blijft in de browser. Er gaat niets naar een server. Letterlijk niets."** |
+| "Heeft het een verwerkersovereenkomst nodig?" | "Yes, here's our 12-page DPA" | **"Nee. Geen server = geen verwerker = geen AVG-verplichting voor de school."** |
+| "Wat kost het qua IT?" | "Please submit an IT security review request" | **"Niets. Het is een website. Geen installatie, geen account, geen app store."** |
+
+This is the strongest sales pitch possible for a Dutch school. Put it front and center on the `/pricing` page:
+
+> **Geen AVG-gedoe. Geen IT-aanvraag. Geen installatie.**
+> Alle data blijft in de browser van de docent.
+
+#### The "shareable one-pager"
+
+Create a single-page PDF that teachers can forward to their department head or ICT-coördinator. Auto-generated from a Markdown template in the repo, built by GitHub Actions on every release:
+
+```
+Wat is het?          — 2 sentences
+Hoe werkt het?       — 3 bullet points
+Privacy & AVG        — "geen server, geen persoonsgegevens buiten het apparaat"
+Wat kost het?        — free / School Plan pricing
+Wie gebruikt het?    — [testimonial slot]
+Hoe beginnen?        — URL + QR code
+```
+
+**Automation**: GitHub Actions runs `pandoc one-pager.md → one-pager.pdf` on every release tag and attaches it to the GitHub Release. Teachers always link to the latest version.
+
+---
+
+### 11.5 Referral Mechanics
+
+Word of mouth is the dominant channel for teacher tools. Make it structural:
+
+**In-app**: after a successful Results export, show a one-time nudge:
+
+> "Tevreden? Deel dit met een collega →"
+> `[Kopieer link]` `[Stuur email]`
+
+**For School Plan customers**: include in the welcome email:
+
+> "Ken je een collega-school die ook aan de slag wil? Stuur hen deze link. Als zij een schoollicentie nemen, krijg jij de volgende jaarverlenging gratis."
+
+LemonSqueezy has a built-in affiliate/referral system — enable it for School Plan holders. Zero setup beyond turning it on. Payouts are automatic.
+
+---
+
+### 11.6 International Rollout Sequence
+
+Don't launch all languages simultaneously. Sequence for maximum impact:
+
+1. **Dutch (existing)**: focus on Kennisnet listing + teacher training institutes + 1 conference talk
+2. **English**: ProductHunt + HN + ResearchEd UK (annual conference, ideal audience) + TES forums
+3. **French**: reach out to Belgian Flemish-to-French crossover contacts; post in "Enseignants de français" Facebook groups; submit to French equivalent of Kennisnet (Éduthèque, Canopé)
+4. **German**: submit to [Schul-Cloud Brandenburg](https://schul-cloud.org/) directory; post in "Deutschlehrer" communities; ZfL (Zentrum für Lehrerinnenbildung) contacts at German universities
+
+For each new language: the only manual work is 2–3 hours of outreach. Everything else (translation, deploy, billing) is automated by then.
+
+---
+
+### 11.7 Success Metrics
+
+Track these monthly in Plausible + LemonSqueezy dashboard:
+
+| Metric | Target (month 6) | Target (month 12) |
+|---|---|---|
+| Monthly active users | 200 | 800 |
+| Email subscribers | 150 | 600 |
+| School Plan customers | 5 | 25 |
+| Languages with >10 MAU | 1 (NL) | 3 (NL/EN/FR) |
+| GitHub stars | 50 | 150 |
+
+---
+
+### 11.8 Updated Steady-State Workload (with marketing)
+
+| Activity | Time/month |
+|---|---|
+| Review Crowdin PRs | ~1h |
+| Answer support emails | ~1h |
+| Bug fixes | varies |
+| LinkedIn posts (4×) | ~1.5h |
+| Monthly newsletter | ~1h |
+| Check dashboards | 15 min |
+| **Total** | **~5–6h/month** |
+
+The email sequences, referral program, Kennisnet listing, and pricing page all generate leads passively once configured.
