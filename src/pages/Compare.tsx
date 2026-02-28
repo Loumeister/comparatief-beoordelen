@@ -1,5 +1,5 @@
 // src/pages/Compare.tsx
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,18 +7,23 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Info, AlertTriangle, ChevronDown, ChevronRight, Shuffle } from "lucide-react";
+import { ArrowLeft, Info, AlertTriangle, ChevronDown, ChevronRight, Shuffle, ClipboardList, RotateCcw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ToastAction } from "@/components/ui/toast";
 import { HeaderNav } from "@/components/HeaderNav";
 import { TextCard } from "@/components/compare/TextCard";
 import { TextProgressCard } from "@/components/compare/TextProgressCard";
+import { MyJudgementsDialog } from "@/components/compare/MyJudgementsDialog";
 import { useCompareData, useRaterIdentification } from "@/hooks/use-compare-data";
+import { useToast } from "@/hooks/use-toast";
 
 const Compare = () => {
   const navigate = useNavigate();
 
   // Rater identification
   const { raterName, raterId, raterNameInput, setRaterNameInput, showRaterPrompt, handleRaterNameSubmit } = useRaterIdentification();
+
+  const { toast } = useToast();
 
   // Core data + logic
   const {
@@ -33,8 +38,11 @@ const Compare = () => {
     reliabilityAdvice,
     tieRate,
     textProgress,
+    myJudgements,
+    lastJudgementId,
     handleJudgement: rawHandleJudgement,
     saveManualJudgement,
+    undoLastJudgement,
     loadData,
   } = useCompareData(raterId, raterName);
 
@@ -49,6 +57,31 @@ const Compare = () => {
   const [manualTextBId, setManualTextBId] = useState<string>("");
   const [manualActive, setManualActive] = useState(false);
 
+  // Revision state (PLAN-19)
+  const [supersedesId, setSupersedesId] = useState<number | undefined>();
+  const [myJudgementsOpen, setMyJudgementsOpen] = useState(false);
+
+  // Undo timer ref
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Show undo toast after judgement (PLAN-19)
+  const showUndoToast = useCallback((judgementId: number) => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    const { dismiss } = toast({
+      title: "Oordeel opgeslagen",
+      action: (
+        <ToastAction altText="Ongedaan maken" onClick={() => {
+          if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+          void undoLastJudgement(judgementId);
+        }}>
+          Ongedaan maken
+        </ToastAction>
+      ),
+      duration: 5000,
+    });
+    undoTimerRef.current = setTimeout(() => { dismiss(); undoTimerRef.current = null; }, 5000);
+  }, [toast, undoLastJudgement]);
+
   // Wrap handleJudgement to include local comment state
   const handleJudgement = useCallback(
     async (winner: "A" | "B" | "EQUAL") => {
@@ -59,6 +92,11 @@ const Compare = () => {
     },
     [rawHandleJudgement, commentLeft, commentRight, isFinal],
   );
+
+  // Show undo toast when a new judgement is saved
+  useEffect(() => {
+    if (lastJudgementId) showUndoToast(lastJudgementId);
+  }, [lastJudgementId, showUndoToast]);
 
   // Handle manual pair judgement
   const handleManualJudgement = useCallback(
@@ -79,15 +117,16 @@ const Compare = () => {
       const commentA = leftIsA ? commentLeft.trim() : commentRight.trim();
       const commentB = leftIsA ? commentRight.trim() : commentLeft.trim();
 
-      await saveManualJudgement(aId, bId, winner, commentA, commentB, isFinal);
+      await saveManualJudgement(aId, bId, winner, commentA, commentB, isFinal, supersedesId);
       setCommentLeft("");
       setCommentRight("");
       setIsFinal(false);
       setManualActive(false);
       setManualTextAId("");
       setManualTextBId("");
+      setSupersedesId(undefined);
     },
-    [manualTextAId, manualTextBId, allTexts, commentLeft, commentRight, isFinal, saveManualJudgement],
+    [manualTextAId, manualTextBId, allTexts, commentLeft, commentRight, isFinal, saveManualJudgement, supersedesId],
   );
 
   // Keyboard shortcuts
@@ -228,7 +267,15 @@ const Compare = () => {
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Terug
               </Button>
-              <HeaderNav />
+              <div className="flex items-center gap-2">
+                {myJudgements.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={() => setMyJudgementsOpen(true)}>
+                    <ClipboardList className="w-4 h-4 mr-1" />
+                    Mijn oordelen ({myJudgements.length})
+                  </Button>
+                )}
+                <HeaderNav />
+              </div>
             </div>
             <h1 className="text-2xl font-bold">{assignment?.title}</h1>
           </div>
@@ -259,6 +306,21 @@ const Compare = () => {
           </Card>
           <div className="mt-6">{manualPairSelector}</div>
         </div>
+
+        {/* My Judgements dialog (PLAN-19) */}
+        <MyJudgementsDialog
+          open={myJudgementsOpen}
+          onOpenChange={setMyJudgementsOpen}
+          judgements={myJudgements}
+          allTexts={allTexts}
+          onRevise={(textAId, textBId, oldJudgementId) => {
+            setManualTextAId(String(textAId));
+            setManualTextBId(String(textBId));
+            setSupersedesId(oldJudgementId);
+            setManualActive(true);
+            setManualOpen(false);
+          }}
+        />
       </div>
     );
   }
@@ -304,7 +366,15 @@ const Compare = () => {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Terug
             </Button>
-            <HeaderNav />
+            <div className="flex items-center gap-2">
+              {myJudgements.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => setMyJudgementsOpen(true)}>
+                  <ClipboardList className="w-4 h-4 mr-1" />
+                  Mijn oordelen ({myJudgements.length})
+                </Button>
+              )}
+              <HeaderNav />
+            </div>
           </div>
           <div className="mb-2">
             <h1 className="text-2xl font-bold">{assignment?.title}</h1>
@@ -363,20 +433,22 @@ const Compare = () => {
         {/* Per-text progress (PLAN-10) */}
         {textProgress.length > 0 && !isManualPair && <TextProgressCard items={textProgress} />}
 
-        {/* Manual pair indicator */}
+        {/* Manual pair / revision indicator */}
         {isManualPair && (
-          <Alert className="mb-6 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-            <Shuffle className="h-4 w-4" />
+          <Alert className={`mb-6 ${supersedesId ? "bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800" : "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800"}`}>
+            {supersedesId ? <RotateCcw className="h-4 w-4" /> : <Shuffle className="h-4 w-4" />}
             <AlertDescription className="ml-2 flex items-center justify-between">
               <span className="text-sm">
-                Je vergelijkt nu een <strong>zelf gekozen paar</strong>. Het oordeel telt gewoon mee.
+                {supersedesId
+                  ? <>Je <strong>herziet</strong> een eerder oordeel. Het nieuwe oordeel vervangt het oude.</>
+                  : <>Je vergelijkt nu een <strong>zelf gekozen paar</strong>. Het oordeel telt gewoon mee.</>}
               </span>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setManualActive(false); setManualTextAId(""); setManualTextBId(""); }}
+                onClick={() => { setManualActive(false); setManualTextAId(""); setManualTextBId(""); setSupersedesId(undefined); }}
               >
-                Terug naar suggesties
+                Annuleren
               </Button>
             </AlertDescription>
           </Alert>
@@ -467,6 +539,21 @@ const Compare = () => {
           <TextCard text={rightText} colorClass="bg-secondary/10 text-secondary-foreground" />
         </div>
       </div>
+
+      {/* My Judgements dialog (PLAN-19) */}
+      <MyJudgementsDialog
+        open={myJudgementsOpen}
+        onOpenChange={setMyJudgementsOpen}
+        judgements={myJudgements}
+        allTexts={allTexts}
+        onRevise={(textAId, textBId, oldJudgementId) => {
+          setManualTextAId(String(textAId));
+          setManualTextBId(String(textBId));
+          setSupersedesId(oldJudgementId);
+          setManualActive(true);
+          setManualOpen(false);
+        }}
+      />
     </div>
   );
 };

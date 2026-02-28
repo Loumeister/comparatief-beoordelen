@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { db, Assignment, AssignmentMeta, Text } from "@/lib/db";
+import { db, Assignment, AssignmentMeta, Text, Judgement } from "@/lib/db";
 import { generatePairs } from "@/lib/pairing";
 import { calculateBradleyTerry } from "@/lib/bradley-terry";
 import { getEffectiveJudgements } from "@/lib/effective-judgements";
@@ -142,6 +142,8 @@ export function useCompareData(raterId: string, raterName: string) {
     se: number;
     status: 'reliable' | 'almost' | 'needsWork';
   }>>([]);
+  const [myJudgements, setMyJudgements] = useState<Judgement[]>([]);
+  const [lastJudgementId, setLastJudgementId] = useState<number | null>(null);
 
   // Shared logic for loading BT maps, reliability, tie rate, and generating pairs
   const loadPairsFromBT = useCallback(async (id: number, assign: Assignment) => {
@@ -179,12 +181,25 @@ export function useCompareData(raterId: string, raterName: string) {
       }).sort((a, b) => b.se - a.se) // worst first
     );
 
-    // Tie rate for current rater (PLAN-9)
-    const myJudgements = all.filter(j => j.raterId === raterId);
-    if (myJudgements.length >= 5) {
-      const ties = myJudgements.filter(j => j.winner === 'EQUAL').length;
-      setTieRate(ties / myJudgements.length);
+    // My judgements for review dialog + tie rate (PLAN-9, PLAN-19)
+    const myRaterJudgements = all.filter(j => j.raterId === raterId);
+    if (myRaterJudgements.length >= 5) {
+      const ties = myRaterJudgements.filter(j => j.winner === 'EQUAL').length;
+      setTieRate(ties / myRaterJudgements.length);
     }
+
+    // Deduplicate per pair, keeping newest (for review dialog)
+    const myEffective = new Map<string, Judgement>();
+    for (const j of myRaterJudgements) {
+      const pk = j.pairKey ?? pairKey(j.textAId, j.textBId);
+      const prev = myEffective.get(pk);
+      if (!prev || j.createdAt > prev.createdAt) {
+        myEffective.set(pk, j);
+      }
+    }
+    setMyJudgements(
+      Array.from(myEffective.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    );
 
     const newPairs = generatePairsWithFallback(texts, judgements, targetPerText, batch, { theta, se }, judgedPairsCounts);
     setPairs(newPairs);
@@ -264,20 +279,31 @@ export function useCompareData(raterId: string, raterName: string) {
         const commentA = leftIsA ? commentLeft.trim() : commentRight.trim();
         const commentB = leftIsA ? commentRight.trim() : commentLeft.trim();
 
-        await db.judgements.add({
+        const now = new Date();
+        const newId = await db.judgements.add({
           assignmentId: assignment.id!,
           textAId: pair.textA.id!,
           textBId: pair.textB.id!,
           winner,
           commentA: commentA || undefined,
           commentB: commentB || undefined,
-          createdAt: new Date(),
+          createdAt: now,
           raterId,
           raterName: raterName || undefined,
           source: "human",
           isFinal: assignmentMeta.judgementMode === "moderate" ? isFinal : false,
           pairKey: pk,
         });
+
+        setLastJudgementId(newId as number);
+
+        // Update myJudgements inline (PLAN-19)
+        setMyJudgements(prev => [{
+          id: newId as number, assignmentId: assignment.id!, textAId: pair.textA.id!,
+          textBId: pair.textB.id!, winner, commentA: commentA || undefined,
+          commentB: commentB || undefined, createdAt: now, raterId,
+          raterName: raterName || undefined, source: "human" as const, pairKey: pk,
+        }, ...prev.filter(j => j.pairKey !== pk)]);
 
         setTotalJudgements((prev) => prev + 1);
 
@@ -319,27 +345,31 @@ export function useCompareData(raterId: string, raterName: string) {
       commentA: string,
       commentB: string,
       isFinal: boolean,
+      supersedesJudgementId?: number,
     ) => {
       if (!assignment || !assignmentMeta || saving) return;
       try {
         setSaving(true);
         const pk = pairKey(textAId, textBId);
 
-        await db.judgements.add({
+        const now = new Date();
+        const newId = await db.judgements.add({
           assignmentId: assignment.id!,
           textAId,
           textBId,
           winner,
           commentA: commentA.trim() || undefined,
           commentB: commentB.trim() || undefined,
-          createdAt: new Date(),
+          createdAt: now,
           raterId,
           raterName: raterName || undefined,
           source: "human",
           isFinal: assignmentMeta.judgementMode === "moderate" ? isFinal : false,
           pairKey: pk,
+          supersedesJudgementId: supersedesJudgementId || undefined,
         });
 
+        setLastJudgementId(newId as number);
         setTotalJudgements((prev) => prev + 1);
         await reloadPairs();
       } catch (error) {
@@ -351,6 +381,19 @@ export function useCompareData(raterId: string, raterName: string) {
     },
     [assignment, assignmentMeta, saving, reloadPairs, toast, raterId, raterName],
   );
+
+  // Undo last judgement (PLAN-19)
+  const undoLastJudgement = useCallback(async (judgementId: number) => {
+    try {
+      await db.judgements.delete(judgementId);
+      setLastJudgementId(null);
+      setTotalJudgements(prev => Math.max(0, prev - 1));
+      await reloadPairs();
+    } catch (error) {
+      console.error("Undo error:", error);
+      toast({ title: "Fout bij ongedaan maken", variant: "destructive" });
+    }
+  }, [reloadPairs, toast]);
 
   return {
     assignment,
@@ -364,8 +407,11 @@ export function useCompareData(raterId: string, raterName: string) {
     reliabilityAdvice,
     tieRate,
     textProgress,
+    myJudgements,
+    lastJudgementId,
     handleJudgement,
     saveManualJudgement,
+    undoLastJudgement,
     loadData,
   };
 }
