@@ -331,6 +331,92 @@ The following plans from the original roadmap have been **fully implemented** an
 
 ---
 
+## Pending UI/UX Improvements
+
+These features have been approved for implementation. Each is small-to-medium scope, requires no new libraries, and no server dependency.
+
+---
+
+### UI-1: Grade Distribution Histogram
+
+**Location**: `src/pages/Results.tsx` (above or below `ReliabilityCard`)
+**What**: A horizontal bar chart showing the distribution of grades across the cohort. Each bar represents a grade band (e.g. 4–5, 5–6, 6–7, 7–8, 8–9, 9–10), with bar width proportional to the number of students in that band and a count label.
+**How**: Pure CSS/Tailwind — no chart library. Compute band counts from the `results` array. Display only when anchored or norm-referenced grades are available (i.e. `gradedResults` exists).
+**Dutch label**: "Verdeling cijfers"
+
+---
+
+### UI-2: Student Name Search / Filter in Results Table
+
+**Location**: `src/components/results/ResultsTable.tsx`
+**What**: A text `<input>` above the results table that filters rows by `anonymizedName` (case-insensitive, partial match). Show a match count: "X van Y leerlingen". Clears on empty input.
+**How**: Add a `filterQuery` state variable. Apply `.filter()` before the existing sort logic. The input should be a plain shadcn-ui `<Input>` with a search icon.
+**Dutch label**: "Zoek leerling…" (placeholder)
+
+---
+
+### UI-3: Grade Rounding Toggle
+
+**Location**: `src/components/GradingSettingsDialog.tsx` + `src/lib/db.ts` + `src/hooks/use-results-data.ts`
+**What**: Add an "Afronden op" segmented control in `GradingSettingsDialog` with three options: `0.1` (default, current behavior) / `0.5` / `1`. Stored on `assignmentMeta` as a new optional field `gradeRounding?: 0.1 | 0.5 | 1`. Applied when computing displayed grades in `use-results-data.ts`.
+**How**: Schema stays at v9 — `gradeRounding` fits within the existing `assignmentMeta` object (no new table column needed since it's a JS-level field read via Dexie). Apply rounding via `Math.round(grade / step) * step` before display.
+**Dutch label**: "Afronden op: 0,1 / 0,5 / 1"
+
+---
+
+### UI-4: Assignment Duplication
+
+**Location**: `src/pages/Dashboard.tsx` + `src/hooks/use-dashboard-data.ts` + `src/components/dashboard/AssignmentCard.tsx`
+**What**: A "Kopieer opdracht" button (or icon button) on each `AssignmentCard`. Creates a new assignment with the same `title + " (kopie)"` and copies all `texts` records (content, contentHtml, originalFilename, anonymizedName). No judgements, scores, or meta are copied.
+**How**: Single `db.transaction('rw', ...)` in `use-dashboard-data.ts`: insert new assignment, bulk-insert cloned texts. Show a toast confirmation. Button placed next to the existing delete button to avoid clutter.
+**Dutch label**: "Kopieer opdracht"
+
+---
+
+### UI-5: Assignment Search / Filter on Dashboard
+
+**Location**: `src/pages/Dashboard.tsx`
+**What**: A text `<Input>` above the assignment grid, filtering by assignment title (case-insensitive, partial match). Show count: "X opdrachten". Appears only when there are ≥4 assignments (below that threshold, a filter adds more noise than value).
+**How**: `filterQuery` state, `.filter()` on the `assignments` array before rendering. Clear button (×) when non-empty. No routing change — client-side only.
+**Dutch label**: "Zoek opdracht…" (placeholder)
+
+---
+
+### UI-6: "Snel Starten" — Prominent Continue Button
+
+**Location**: `src/components/dashboard/AssignmentCard.tsx`
+**What**: When an assignment has ≥1 judgements AND is not yet reliable (median SE still above threshold), visually distinguish the "Vergelijk" button as the primary call-to-action with a "Ga verder →" label. When not yet started (0 judgements), show "Vergelijk". When reliable, the existing "Bekijk resultaten" button takes precedence.
+**How**: Pass `isInProgress` prop (computed from `stats.judgements > 0 && !stats.isReliable`) to `AssignmentCard`. Conditionally set button variant and label. No layout changes.
+**Dutch labels**: "Ga verder →" (in-progress) / "Vergelijk" (not started)
+
+---
+
+### UI-7: Print Stylesheet
+
+**Location**: `src/index.css`
+**What**: Add `@media print` CSS rules that produce a clean printed Results page. Hide: `HeaderNav`, all action/export buttons, `ReliabilityCard` controls, collapsible section toggles, the "Toon achtergrondscores" toggle. Show: results table, reliability status text, grade settings summary. Ensure table borders print, avoid page breaks mid-row.
+**How**: Pure CSS in `src/index.css`. Add `.no-print` utility class applied to elements that should be hidden on print, plus direct `@media print` overrides for table styling.
+**Dutch note**: No visible UI changes — print triggered by browser Ctrl+P / Cmd+P
+
+---
+
+### UI-8: Fullscreen Text Reader
+
+**Location**: `src/components/compare/TextCard.tsx`
+**What**: A small `Maximize2` icon button (lucide, already a dependency) in the top-right corner of each `TextCard`. Clicking it opens a full-screen `<Dialog>` showing the complete text with comfortable reading width and line height. Supports plain text, `contentHtml`, and shows "Fysiek exemplaar" for paper-only texts.
+**How**: Add local `isOpen` state + `Dialog` using the existing shadcn-ui `Dialog` component. No new dependencies. Dialog shows the student name (anonymized), full text content, and a close button.
+**Dutch label**: Tooltip on expand icon: "Tekst volledig lezen"
+
+---
+
+### UI-9: Keyboard Shortcut "E" for Gelijkwaardig
+
+**Location**: `src/pages/Compare.tsx`
+**What**: Add `e` / `E` as an additional keyboard alias for the existing `T` / `t` shortcut that submits a tie ("Gelijkwaardig"). Update shortcut hint text in the UI from `[T]` to `[T / E]`.
+**How**: In the existing `handleKeyPress` `useEffect` (around line 143), add `|| e.key === "e" || e.key === "E"` to the `t`/`T` condition. Update the shortcut badge display string. `T` remains supported.
+
+---
+
 ## Competitive Landscape
 
 This section maps features from professional CJ platforms to identify what we have, what we lack, and what's worth building. The goal is **not** to replicate enterprise SaaS — we stay local-first and simple — but to cherry-pick the high-impact features that teachers actually benefit from.
