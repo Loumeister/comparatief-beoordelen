@@ -337,21 +337,17 @@ These features have been approved for implementation. Each is small-to-medium sc
 
 ---
 
-### UI-1: Grade Distribution Histogram
+### UI-1: Grade Distribution Histogram — IMPLEMENTED
 
-**Location**: `src/pages/Results.tsx` (above or below `ReliabilityCard`)
-**What**: A horizontal bar chart showing the distribution of grades across the cohort. Each bar represents a grade band (e.g. 4–5, 5–6, 6–7, 7–8, 8–9, 9–10), with bar width proportional to the number of students in that band and a count label.
-**How**: Pure CSS/Tailwind — no chart library. Compute band counts from the `results` array. Display only when anchored or norm-referenced grades are available (i.e. `gradedResults` exists).
-**Dutch label**: "Verdeling cijfers"
+**Location**: `src/components/results/GradeHistogram.tsx` (used in `src/pages/Results.tsx`)
+Vertical bar chart per whole-number grade band. Uses `anchoredGrade ?? grade`. Pure CSS/Tailwind, no chart library. Shows average and labels which grade type is displayed. Hidden when fewer than 3 students.
 
 ---
 
-### UI-2: Student Name Search / Filter in Results Table
+### UI-2: Student Name Search / Filter in Results Table — IMPLEMENTED
 
 **Location**: `src/components/results/ResultsTable.tsx`
-**What**: A text `<input>` above the results table that filters rows by `anonymizedName` (case-insensitive, partial match). Show a match count: "X van Y leerlingen". Clears on empty input.
-**How**: Add a `filterQuery` state variable. Apply `.filter()` before the existing sort logic. The input should be a plain shadcn-ui `<Input>` with a search icon.
-**Dutch label**: "Zoek leerling…" (placeholder)
+Search input above the results table with `Search` icon. Filters by `anonymizedName`, shows "X van Y leerlingen" count when active.
 
 ---
 
@@ -364,30 +360,24 @@ These features have been approved for implementation. Each is small-to-medium sc
 
 ---
 
-### UI-4: Assignment Duplication
+### UI-4: Assignment Duplication — IMPLEMENTED
 
-**Location**: `src/pages/Dashboard.tsx` + `src/hooks/use-dashboard-data.ts` + `src/components/dashboard/AssignmentCard.tsx`
-**What**: A "Kopieer opdracht" button (or icon button) on each `AssignmentCard`. Creates a new assignment with the same `title + " (kopie)"` and copies all `texts` records (content, contentHtml, originalFilename, anonymizedName). No judgements, scores, or meta are copied.
-**How**: Single `db.transaction('rw', ...)` in `use-dashboard-data.ts`: insert new assignment, bulk-insert cloned texts. Show a toast confirmation. Button placed next to the existing delete button to avoid clutter.
-**Dutch label**: "Kopieer opdracht"
+**Location**: `src/hooks/use-dashboard-data.ts` + `src/components/dashboard/AssignmentCard.tsx`
+`Copy` icon button in card header (next to edit/delete). `handleDuplicate` in hook clones assignment + all texts in one transaction. Toast confirmation. No judgements/meta copied.
 
 ---
 
-### UI-5: Assignment Search / Filter on Dashboard
+### UI-5: Assignment Search / Filter on Dashboard — IMPLEMENTED
 
 **Location**: `src/pages/Dashboard.tsx`
-**What**: A text `<Input>` above the assignment grid, filtering by assignment title (case-insensitive, partial match). Show count: "X opdrachten". Appears only when there are ≥4 assignments (below that threshold, a filter adds more noise than value).
-**How**: `filterQuery` state, `.filter()` on the `assignments` array before rendering. Clear button (×) when non-empty. No routing change — client-side only.
-**Dutch label**: "Zoek opdracht…" (placeholder)
+Search input appears in the header row when ≥4 assignments exist. Filters by title with clear (×) button.
 
 ---
 
-### UI-6: "Snel Starten" — Prominent Continue Button
+### UI-6: "Snel Starten" — Prominent Continue Button — IMPLEMENTED
 
 **Location**: `src/components/dashboard/AssignmentCard.tsx`
-**What**: When an assignment has ≥1 judgements AND is not yet reliable (median SE still above threshold), visually distinguish the "Vergelijk" button as the primary call-to-action with a "Ga verder →" label. When not yet started (0 judgements), show "Vergelijk". When reliable, the existing "Bekijk resultaten" button takes precedence.
-**How**: Pass `isInProgress` prop (computed from `stats.judgements > 0 && !stats.isReliable`) to `AssignmentCard`. Conditionally set button variant and label. No layout changes.
-**Dutch labels**: "Ga verder →" (in-progress) / "Vergelijk" (not started)
+Button shows "Ga verder →" when `stats.judgements > 0 && stats.reliabilityPct < 100`, "Vergelijk" when not yet started.
 
 ---
 
@@ -409,11 +399,10 @@ These features have been approved for implementation. Each is small-to-medium sc
 
 ---
 
-### UI-9: Keyboard Shortcut "E" for Gelijkwaardig
+### UI-9: Keyboard Shortcut "E" for Gelijkwaardig — IMPLEMENTED
 
 **Location**: `src/pages/Compare.tsx`
-**What**: Add `e` / `E` as an additional keyboard alias for the existing `T` / `t` shortcut that submits a tie ("Gelijkwaardig"). Update shortcut hint text in the UI from `[T]` to `[T / E]`.
-**How**: In the existing `handleKeyPress` `useEffect` (around line 143), add `|| e.key === "e" || e.key === "E"` to the `t`/`T` condition. Update the shortcut badge display string. `T` remains supported.
+`E`/`e` added as alias for `T`/`t`. UI updated: button shows "Sneltoets: T / E", guidance text says "(sneltoets T of E)".
 
 ---
 

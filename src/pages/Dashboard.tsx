@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, Upload, BookOpen } from 'lucide-react';
+import { Plus, FileText, Upload, BookOpen, Search, X } from 'lucide-react';
 import { Assignment } from '@/lib/db';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -26,8 +26,12 @@ const Dashboard = () => {
     handleEdit: saveEdit,
     handleExport,
     handleDelete,
+    handleDuplicate,
     handleImport,
   } = useDashboardData();
+
+  // Assignment filter state
+  const [assignmentFilter, setAssignmentFilter] = useState('');
 
   // Edit dialog state
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
@@ -105,15 +109,39 @@ const Dashboard = () => {
           </Card>
         ) : (
           <div>
-            <h2 className="text-2xl font-bold mb-6">Je beoordelingen</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Je beoordelingen</h2>
+              {assignments.length >= 4 && (
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Zoek opdracht…"
+                    value={assignmentFilter}
+                    onChange={(e) => setAssignmentFilter(e.target.value)}
+                    className="pl-8 h-9 w-56"
+                  />
+                  {assignmentFilter && (
+                    <button
+                      onClick={() => setAssignmentFilter('')}
+                      className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="grid gap-4">
-              {assignments.map((assignment) => (
+              {assignments
+                .filter(a => !assignmentFilter.trim() || a.title.toLowerCase().includes(assignmentFilter.trim().toLowerCase()))
+                .map((assignment) => (
                 <AssignmentCard
                   key={assignment.id}
                   assignment={assignment}
                   stats={stats.get(assignment.id!) || { texts: 0, judgements: 0, reliabilityPct: 0, raterCount: 0 }}
                   onEdit={handleEditClick}
                   onDelete={handleDelete}
+                  onDuplicate={handleDuplicate}
                   onExport={handleExport}
                   onManageStudents={(id, title) => setManagingStudents({ id, title })}
                   onManageGrading={(id, title) => setManagingGrading({ id, title })}

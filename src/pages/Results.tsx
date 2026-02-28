@@ -15,6 +15,7 @@ import { AnchorInfoCard } from "@/components/results/AnchorInfoCard";
 import { ResultsTable } from "@/components/results/ResultsTable";
 import { AnchorDialog } from "@/components/results/AnchorDialog";
 import { FeedbackDialog } from "@/components/results/FeedbackDialog";
+import { GradeHistogram } from "@/components/results/GradeHistogram";
 
 const Results = () => {
   const navigate = useNavigate();
@@ -136,6 +137,8 @@ const Results = () => {
         {raterAnalysis && <DisagreementsCard raterAnalysis={raterAnalysis} />}
 
         <AnchorInfoCard anchors={anchors} onClearAll={clearAllAnchors} />
+
+        <GradeHistogram results={results} />
 
         <ResultsTable
           results={results}

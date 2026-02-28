@@ -140,7 +140,7 @@ const Compare = () => {
         void handler("A");
       } else if (e.key === "b" || e.key === "B") {
         void handler("B");
-      } else if (e.key === "t" || e.key === "T") {
+      } else if (e.key === "t" || e.key === "T" || e.key === "e" || e.key === "E") {
         void handler("EQUAL");
       }
     };
@@ -461,7 +461,7 @@ const Compare = () => {
           <CardContent className="p-6">
             <p className="text-lg font-medium mb-2">Welke tekst is beter?</p>
             <p className="text-sm text-muted-foreground mb-4">
-              Kies de <strong>betere</strong> tekst, ook als het verschil klein is. Alleen <em>Gelijkwaardig</em> (sneltoets T) als ze echt even goed zijn.
+              Kies de <strong>betere</strong> tekst, ook als het verschil klein is. Alleen <em>Gelijkwaardig</em> (sneltoets T of E) als ze echt even goed zijn.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
@@ -486,7 +486,7 @@ const Compare = () => {
               >
                 <div>
                   <div className="font-bold">Gelijkwaardig</div>
-                  <div className="text-xs opacity-80 hidden sm:block">Sneltoets: T</div>
+                  <div className="text-xs opacity-80 hidden sm:block">Sneltoets: T / E</div>
                 </div>
               </Button>
 

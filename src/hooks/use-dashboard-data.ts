@@ -77,6 +77,38 @@ export function useDashboardData() {
     }
   }, [toast]);
 
+  const handleDuplicate = useCallback(async (id: number, title: string) => {
+    try {
+      const original = await db.assignments.get(id);
+      const texts = await db.texts.where('assignmentId').equals(id).toArray();
+      const newId = await db.transaction('rw', db.assignments, db.texts, async () => {
+        const assignmentId = await db.assignments.add({
+          title: `${title} (kopie)`,
+          genre: original?.genre ?? '',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        for (const text of texts) {
+          await db.texts.add({
+            assignmentId: assignmentId as number,
+            content: text.content,
+            contentHtml: text.contentHtml,
+            originalFilename: text.originalFilename,
+            anonymizedName: text.anonymizedName,
+            createdAt: new Date(),
+          });
+        }
+        return assignmentId;
+      });
+      toast({ title: 'Opdracht gekopieerd', description: `"${title} (kopie)" is aangemaakt met ${texts.length} teksten` });
+      void newId;
+      await loadAssignments();
+    } catch (error) {
+      console.error('Duplicate error:', error);
+      toast({ title: 'Fout bij kopiëren', variant: 'destructive' });
+    }
+  }, [toast, loadAssignments]);
+
   const handleDelete = useCallback(async (id: number, title: string) => {
     if (!confirm(`Weet je zeker dat je "${title}" wilt verwijderen?`)) return;
     try {
@@ -140,6 +172,7 @@ export function useDashboardData() {
     handleEdit,
     handleExport,
     handleDelete,
+    handleDuplicate,
     handleImport,
   };
 }
