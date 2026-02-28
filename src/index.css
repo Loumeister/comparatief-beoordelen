@@ -224,3 +224,41 @@ All colors MUST be HSL.
   color: hsl(var(--muted-foreground));
   font-style: italic;
 }
+
+/* Print stylesheet */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Remove card shadows */
+  * {
+    box-shadow: none !important;
+  }
+
+  /* Ensure table borders print */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  th, td {
+    border: 1px solid #ccc !important;
+    padding: 6px 10px !important;
+  }
+
+  /* Avoid page breaks inside table rows */
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* Keep headings with their content */
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+}

@@ -381,7 +381,7 @@ Button shows "Ga verder →" when `stats.judgements > 0 && stats.reliabilityPct 
 
 ---
 
-### UI-7: Print Stylesheet
+### UI-7: Print Stylesheet — IMPLEMENTED
 
 **Location**: `src/index.css`
 **What**: Add `@media print` CSS rules that produce a clean printed Results page. Hide: `HeaderNav`, all action/export buttons, `ReliabilityCard` controls, collapsible section toggles, the "Toon achtergrondscores" toggle. Show: results table, reliability status text, grade settings summary. Ensure table borders print, avoid page breaks mid-row.

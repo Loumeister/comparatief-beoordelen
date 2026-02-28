@@ -84,7 +84,7 @@ export function ResultsTable({ results, anchors, onSelectStudent, onOpenAnchorDi
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Rangorde</CardTitle>
-        <Button variant="outline" size="sm" onClick={() => setShowDetails(!showDetails)}>
+        <Button variant="outline" size="sm" onClick={() => setShowDetails(!showDetails)} className="no-print">
           {showDetails ? (
             <>
               <EyeOff className="w-4 h-4 mr-2" />
@@ -99,7 +99,7 @@ export function ResultsTable({ results, anchors, onSelectStudent, onOpenAnchorDi
         </Button>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-3 no-print">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
             <Input
@@ -115,7 +115,7 @@ export function ResultsTable({ results, anchors, onSelectStudent, onOpenAnchorDi
             </span>
           )}
         </div>
-        <p className="text-xs text-muted-foreground mb-3">Klik op een kolomkop om te sorteren. Klik op een tekst voor meer details.</p>
+        <p className="text-xs text-muted-foreground mb-3 no-print">Klik op een kolomkop om te sorteren. Klik op een tekst voor meer details.</p>
         <Table>
           <TableHeader>
             <TableRow>
@@ -243,7 +243,7 @@ export function ResultsTable({ results, anchors, onSelectStudent, onOpenAnchorDi
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
-                              className={`p-1 rounded hover:bg-muted transition-colors ${isAnchor ? 'text-primary' : 'text-muted-foreground/40 hover:text-muted-foreground'}`}
+                              className={`p-1 rounded hover:bg-muted transition-colors no-print ${isAnchor ? 'text-primary' : 'text-muted-foreground/40 hover:text-muted-foreground'}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (r.textId != null) onOpenAnchorDialog(r.textId, r.anonymizedName, r.grade);
