@@ -75,7 +75,6 @@ export function AnchorDialog({ open, onOpenChange, target, anchors, gradingConfi
                   size="sm"
                   className="text-destructive hover:text-destructive"
                   onClick={async () => {
-                    if (!confirm(`Verwijder het ijkpunt voor "${target.name}"?`)) return;
                     await onRemove(target.textId);
                     onOpenChange(false);
                   }}
