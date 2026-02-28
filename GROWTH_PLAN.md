@@ -52,39 +52,79 @@ Monetization stays simple: **the app is always free for individuals**. Schools g
 
 ## 4. Business Model
 
-### 4.1 Recommended: Free App + School Support Package
+### 4.1 The Honest Problem
 
-The app remains **100% free and open-source**. Schools pay for:
+Nothing stops a teacher from using the free version forever — and that is intentional. The free version does everything. There is no usage cap, no watermark, no feature lock.
 
-| Tier | Price | What's included | Automated? |
+This means the School Plan cannot be built around features. It has to be built around two other things: **identity** (the school owns a branded version) and **relationship** (someone is accountable, invoices exist, there's a number to call).
+
+### 4.2 Tiers
+
+| Tier | Price | Core value | Automated? |
 |---|---|---|---|
-| **Free** | €0 | Full app, forever | — |
-| **School Plan** | €150–250/year | Invoice (for school admin), onboarding video call (1h), priority email support, licence key for tracking | ~80% automated |
-| **District Plan** | €500–800/year | Everything above × 5 schools, shared results session | ~60% automated |
+| **Free** | €0 | Full app, forever, for any individual teacher | — |
+| **School Plan** | €150–200/year | Hosted URL (`jouwschool.comparatief.app`) + invoice + onboarding call + priority support | ~75% automated |
+| **District Plan** | €450–600/year | Hosted URL × 5 schools + shared coordinator session + invoice | ~60% automated |
 
-**Why this works for a no-server app:**
-- Schools need an invoice. A free tool with no paper trail is hard to "buy" through procurement. A €150 annual fee with an invoice solves this.
-- Most support questions are answered by the in-app ReadMe. Email support costs ~30 min/month once the FAQ covers the top 10 questions.
-- Renewals are fully automated via LemonSqueezy.
+### 4.3 The Real Differentiator: Hosted School URL
 
-### 4.2 What the Licence Key Does
+The free version lives at a generic GitHub Pages URL. The School Plan gives the school their own URL:
 
-The licence key is **symbolic, not technical DRM** — the app is open-source so any school could fork it. The key:
+```
+obs-esdoorn.comparatief.app
+  └── School logo in header
+  └── "Welkom bij OBS De Esdoorn — Vergelijkend Beoordelen"
+  └── Same app, same data (still local), custom identity
+```
+
+This matters for three reasons:
+
+1. **Procurement**: schools can formally adopt "their own tool" with a URL that is clearly theirs, not a random public website
+2. **Trust**: teachers and parents see a school-branded tool, not an anonymous web app
+3. **Stickiness**: a school that has set up their own URL and told 20 teachers about it is not going to cancel
+
+Implementation is lightweight: Cloudflare Workers intercepts requests to `*.comparatief.app`, routes to the same static app, injects the school config (name, logo URL) via a small JSON served per subdomain. No per-school build or deploy. New school = add one entry to a Workers KV store (< 5 min).
+
+### 4.4 The Honest Second Reason: Sponsorship with Receipt
+
+Position the School Plan explicitly as support for the project, not just a product:
+
+> "Dit is een gratis, open-source tool. Scholen die hem intensief gebruiken kunnen de ontwikkeling steunen met een schoollicentie — inclusief factuur voor de boekhouding, een onboardingsgesprek en prioritaire ondersteuning."
+
+This is not a weakness. Many Dutch schools are willing to pay a modest annual fee for a tool they rely on, if:
+- They get a proper invoice (required for school administration)
+- They feel the money goes somewhere meaningful (development of the tool)
+- It is not extortionate
+
+The receipt solves the procurement problem. The relationship solves the accountability concern. There are no fake feature gates.
+
+### 4.5 Long-Term: School Coordinator Feature (PLAN-23, deferred)
+
+Once there is enough traction to justify the dev time, add a "Schooloverzicht" mode: a coordinator imports all teachers' JSON exports and gets aggregated school-wide stats — combined reliability scores, total comparisons, which teachers are active. This would be a genuine school-only feature, not a soft paywall. Pure client-side, no server required.
+
+**Do not build this until B+C have paying customers.** If schools don't pay for the hosted URL + sponsorship model, adding a feature won't fix it.
+
+### 4.6 What the Licence Key Does
+
+The licence key is **symbolic, not technical DRM**. The key:
 - Validates offline via HMAC-SHA256 pattern check (no server call at runtime)
-- Unlocks a small "School Plan" badge in the header (visible to teachers, signals legitimacy)
-- Stores school name in `localStorage` for personalised export headers ("Rapport — Obs De Esdoorn")
+- Activates the school's custom subdomain config
+- Stores school name in `localStorage` for personalised export headers ("Rapport — OBS De Esdoorn")
+- Displays a small verified badge in `HeaderNav.tsx`
 
-This is not a paywall. It is a receipted relationship.
+Any school could fork the repo and self-host. That is fine. The ones paying are paying for convenience, identity, and relationship — not to be locked in.
 
-### 4.3 Revenue Projection
+### 4.7 Revenue Projection (revised)
+
+Conversion from free to paid will be low — realistically 1–3% of active schools. That is the baseline assumption.
 
 | Scenario | Schools | Annual |
 |---|---|---|
-| Conservative | 20 NL + 10 EN | €4,500 |
-| Moderate | 50 NL + 30 EN + 20 FR | €15,000 |
-| Optimistic | 150 schools across 4 languages | €37,500 |
+| Conservative | 15 NL + 5 EN | ~€3,000 |
+| Moderate | 40 NL + 20 EN + 10 FR | ~€10,500 |
+| Optimistic | 100 schools across 4 languages | ~€18,000 |
 
-These numbers are achievable with **zero sales staff** — pure inbound from GitHub, word-of-mouth, and teacher communities.
+These numbers are lower than originally projected — deliberately, to avoid overestimating. The business case is a sustainable side income that keeps the project alive, not a growth-stage startup.
 
 ---
 
