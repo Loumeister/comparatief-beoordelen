@@ -76,7 +76,7 @@ const Results = () => {
               <h1 className="text-4xl font-bold mb-2">{assignment?.title}</h1>
               <p className="text-muted-foreground">Resultaten van vergelijkende beoordeling</p>
             </div>
-            <div className="no-print"><HeaderNav /></div>
+            <HeaderNav className="no-print" />
           </div>
 
           <div className="mt-4 no-print">

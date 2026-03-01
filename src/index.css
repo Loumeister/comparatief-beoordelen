@@ -254,11 +254,13 @@ All colors MUST be HSL.
 
   /* Avoid page breaks inside table rows */
   tr {
-    page-break-inside: avoid;
+    break-inside: avoid;
+    page-break-inside: avoid; /* legacy fallback */
   }
 
   /* Keep headings with their content */
   h1, h2, h3 {
-    page-break-after: avoid;
+    break-after: avoid;
+    page-break-after: avoid; /* legacy fallback */
   }
 }
