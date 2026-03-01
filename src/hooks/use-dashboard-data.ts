@@ -85,6 +85,7 @@ export function useDashboardData() {
         const assignmentId = await db.assignments.add({
           title: `${title} (kopie)`,
           genre: original?.genre ?? '',
+          leerdoel: original?.leerdoel,
           createdAt: new Date(),
           updatedAt: new Date(),
         });

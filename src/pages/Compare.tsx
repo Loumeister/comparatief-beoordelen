@@ -535,6 +535,14 @@ const Compare = () => {
           </CardContent>
         </Card>
 
+        {/* Leerdoel — leidraad voor beoordelaars */}
+        {assignment?.leerdoel && (
+          <div className="rounded-lg border bg-muted/40 px-4 py-3 text-sm">
+            <span className="font-medium">Leerdoel: </span>
+            {assignment.leerdoel}
+          </div>
+        )}
+
         {/* Text cards */}
         <div className="grid md:grid-cols-2 gap-6">
           <TextCard text={leftText} colorClass="bg-primary/10 text-primary" />

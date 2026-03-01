@@ -4,6 +4,7 @@ export interface Assignment {
   id?: number;
   title: string;
   genre: string;
+  leerdoel?: string; // Optioneel leidraad voor beoordelaars
   numComparisons?: number;
   createdAt: Date;
   updatedAt: Date;
