@@ -54,8 +54,14 @@ export function ReliabilityCard({ results, splitHalf }: ReliabilityCardProps) {
       ? "text-primary"
       : "text-destructive";
 
+  const borderClass = reliabilityStatus === 'reliable'
+    ? 'border-l-4 border-l-[hsl(var(--secondary))]'
+    : reliabilityStatus === 'moderate'
+      ? 'border-l-4 border-l-[hsl(var(--primary))]'
+      : 'border-l-4 border-l-[hsl(var(--destructive))]';
+
   return (
-    <Card className="mb-6">
+    <Card className={`mb-6 ${borderClass}`}>
       <CardContent className="p-6">
         <div className="flex items-center gap-3 mb-4">
           <ReliabilityIcon className={`w-5 h-5 ${iconColor}`} />

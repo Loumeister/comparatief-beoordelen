@@ -18,6 +18,7 @@ const Upload = () => {
   const [mode, setMode] = useState<'upload' | 'names'>('upload');
   const [title, setTitle] = useState('');
   const [genre, setGenre] = useState('');
+  const [leerdoel, setLeerdoel] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [namesText, setNamesText] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -79,6 +80,7 @@ const Upload = () => {
       const assignmentId = await db.assignments.add({
         title: title.trim(),
         genre: genre.trim() || 'Algemeen',
+        leerdoel: leerdoel.trim() || undefined,
         createdAt: new Date(),
         updatedAt: new Date()
       });
@@ -177,6 +179,22 @@ const Upload = () => {
                   onChange={(e) => setGenre(e.target.value)}
                   placeholder="bijv. Betoog, Verslag, Verhaal"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="leerdoel">
+                  Leerdoel <span className="text-muted-foreground font-normal text-sm">(optioneel)</span>
+                </Label>
+                <Textarea
+                  id="leerdoel"
+                  value={leerdoel}
+                  onChange={(e) => setLeerdoel(e.target.value)}
+                  placeholder="Bijv. 'Let op de opbouw en samenhang van de argumenten'"
+                  rows={2}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Beoordelaars zien dit als leidraad tijdens het vergelijken.
+                </p>
               </div>
             </CardContent>
           </Card>

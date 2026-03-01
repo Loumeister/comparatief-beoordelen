@@ -2,7 +2,7 @@ import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 
-export const HeaderNav = () => {
+export const HeaderNav = ({ className }: { className?: string }) => {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export const HeaderNav = () => {
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={`flex items-center gap-2${className ? ` ${className}` : ''}`}>
       <Button
         variant="outline"
         size="icon"

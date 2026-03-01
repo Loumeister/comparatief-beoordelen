@@ -3,9 +3,10 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Eye, EyeOff, Anchor, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, HelpCircle } from "lucide-react";
+import { Eye, EyeOff, Anchor, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, HelpCircle, Search } from "lucide-react";
 import { ExportData } from "@/lib/export";
 import type { Anchor as AnchorType } from "@/lib/db";
 
@@ -46,6 +47,7 @@ export function ResultsTable({ results, anchors, onSelectStudent, onOpenAnchorDi
   const [showDetails, setShowDetails] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>('rank');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [filterQuery, setFilterQuery] = useState('');
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -63,7 +65,11 @@ export function ResultsTable({ results, anchors, onSelectStudent, onOpenAnchorDi
       : <ArrowDown className="w-4 h-4 ml-1 inline" />;
   };
 
-  const sortedResults = [...results].sort((a, b) => {
+  const filteredResults = filterQuery.trim()
+    ? results.filter(r => r.anonymizedName.toLowerCase().includes(filterQuery.trim().toLowerCase()))
+    : results;
+
+  const sortedResults = [...filteredResults].sort((a, b) => {
     if (sortColumn === 'name') {
       const comparison = a.anonymizedName.localeCompare(b.anonymizedName, 'nl');
       return sortDirection === 'asc' ? comparison : -comparison;
@@ -78,7 +84,7 @@ export function ResultsTable({ results, anchors, onSelectStudent, onOpenAnchorDi
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Rangorde</CardTitle>
-        <Button variant="outline" size="sm" onClick={() => setShowDetails(!showDetails)}>
+        <Button variant="outline" size="sm" onClick={() => setShowDetails(!showDetails)} className="no-print">
           {showDetails ? (
             <>
               <EyeOff className="w-4 h-4 mr-2" />
@@ -93,7 +99,23 @@ export function ResultsTable({ results, anchors, onSelectStudent, onOpenAnchorDi
         </Button>
       </CardHeader>
       <CardContent>
-        <p className="text-xs text-muted-foreground mb-3">Klik op een kolomkop om te sorteren. Klik op een tekst voor meer details.</p>
+        <div className="flex items-center gap-2 mb-3 no-print">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Zoek leerling…"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              className="pl-8 h-9"
+            />
+          </div>
+          {filterQuery.trim() && (
+            <span className="text-xs text-muted-foreground">
+              {sortedResults.length} van {results.length} leerlingen
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mb-3 no-print">Klik op een kolomkop om te sorteren. Klik op een tekst voor meer details.</p>
         <Table>
           <TableHeader>
             <TableRow>
@@ -221,7 +243,7 @@ export function ResultsTable({ results, anchors, onSelectStudent, onOpenAnchorDi
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
-                              className={`p-1 rounded hover:bg-muted transition-colors ${isAnchor ? 'text-primary' : 'text-muted-foreground/40 hover:text-muted-foreground'}`}
+                              className={`p-1 rounded hover:bg-muted transition-colors no-print ${isAnchor ? 'text-primary' : 'text-muted-foreground/40 hover:text-muted-foreground'}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (r.textId != null) onOpenAnchorDialog(r.textId, r.anonymizedName, r.grade);

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, Upload, BookOpen } from 'lucide-react';
+import { Plus, FileText, Upload, BookOpen, Search, X } from 'lucide-react';
 import { Assignment } from '@/lib/db';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -26,8 +26,12 @@ const Dashboard = () => {
     handleEdit: saveEdit,
     handleExport,
     handleDelete,
+    handleDuplicate,
     handleImport,
   } = useDashboardData();
+
+  // Assignment filter state
+  const [assignmentFilter, setAssignmentFilter] = useState('');
 
   // Edit dialog state
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
@@ -52,7 +56,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-primary/10 to-[hsl(var(--choice-b))]/10 border-b">
+      <div className="bg-gradient-to-br from-primary/[0.14] via-primary/[0.07] to-[hsl(var(--choice-b))]/[0.12] border-b">
         <div className="max-w-6xl mx-auto p-8">
           <div className="flex items-start justify-between mb-4">
             <h1 className="text-5xl font-bold">Vergelijkende Beoordeling</h1>
@@ -92,7 +96,7 @@ const Dashboard = () => {
         {assignments.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">
-              <FileText className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+              <FileText className="w-16 h-16 mx-auto mb-4 text-primary/40" />
               <h3 className="text-xl font-semibold mb-2">Nog geen opdrachten</h3>
               <p className="text-muted-foreground mb-6">
                 Begin met het uploaden van leerlingteksten om te vergelijken
@@ -105,15 +109,39 @@ const Dashboard = () => {
           </Card>
         ) : (
           <div>
-            <h2 className="text-2xl font-bold mb-6">Je beoordelingen</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Je beoordelingen</h2>
+              {assignments.length >= 4 && (
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Zoek opdracht…"
+                    value={assignmentFilter}
+                    onChange={(e) => setAssignmentFilter(e.target.value)}
+                    className="pl-8 h-9 w-56"
+                  />
+                  {assignmentFilter && (
+                    <button
+                      onClick={() => setAssignmentFilter('')}
+                      className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="grid gap-4">
-              {assignments.map((assignment) => (
+              {assignments
+                .filter(a => !assignmentFilter.trim() || a.title.toLowerCase().includes(assignmentFilter.trim().toLowerCase()))
+                .map((assignment) => (
                 <AssignmentCard
                   key={assignment.id}
                   assignment={assignment}
                   stats={stats.get(assignment.id!) || { texts: 0, judgements: 0, reliabilityPct: 0, raterCount: 0 }}
                   onEdit={handleEditClick}
                   onDelete={handleDelete}
+                  onDuplicate={handleDuplicate}
                   onExport={handleExport}
                   onManageStudents={(id, title) => setManagingStudents({ id, title })}
                   onManageGrading={(id, title) => setManagingGrading({ id, title })}
@@ -131,8 +159,8 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <span className="font-bold text-primary">1</span>
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+                <span className="font-bold text-sm text-white">1</span>
               </div>
               <div>
                 <h4 className="font-semibold mb-1">Upload teksten</h4>
@@ -143,8 +171,8 @@ const Dashboard = () => {
             </div>
 
             <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <span className="font-bold text-primary">2</span>
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+                <span className="font-bold text-sm text-white">2</span>
               </div>
               <div>
                 <h4 className="font-semibold mb-1">Vergelijk steeds twee teksten</h4>
@@ -155,8 +183,8 @@ const Dashboard = () => {
             </div>
 
             <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <span className="font-bold text-primary">3</span>
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+                <span className="font-bold text-sm text-white">3</span>
               </div>
               <div>
                 <h4 className="font-semibold mb-1">Bekijk rangorde en cijfers</h4>

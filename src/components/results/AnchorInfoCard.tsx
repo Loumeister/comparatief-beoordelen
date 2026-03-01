@@ -27,7 +27,7 @@ export function AnchorInfoCard({ anchors, onClearAll }: AnchorInfoCardProps) {
               </p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClearAll} className="text-muted-foreground hover:text-destructive">
+          <Button variant="ghost" size="sm" onClick={onClearAll} className="text-muted-foreground hover:text-destructive no-print">
             <X className="w-4 h-4 mr-1" />
             Wis ijkpunten
           </Button>

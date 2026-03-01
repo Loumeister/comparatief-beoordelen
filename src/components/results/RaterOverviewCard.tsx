@@ -26,7 +26,7 @@ export function RaterOverviewCard({ raterAnalysis }: RaterOverviewCardProps) {
           <h3 className="font-semibold text-lg flex-1">
             Beoordelaarsoverzicht ({raterAnalysis.uniqueRaterCount} beoordelaars)
           </h3>
-          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          {expanded ? <ChevronUp className="w-4 h-4 no-print" /> : <ChevronDown className="w-4 h-4 no-print" />}
         </button>
 
         {expanded && (

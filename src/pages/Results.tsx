@@ -15,6 +15,7 @@ import { AnchorInfoCard } from "@/components/results/AnchorInfoCard";
 import { ResultsTable } from "@/components/results/ResultsTable";
 import { AnchorDialog } from "@/components/results/AnchorDialog";
 import { FeedbackDialog } from "@/components/results/FeedbackDialog";
+import { GradeHistogram } from "@/components/results/GradeHistogram";
 
 const Results = () => {
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ const Results = () => {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <Button variant="ghost" onClick={() => navigate("/")} className="mb-4">
+          <Button variant="ghost" onClick={() => navigate("/")} className="mb-4 no-print">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Terug naar overzicht
           </Button>
@@ -75,12 +76,12 @@ const Results = () => {
               <h1 className="text-4xl font-bold mb-2">{assignment?.title}</h1>
               <p className="text-muted-foreground">Resultaten van vergelijkende beoordeling</p>
             </div>
-            <HeaderNav />
+            <HeaderNav className="no-print" />
           </div>
 
-          <div className="mt-4">
+          <div className="mt-4 no-print">
             <p className="text-sm text-muted-foreground mb-2">Exporteer resultaten:</p>
-            <div className="flex flex-wrap gap-2">
+            <div className="bg-muted/40 rounded-lg p-3 flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => handleExport("xlsx")} title="Download als Excel-bestand">
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
                 Excel
@@ -120,7 +121,7 @@ const Results = () => {
                   <p className="text-sm text-muted-foreground mb-3">
                     Sommige leerlingen vormen nog losse groepen die niet met elkaar zijn vergeleken. De weergegeven rangorde is daarom onvolledig en mogelijk onbetrouwbaar.
                   </p>
-                  <Button size="sm" onClick={() => navigate(`/compare/${assignment?.id}`)}>
+                  <Button size="sm" onClick={() => navigate(`/compare/${assignment?.id}`)} className="no-print">
                     <Link2 className="w-4 h-4 mr-2" />
                     Meer vergelijkingen maken
                   </Button>
@@ -137,6 +138,8 @@ const Results = () => {
 
         <AnchorInfoCard anchors={anchors} onClearAll={clearAllAnchors} />
 
+        <GradeHistogram results={results} />
+
         <ResultsTable
           results={results}
           anchors={anchors}
@@ -145,7 +148,7 @@ const Results = () => {
         />
 
         {/* Continue comparing button */}
-        <div className="mt-6 flex items-center gap-4">
+        <div className="mt-6 flex items-center gap-4 no-print">
           <Button variant="outline" onClick={() => navigate(`/compare/${assignment?.id}`)}>
             Meer vergelijkingen maken
           </Button>
