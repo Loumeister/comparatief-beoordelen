@@ -10,7 +10,7 @@ interface DisagreementsCardProps {
 }
 
 export function DisagreementsCard({ raterAnalysis }: DisagreementsCardProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   if (raterAnalysis.disagreements.length === 0) return null;
 
@@ -31,7 +31,8 @@ export function DisagreementsCard({ raterAnalysis }: DisagreementsCardProps) {
         {expanded && (
           <div className="mt-4 space-y-3">
             <p className="text-sm text-muted-foreground">
-              Paren waar beoordelaars het oneens zijn over welke tekst beter is. Dit zijn de teksten die het meest geschikt zijn voor gezamenlijk overleg.
+              Paren waar beoordelaars het oneens zijn over welke tekst beter is.{" "}
+              <strong>Bespreek deze paren samen</strong> — zo kom je tot een gezamenlijk oordeel en maak je de eindrangorde nog betrouwbaarder.
             </p>
             {raterAnalysis.disagreements.map((d, idx) => (
               <div key={idx} className="p-3 border rounded-lg">

@@ -1,249 +1,150 @@
-# Comparative Judgment App
+# Vergelijkende Beoordeling
 
-Een applicatie voor het beoordelen van leerlingteksten via **comparative judgment** (vergelijkend beoordelen).
+Een **gratis, privacyvriendelijke** app voor het beoordelen van leerlingteksten via vergelijkende beoordeling. Geen account, geen cloud, geen abonnement — alles staat op jouw eigen apparaat.
 
----
-
-## 📚 Wat is Comparative Judgment?
-
-**Comparative judgment** is een beoordelingsmethode waarbij je **niet direct een cijfer geeft**, maar **teksten paarsgewijs met elkaar vergelijkt**. In plaats van te beslissen "deze tekst verdient een 7", kies je simpelweg: "welke van deze twee teksten is beter?"
-
-### Waarom comparative judgment?
-
-- **Betrouwbaarder**: Mensen zijn beter in vergelijken dan in absoluut beoordelen.
-- **Consistenter**: Je gebruikt automatisch dezelfde maatstaf voor alle teksten.
-- **Efficiënter**: Je hoeft niet na te denken over cijfers of rubrics, alleen: "welke is beter?"
-
-### Hoe werkt het?
-
-1. Je krijgt twee anonieme teksten te zien.
-2. Je leest beide teksten.
-3. Je klikt op de betere tekst (of kiest "gelijkwaardig" als ze echt even goed zijn).
-4. Het systeem gebruikt een wiskundig model (Bradley-Terry) om uit alle vergelijkingen een rangorde en cijfers te berekenen.
-
-**Vuistregel**: Elk leerlingwerk moet ongeveer 7-10 keer vergeleken worden voor een betrouwbaar resultaat.
+[▶ Open de app](https://loumeister.github.io/comparatief-beoordelen/)
 
 ---
 
-## 📊 Scores en Betrouwbaarheid
+## Wat doet deze app?
 
-### Individuele scores per tekst
+In plaats van direct een cijfer te geven, vergelijk je steeds twee teksten en kies je welke beter is. Het systeem berekent daarna automatisch een rangorde met cijfers — betrouwbaarder dan wanneer je elke tekst apart beoordeelt.
 
-Na voldoende vergelijkingen krijgt elke tekst:
+**In drie stappen:**
 
-- **Cijfer** (1-10): Berekend op basis van de positie in de rangorde
-- **Label**: 
-  - *Topgroep* (top 10%)
-  - *Bovengemiddeld* (11-50%)
-  - *Gemiddeld* (51-90%)
-  - *Onder gemiddeld* (onderste 10%)
-- **Betrouwbaarheidsindicator**:
-  - ✅ **Resultaat betrouwbaar** (SE ≤ 0.75) - voldoende vergelijkingen
-  - ⚠️ **Nog enkele vergelijkingen nodig** (0.75 < SE ≤ 1.00) - bijna klaar
-  - ❌ **Onvoldoende gegevens** (SE > 1.00) - meer vergelijkingen nodig
-
-### Cohort-betrouwbaarheid (stopadvies)
-
-Het systeem geeft aan wanneer je kunt **stoppen met beoordelen**:
-
-- **Resultaat betrouwbaar (stopadvies)** als:
-  - ≥70% van de teksten heeft SE ≤ 0.75, **of**
-  - Mediaan(SE) ≤ 0.80 én max(SE) ≤ 1.40
+1. **Upload** — maak een opdracht aan en upload de teksten van je leerlingen (Word, TXT, of gewoon namen)
+2. **Vergelijk** — je krijgt steeds twee teksten naast elkaar; klik op de betere
+3. **Bekijk resultaten** — rangorde, cijfers en labels, klaar om te exporteren
 
 ---
 
-## 🧭 Navigatie in de App
+## Waarom vergelijkend beoordelen?
 
-### 1️⃣ **Dashboard** (`/`)
+Schrijfopdrachten beoordelen is moeilijk. Twee docenten die dezelfde tekst lezen, komen vaak tot een ander cijfer. Rubrics helpen, maar lossen het probleem niet volledig op.
 
-Het startscherm toont al je opdrachten.
+Vergelijkend beoordelen werkt beter omdat:
 
-**Wat kun je hier doen:**
-- Bekijk alle opdrachten met status (aantal teksten, aantal beoordelingen)
-- Klik op **"Vergelijken"** om te starten met beoordelen
-- Klik op **"Resultaten"** om de uitkomsten te bekijken
-- Klik op **"Nieuw"** (rechtsonder) om een nieuwe opdracht aan te maken
+- **Mensen zijn beter in vergelijken dan in absoluut beoordelen.** "Welke is beter?" is makkelijker te beantwoorden dan "welk cijfer verdient deze tekst?"
+- **Je gebruikt automatisch dezelfde maatstaf.** Omdat je twee teksten tegelijk ziet, pas je onbewust dezelfde norm toe.
+- **Het is sneller.** Geen rubric invullen, geen puntentelrij — gewoon kiezen.
 
----
-
-### 2️⃣ **Upload** (`/upload`)
-
-Upload leerlingteksten voor een nieuwe opdracht.
-
-**Stappen:**
-1. Geef de opdracht een naam
-2. Stel optioneel beoordelingsinstellingen in (basis cijfer, schaal, min/max)
-3. Upload teksten via **kopiëren/plakken** of **bestand uploaden**:
-   - **Tekst**: Plak tekst direct in het veld
-   - **Word (.docx)**: Upload één of meerdere Word-bestanden
-   - **Excel/CSV**: Upload een bestand met meerdere teksten (één kolom)
-4. Klik op **"Opslaan"** om de opdracht aan te maken
-
-**Tips:**
-- Je kunt anonieme labels gebruiken (bijv. "Tekst A", "Tekst B") of echte namen
-- Zorg dat alle teksten dezelfde opdracht beantwoorden
+Onderzoek laat zien dat vergelijkende beoordeling betrouwbaardere en eerlijkere resultaten geeft dan traditionele cijfergeving.
 
 ---
 
-### 3️⃣ **Vergelijken** (`/compare/:assignmentId`)
+## Hoe gebruik je de app?
 
-Hier beoordeel je door teksten paarsgewijs te vergelijken.
+### Alleen beoordelen
 
-**Interface:**
-- **Twee kolommen** met een tekst links en rechts
-- **Knoppen onderaan**: "Tekst links is beter" | "Gelijkwaardig" | "Tekst rechts is beter"
-- **Voortgangsbalk**: Toont hoeveel vergelijkingen je al hebt gedaan
-- **Betrouwbaarheidsindicator**: Toont wanneer je kunt stoppen
+1. Klik op **"Nieuwe Opdracht"** op het startscherm
+2. Upload de teksten van je leerlingen (of voer alleen hun namen in als je papieren teksten beoordeelt)
+3. Klik op **"Vergelijk"** bij de opdracht en begin met beoordelen
+4. Het systeem geeft aan wanneer je genoeg hebt gedaan — je ziet een groene melding bovenaan
+5. Klik op **"Resultaten"** om de rangorde en cijfers te bekijken
+6. Download de resultaten als Excel of PDF
 
-**Workflow:**
-1. Lees beide teksten aandachtig
-2. Klik op de betere tekst (of "gelijkwaardig")
-3. De volgende vergelijking verschijnt automatisch
-4. Ga door tot het systeem aangeeft dat het cohort betrouwbaar is
-
-**Tips:**
-- Wees consistent: gebruik dezelfde criteria voor elke vergelijking
-- Kies altijd de betere tekst, ook als het verschil klein is — dat maakt de resultaten nauwkeuriger
-- Gebruik "Gelijkwaardig" alleen als twee teksten echt even goed zijn
-- Je kunt altijd stoppen en later verder gaan
+**Hoeveel vergelijkingen?** Ongeveer 7–10 per tekst. Bij 25 leerlingen zijn dat zo'n 90–100 vergelijkingen totaal — dat doe je in 1 à 2 uur.
 
 ---
 
-### 4️⃣ **Resultaten** (`/results/:assignmentId`)
+### Samenwerken met collega's
 
-Bekijk de definitieve rangorde en cijfers.
+Meerdere beoordelaars maken de uitslag nog betrouwbaarder. Zo werkt het:
 
-**Wat zie je:**
-- **Cohort-betrouwbaarheid**: Algemene betrouwbaarheidsstatus met statistieken
-- **Voortgang**: Grafiek met vergelijkingen per tekst
-- **Rangorde-tabel**: Alle teksten gesorteerd op kwaliteit met:
-  - Rang (1 = beste)
-  - Label (Topgroep, Bovengemiddeld, etc.)
-  - Cijfer (1-10)
-  - Betrouwbaarheidsindicator per tekst
-- **Beoordelaarsoverzicht** (alleen bij meerdere beoordelaars): per beoordelaar het aantal vergelijkingen, overeenstemming met het model, en gelijkwaardig-percentage
-- **Meningsverschillen** (alleen bij meerdere beoordelaars): overzicht van paren waarover beoordelaars het oneens zijn
-- **Ijkpunten** (optioneel): markeer een tekst als referentie-cijfer (bijv. "dit essay is een 6") om de cijferschaal te kalibreren. Het systeem toont dan zowel een relatief cijfer als een geijkt cijfer.
+**Stap 1 — Deel de teksten**
+Ga naar de resultatenpagina en klik op **"Deel met collega"**. Je downloadt een bestand met alleen de teksten (zonder jouw oordelen). Stuur dit bestand per e-mail of Teams naar je collega.
 
-**Acties:**
-- **"Toon technische details"**: Bekijk achtergrondscores (theta, SE, aantal beoordelingen)
-- **"Exporteer naar CSV/Excel/PDF"**: Download resultaten voor verdere analyse
-- **"Leerlingfeedback"**: Download een PDF met per leerling alle verzamelde opmerkingen — handig om uit te delen als feedback
-- **"Terug naar vergelijken"**: Voeg meer beoordelingen toe als resultaten nog niet betrouwbaar zijn
-- **"Terug naar Dashboard"**: Ga terug naar het overzicht
+**Stap 2 — Collega beoordeelt zelfstandig**
+Je collega opent de app, klikt op **"Importeer bestand"** en kiest het ontvangen bestand. Bij het starten van de vergelijking vraagt de app om een naam — dit is belangrijk zodat later zichtbaar is wie wat beoordeeld heeft. Je collega beoordeelt de teksten op eigen apparaat.
+
+**Stap 3 — Collega stuurt terug**
+Als je collega klaar is, gaat hij/zij naar de resultatenpagina en klikt op **"Maak back-up"**. Dat bestand stuurt je collega naar jou terug.
+
+**Stap 4 — Samenvoegen**
+Jij klikt op **"Importeer bestand"** en opent het bestand van je collega. De oordelen worden automatisch samengevoegd. Op de resultatenpagina zie je:
+- Een **beoordelaarsoverzicht**: wie heeft hoeveel beoordeeld, en hoe goed komen de oordelen overeen?
+- Een **meningsverschillen-overzicht**: welke paren hebben jullie anders beoordeeld? Precies de teksten om samen te bespreken.
+
+> **Tip voor niet-techneuten:** vertel je collega simpelweg: "Open de link, klik op 'Importeer bestand', kies het bestand dat ik gestuurd heb, vul je naam in en ga beoordelen. Als je klaar bent, klik op 'Maak back-up' en stuur dat terug." Meer hoeft je collega niet te weten.
 
 ---
 
-## 🎯 Typische Workflow
+## Veelgestelde vragen
 
-### Solo (alleen jij)
-1. **Upload** → Upload alle leerlingteksten voor een opdracht
-2. **Vergelijken** → Beoordeel door teksten te vergelijken (elk werk ~7-10x)
-3. **Resultaten** → Bekijk de rangorde en exporteer cijfers
-4. **(Optioneel) Terug naar Vergelijken** → Voeg meer beoordelingen toe als het nog niet betrouwbaar genoeg is
+**Worden mijn gegevens ergens opgeslagen?**
+Nee. Alle data staat alleen in jouw eigen browser. Er is geen server, geen account, geen cloud. Als je je browsergegevens wist, zijn je opdrachten weg — maak regelmatig een back-up via "Maak back-up" op de resultatenpagina.
 
-### Team (met collega's)
-1. **Upload** → Maak de opdracht aan met alle teksten
-2. **Deel** → Exporteer de opdracht via "Deel met collega" (teksten zonder oordelen)
-3. **Collega's importeren** → Elke collega importeert het bestand en maakt eigen vergelijkingen
-4. **Collega's exporteren** → Iedereen exporteert het resultaat als JSON-bestand
-5. **Importeer alles** → Importeer alle JSON-bestanden. Het systeem combineert alle oordelen
-6. **Resultaten** → Bekijk de gecombineerde rangorde, beoordelaarsoverzicht en eventuele meningsverschillen
+**Wat als ik een fout maak bij het beoordelen?**
+Geen probleem. Het systeem is robuust: één foutje heeft nauwelijks invloed als je genoeg vergelijkingen maakt. Je kunt oordelen ook herzien via de knop "Mijn oordelen" op de vergelijkpagina.
 
----
+**Kan ik de cijfers aanpassen?**
+De gemiddelde leerling krijgt standaard een 7,0. Via **"Cijferinstellingen"** kun je het basiscijfer en de spreiding aanpassen. Je kunt ook ijkpunten instellen: wijs een tekst een vast cijfer toe (bijv. 6,0) en de rest wordt automatisch herschaald.
 
-## ⚙️ Technische Details
+**Hoe nauwkeurig zijn de cijfers?**
+De **rangorde** is na voldoende vergelijkingen zeer betrouwbaar. De precieze cijferwaarden (bijv. 7,2 vs 7,3) zijn minder exact — kijk vooral naar de rangorde en de labels (Topgroep, Bovengemiddeld, etc.).
 
-### Wiskundig model
-- **Bradley-Terry model** met ridge-regularisatie
-- **Newton-Raphson optimalisatie** voor theta-schatting
-- **Standard Error (SE)** gebaseerd op de inverse van de volledige Hessian-matrix (Cholesky-decompositie)
+**Werkt de app ook offline?**
+Ja, na de eerste keer laden werkt de app ook zonder internet.
 
-### Betrouwbaarheidsdrempels
-- Individueel: SE ≤ 0.75 (betrouwbaar), SE ≤ 1.00 (bijna klaar)
-- Cohort: ≥70% betrouwbaar OF (mediaan ≤ 0.80 EN max ≤ 1.40)
-
-### Pairing-strategie
-- **Bridging**: Prioriteit voor vergelijkingen tussen ongekoppelde groepen
-- **Informatief**: Focus op teksten met hoge SE en kleine θ-verschillen
-- **Adaptief**: Past zich aan naarmate er meer data komt
+**Kan ik ook papieren teksten beoordelen?**
+Ja. Bij het aanmaken van de opdracht kun je alleen namen invoeren (bijv. "Leerling 1") zonder tekst te uploaden. Tijdens het vergelijken zie je de naam als kaartje — je beoordeelt de papieren versie er naast.
 
 ---
 
-## 💡 Veelgestelde Vragen
-
-**Hoeveel vergelijkingen zijn nodig?**  
-→ Ongeveer 7-10 vergelijkingen per tekst. Het systeem geeft aan wanneer je kunt stoppen.
-
-**Wat als ik een fout maak?**  
-→ Geen probleem! Het model is robuust en één foutje heeft weinig impact bij voldoende vergelijkingen.
-
-**Kan ik met meerdere mensen tegelijk beoordelen?**
-→ Ja! Exporteer de opdracht via de "Deel met collega"-knop (teksten zonder oordelen). Je collega importeert het bestand, maakt eigen vergelijkingen, en exporteert het resultaat terug. Jij importeert alle bestanden — het systeem combineert alle oordelen automatisch in één rangorde. Op de Resultaten-pagina zie je per beoordelaar hoeveel vergelijkingen zijn gemaakt en hoe goed de onderlinge overeenstemming is.
-
-**Waarom krijgen sommige teksten "Onvoldoende gegevens"?**
-→ Ze zijn nog niet vaak genoeg vergeleken. Ga terug naar "Vergelijken" om meer beoordelingen toe te voegen.
-
-**Wat zijn ijkpunten?**
-→ Met ijkpunten kun je een of meer teksten een vast cijfer geven (bijv. "dit essay is een 6"). Het systeem past de hele schaal daarop aan. Handig als je vindt dat de relatieve cijfers niet aansluiten bij je verwachtingen. Je vindt het anker-icoon naast elk cijfer in de Resultaten-tabel.
-
-**Kan ik feedback aan leerlingen geven?**
-→ Ja! Tijdens het vergelijken kun je per tekst een korte opmerking invoeren (bijv. "goede opbouw" of "veel spelfouten"). Op de Resultaten-pagina kun je via de knop "Leerlingfeedback" een PDF downloaden met per leerling alle verzamelde opmerkingen — klaar om uit te delen.
-
-**Waar wordt mijn data opgeslagen?**
-→ Alle data wordt lokaal in je browser opgeslagen (IndexedDB). Er is geen server, geen login, en niets wordt naar het internet gestuurd. Als je je browserdata wist, verdwijnen ook je opdrachten — maak dus regelmatig een export.
-
----
-
-## 🏫 Vergelijking met professionele tools
-
-Er bestaan commerciële platforms voor vergelijkend beoordelen. Deze app is een **gratis, lokaal alternatief** zonder account of server.
+## Vergelijking met commerciële tools
 
 | | No More Marking | RM Compare | Comproved | **Deze app** |
 |---|---|---|---|---|
-| **Prijs** | Betaald (abonnement) | Betaald (enterprise) | Betaald (licentie) | **Gratis** |
-| **Data** | Cloud (UK) | Cloud (UK) | Cloud (BE/NL) | **Lokaal in browser** |
-| **Account nodig** | Ja | Ja | Ja | **Nee** |
-| **Taal** | Engels | Engels | Nederlands/Engels | **Nederlands** |
-| **AI-beoordelaar** | Ja (90% AI) | Nee | Nee | Nee (gepland) |
-| **Peer assessment** | Nee | Ja | Ja | Nee (gepland) |
-| **Multi-media** | Nee | Ja (video, audio, beeld) | Ja | Nee (gepland) |
-| **Nationaal ijkpunt** | Ja (UK-scholen) | Ja | Nee | Nee (n.v.t.) |
-| **LMS-koppeling** | Nee | Nee | Ja (LTI) | Nee (n.v.t.) |
-| **Anker-/ijkpuntcijfers** | Nee | Nee | Ja | **Ja** |
+| **Kosten** | Abonnement | Enterprise | Licentie | **Gratis** |
+| **Data** | Cloud (UK) | Cloud (UK) | Cloud (BE/NL) | **Lokaal op je apparaat** |
+| **Account** | Verplicht | Verplicht | Verplicht | **Niet nodig** |
+| **Taal** | Engels | Engels | Nederlands | **Nederlands** |
+| **IJkpuntcijfers** | Nee | Nee | Ja | **Ja** |
 | **Leerlingfeedback PDF** | Ja | Nee | Nee | **Ja** |
+| **Samenwerken** | Ja | Ja | Ja | **Ja** |
 
-**Wanneer kies je deze app?**
-- Je wilt snel starten zonder IT-afdeling of schoollicentie
-- Leerlingdata mag je apparaat niet verlaten (AVG/privacy)
-- Je zoekt een gratis tool voor een vakgroep of individueel gebruik
-- Je werkt met schriftelijke teksten (geen video/audio nodig)
+**Kies deze app als** je snel wilt starten zonder IT-afdeling, als leerlingdata je apparaat niet mag verlaten (AVG/privacy), of als je een gratis tool zoekt voor vakgroepgebruik.
 
-**Wanneer kies je een commercieel platform?**
-- Je wilt nationale benchmarks of vergelijking tussen scholen
-- Je hebt AI-ondersteuning nodig om beoordelingstijd te halveren
-- Je wilt leerlingen als beoordelaars inzetten (peer assessment)
-- Je beoordeelt video's, audio, of beeldend werk
+**Kies een commercieel platform als** je nationale benchmarks nodig hebt, AI-ondersteuning wilt, of video/audio/beeld beoordeelt.
 
 ---
 
-## 🛠️ Technische Informatie (voor ontwikkelaars)
+## Voor ontwikkelaars
 
-Dit project is gebouwd met:
-- **React** + **TypeScript**
-- **Vite** (build tool)
-- **Dexie** (IndexedDB voor lokale opslag)
-- **Tailwind CSS** + **shadcn-ui** (design system)
+### Tech stack
 
-### Lokaal draaien
+- **React 18** + **TypeScript** + **Vite 7** (SWC)
+- **Tailwind CSS 3** + **shadcn-ui** (Radix primitives)
+- **Dexie 4** (IndexedDB)
+- **ExcelJS**, **jsPDF**, **Mammoth**
+- Deployed op **GitHub Pages** (base path `/comparatief-beoordelen/`)
+
+### Commando's
 
 ```sh
-npm install
-npm run dev
+npm install          # installeer afhankelijkheden
+npm run dev          # dev server op poort 8080
+npm run build        # productiebuild naar dist/
+npm run lint         # ESLint
+npx vitest run       # 113 tests in src/lib/__tests__/
 ```
 
-### Deployment
+### Wiskundig model
 
-De app wordt automatisch gedeployed naar **GitHub Pages** via een GitHub Actions workflow. Bij elke push naar `main` wordt de app gebouwd en gepubliceerd.
+- **Bradley-Terry model** met ridge-regularisatie (λ=0.1 voor eindresultaten, λ=0.3 tijdens vergelijken)
+- **Newton-Raphson optimalisatie** voor θ-schatting
+- **Standard Error** via inverse van de volledige Hessian (Cholesky-decompositie)
+- **Stopadvies**: ≥70% van teksten SE ≤ 0.75, of mediaan(SE) ≤ 0.80 én max(SE) ≤ 1.40
 
-Base path: `/comparatief-beoordelen/`
+### Database schema (Dexie v9)
+
+```
+assignments:    ++id, title, createdAt
+texts:          ++id, assignmentId, anonymizedName
+judgements:     ++id, assignmentId, pairKey, textAId, textBId, raterId
+scores:         ++id, assignmentId, textId
+previousFits:   ++id, assignmentId
+assignmentMeta: assignmentId
+```
+
+Zie `CLAUDE.md` voor volledige architectuurdocumentatie.
