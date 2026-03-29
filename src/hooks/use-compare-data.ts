@@ -101,8 +101,8 @@ export function useRaterIdentification() {
     ? `rater-${raterName.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`
     : `rater-anon-${Date.now()}`;
 
-  const handleRaterNameSubmit = useCallback(() => {
-    const name = raterNameInput.trim();
+  const handleRaterNameSubmit = useCallback((nameOverride?: string) => {
+    const name = (nameOverride ?? raterNameInput).trim();
     if (name) {
       setRaterName(name);
       localStorage.setItem('raterName', name);
@@ -113,7 +113,14 @@ export function useRaterIdentification() {
     setShowRaterPrompt(false);
   }, [raterNameInput]);
 
-  return { raterName, raterId, raterNameInput, setRaterNameInput, showRaterPrompt, handleRaterNameSubmit };
+  const resetRaterPrompt = useCallback(() => {
+    localStorage.removeItem('raterName');
+    setRaterName('');
+    setRaterNameInput('');
+    setShowRaterPrompt(true);
+  }, []);
+
+  return { raterName, raterId, raterNameInput, setRaterNameInput, showRaterPrompt, handleRaterNameSubmit, resetRaterPrompt };
 }
 
 // ─── Main Compare data hook ───

@@ -15,6 +15,10 @@ export function RaterOverviewCard({ raterAnalysis }: RaterOverviewCardProps) {
 
   if (raterAnalysis.uniqueRaterCount <= 1) return null;
 
+  // Check if any rater has notably low agreement for a summary callout
+  const lowAgreementRaters = raterAnalysis.raterStats.filter(r => r.modelAgreement < 0.6);
+  const highTieRaters = raterAnalysis.raterStats.filter(r => r.tieRate > 0.4);
+
   return (
     <Card className="mb-6">
       <CardContent className="p-6">
@@ -30,15 +34,29 @@ export function RaterOverviewCard({ raterAnalysis }: RaterOverviewCardProps) {
         </button>
 
         {expanded && (
-          <div className="mt-4">
+          <div className="mt-4 space-y-4">
+            {/* Summary callouts */}
+            {lowAgreementRaters.length > 0 && (
+              <div className="text-sm bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                <strong>Let op:</strong>{" "}
+                {lowAgreementRaters.map(r => r.raterName).join(", ")} wijk{lowAgreementRaters.length === 1 ? "t" : "en"} sterk af van de gezamenlijke rangorde. Bespreek dit samen.
+              </div>
+            )}
+            {highTieRaters.length > 0 && lowAgreementRaters.length === 0 && (
+              <div className="text-sm bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                <strong>Tip:</strong>{" "}
+                {highTieRaters.map(r => r.raterName).join(", ")} kiest{highTieRaters.length === 1 ? "" : "en"} vaak &ldquo;Gelijkwaardig&rdquo;. Probeer vaker een keuze te maken — dat maakt de uitslag nauwkeuriger.
+              </div>
+            )}
+
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Beoordelaar</TableHead>
                   <TableHead className="text-right">Oordelen</TableHead>
-                  <TableHead className="text-right">Overeenstemming</TableHead>
-                  <TableHead className="text-right">Gelijkwaardig-rate</TableHead>
-                  <TableHead className="text-right">Consistentie</TableHead>
+                  <TableHead className="text-right">Eens met groep</TableHead>
+                  <TableHead className="text-right">Gelijkwaardig</TableHead>
+                  <TableHead className="text-right">Patroon</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -64,14 +82,10 @@ export function RaterOverviewCard({ raterAnalysis }: RaterOverviewCardProps) {
                     </TableCell>
                     <TableCell className="text-right">
                       {r.infit != null ? (
-                        <>
-                          <span className={r.infit > 1.2 ? 'text-destructive font-medium' : ''}>
-                            {r.infit.toFixed(2)}
-                          </span>
-                          <span className={`text-xs ml-1 ${r.infit > 1.2 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                            ({r.infitLabel})
-                          </span>
-                        </>
+                        <span className={r.infit > 1.2 ? 'text-destructive font-medium' : 'text-muted-foreground'}>
+                          {r.infitLabel}
+                          <span className="ml-1 text-xs opacity-60">({r.infit.toFixed(2)})</span>
+                        </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">te weinig data</span>
                       )}
@@ -80,8 +94,10 @@ export function RaterOverviewCard({ raterAnalysis }: RaterOverviewCardProps) {
                 ))}
               </TableBody>
             </Table>
-            <p className="text-xs text-muted-foreground mt-3">
-              Overeenstemming = % oordelen dat overeenkomt met de gezamenlijke rangorde. Gelijkwaardig boven 40% kan de nauwkeurigheid verlagen. Consistentie (infit) meet hoe voorspelbaar de oordelen zijn — waarden boven 1.2 wijzen op onregelmatige patronen.
+            <p className="text-xs text-muted-foreground">
+              <strong>Eens met groep</strong> = hoe vaak koos deze beoordelaar hetzelfde als de gezamenlijke rangorde.{" "}
+              <strong>Gelijkwaardig</strong> = hoe vaak werd "Gelijkwaardig" gekozen (boven 40% kan de nauwkeurigheid verlagen).{" "}
+              <strong>Patroon</strong> = of de oordelen consistent zijn.
             </p>
           </div>
         )}

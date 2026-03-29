@@ -196,6 +196,63 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Collaboration Section */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Samenwerken met collega's</CardTitle>
+            <p className="text-sm text-muted-foreground">Meerdere beoordelaars maken de uitslag nog betrouwbaarder</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-4">
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+                <span className="font-bold text-sm text-white">1</span>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">Maak een deelbestand aan</h4>
+                <p className="text-sm text-muted-foreground">
+                  Ga naar de resultatenpagina van je opdracht en klik op <strong>"Deel met collega"</strong>. Je downloadt dan een bestand met alleen de teksten — nog zonder jouw oordelen.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+                <span className="font-bold text-sm text-white">2</span>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">Stuur het bestand naar je collega</h4>
+                <p className="text-sm text-muted-foreground">
+                  Stuur het bestand per e-mail of via Teams/WhatsApp. Je collega klikt hier bovenaan op <strong>"Importeer bestand"</strong> en beoordeelt zelfstandig op zijn of haar eigen apparaat.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+                <span className="font-bold text-sm text-white">3</span>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">Collega stuurt zijn oordelen terug</h4>
+                <p className="text-sm text-muted-foreground">
+                  Jouw collega gaat naar de resultatenpagina en klikt op <strong>"Maak back-up"</strong>. Dat bestand stuurt hij of zij terug naar jou.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+                <span className="font-bold text-sm text-white">4</span>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">Importeer en bekijk samen</h4>
+                <p className="text-sm text-muted-foreground">
+                  Klik hier bovenaan op <strong>"Importeer bestand"</strong> en open het bestand van je collega. De oordelen worden automatisch samengevoegd. Op de resultatenpagina zie je wie wat beoordeeld heeft en waar jullie het oneens zijn.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* README Link */}
         <div className="mt-8 text-center">
           <Button

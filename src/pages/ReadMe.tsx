@@ -50,6 +50,24 @@ const ReadMe = () => {
           </CardContent>
         </Card>
 
+        {/* Why this app */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Waarom deze app?</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p>
+              Schrijfopdrachten een eerlijk cijfer geven is moeilijk. Twee docenten die dezelfde tekst beoordelen, komen vaak tot een ander cijfer. Rubriceringen helpen, maar ze lossen het probleem niet volledig op: elke docent interpreteert criteria toch anders.
+            </p>
+            <p>
+              Deze app gebruikt een methode die is gebaseerd op wat mensen van nature goed kunnen: <strong>vergelijken</strong>. In plaats van een tekst direct een punt te geven, kies je steeds: "welke van deze twee is beter?" Dat is makkelijker, consistenter en — bewezen door onderzoek — betrouwbaarder.
+            </p>
+            <p className="text-sm bg-muted/50 p-3 rounded-lg">
+              <strong>Geschikt voor:</strong> elke schrijfopdracht waarbij je wilt weten hoe leerlingen zich tot elkaar verhouden — betogen, verhalen, verslagen, brieven, en meer.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* What is CJ */}
         <Card>
           <CardHeader>
@@ -226,19 +244,54 @@ const ReadMe = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p>
-              Je kunt dezelfde set teksten met meerdere collega's beoordelen. Dat maakt de resultaten nog betrouwbaarder.
+              Je kunt dezelfde set teksten met meerdere collega's beoordelen. Dat maakt de resultaten nog betrouwbaarder — en je ziet achteraf precies wie wat beoordeeld heeft en waar jullie het oneens zijn.
             </p>
 
+            <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+              <strong>Wat is een "bestand" in dit geval?</strong> De app werkt met gewone computerbestanden, zoals een Word- of Excel-bestand. Je hoeft er niets mee te doen behalve het opslaan en doorsturen — de app regelt de rest zelf.
+            </div>
+
             <div>
-              <h4 className="font-semibold mb-2">Hoe werkt het?</h4>
-              <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                <li>Maak de opdracht aan en upload de teksten.</li>
-                <li>Ga naar Resultaten en klik op <strong>"Deel met collega"</strong>. Dit downloadt een bestand met alleen de teksten (zonder jouw oordelen).</li>
-                <li>Stuur dit bestand naar je collega's. Zij klikken op <strong>"Importeer bestand"</strong> op het startscherm.</li>
-                <li>Iedereen beoordeelt zelfstandig op eigen apparaat.</li>
-                <li>Elke collega exporteert zijn/haar dataset via <strong>"Volledige back-up"</strong> op de resultatenpagina en stuurt het bestand naar jou terug.</li>
-                <li>Jij importeert alle bestanden. De oordelen worden automatisch samengevoegd.</li>
+              <h4 className="font-semibold mb-3">Stap voor stap</h4>
+              <ol className="space-y-4">
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">1</span>
+                  <div>
+                    <p className="text-muted-foreground"><strong>Jij:</strong> maak de opdracht aan en upload de teksten. Ga dan naar de resultatenpagina en klik op <strong>"Deel met collega"</strong>. Er wordt een bestand gedownload naar je computer.</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">2</span>
+                  <div>
+                    <p className="text-muted-foreground"><strong>Jij:</strong> stuur het gedownloade bestand naar je collega('s) — per e-mail of via Teams/WhatsApp.</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">3</span>
+                  <div>
+                    <p className="text-muted-foreground"><strong>Collega:</strong> opent de app op zijn of haar eigen apparaat, klikt op <strong>"Importeer bestand"</strong> op het startscherm en kiest het ontvangen bestand. Vul bij het begin van het beoordelen je naam in — dat is belangrijk zodat de app kan bijhouden wie wie is.</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">4</span>
+                  <div>
+                    <p className="text-muted-foreground"><strong>Collega:</strong> beoordeelt de teksten zelfstandig en gaat daarna naar de resultatenpagina. Klik op <strong>"Maak back-up"</strong> en stuur het bestand terug.</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">5</span>
+                  <div>
+                    <p className="text-muted-foreground"><strong>Jij:</strong> importeer het bestand van je collega via <strong>"Importeer bestand"</strong> op het startscherm. De oordelen worden automatisch samengevoegd — je hoeft niets handmatig te doen.</p>
+                  </div>
+                </li>
               </ol>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-2">Naam invullen is belangrijk</h4>
+              <p className="text-muted-foreground">
+                Wanneer een beoordelaar voor het eerst op de vergelijkpagina komt, vraagt de app: <em>"Wie beoordeelt er?"</em> Kies "Samen met collega's" en vul je naam in. Zo kan de app later tonen wie welk oordeel gaf. Je naam wordt alleen op jouw eigen apparaat opgeslagen — het gaat nergens naartoe.
+              </p>
             </div>
 
             <div>
@@ -251,7 +304,7 @@ const ReadMe = () => {
             <div>
               <h4 className="font-semibold mb-2">Meningsverschillen</h4>
               <p className="text-muted-foreground">
-                Als collega's het bij bepaalde paren oneens zijn, verschijnt een overzicht <strong>"Meningsverschillen"</strong>. Dit zijn precies de teksten die het meest geschikt zijn om samen te bespreken.
+                Als collega's het bij bepaalde paren oneens zijn, verschijnt een overzicht <strong>"Meningsverschillen"</strong>. Dit zijn precies de teksten die het meest geschikt zijn om samen te bespreken. Gebruik dit als uitgangspunt voor je vakgroepoverleg.
               </p>
             </div>
           </CardContent>
@@ -331,6 +384,14 @@ const ReadMe = () => {
             <div>
               <p className="font-semibold">Hoe nauwkeurig zijn de cijfers?</p>
               <p className="text-sm text-muted-foreground">Na voldoende vergelijkingen is de rangorde zeer betrouwbaar (vergelijkbaar met 2-3 onafhankelijke beoordelaars). De precieze cijfers (bijv. 7,2 vs 7,3) zijn minder exact — kijk vooral naar de rangorde en de labels.</p>
+            </div>
+            <div>
+              <p className="font-semibold">Mijn collega kan het bestand niet importeren — wat nu?</p>
+              <p className="text-sm text-muted-foreground">Controleer of je collega het juiste bestand heeft (het eindigt op <code>.json</code>). Klik op "Importeer bestand" op het startscherm en selecteer het bestand. Werkt het nog niet? Stuur het bestand eventueel als bijlage in een e-mail — soms blokkeert Teams bepaalde bestandstypen.</p>
+            </div>
+            <div>
+              <p className="font-semibold">Mijn collega is niet zo handig met computers. Hoe leg ik het uit?</p>
+              <p className="text-sm text-muted-foreground">Zeg gewoon: "Open de link die ik je stuur, klik op 'Importeer bestand', kies het bestand dat ik je gestuurd heb, vul je naam in en ga dan vergelijken. Als je klaar bent, klik je op 'Maak back-up' en stuur dat bestand naar mij terug." Meer hoeft je collega niet te weten.</p>
             </div>
           </CardContent>
         </Card>

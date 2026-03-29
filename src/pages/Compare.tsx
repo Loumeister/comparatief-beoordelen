@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Info, AlertTriangle, ChevronDown, ChevronRight, Shuffle, ClipboardList, RotateCcw } from "lucide-react";
+import { ArrowLeft, Info, AlertTriangle, ChevronDown, ChevronRight, Shuffle, ClipboardList, RotateCcw, Pencil, Users } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ToastAction } from "@/components/ui/toast";
 import { HeaderNav } from "@/components/HeaderNav";
@@ -21,7 +21,10 @@ const Compare = () => {
   const navigate = useNavigate();
 
   // Rater identification
-  const { raterName, raterId, raterNameInput, setRaterNameInput, showRaterPrompt, handleRaterNameSubmit } = useRaterIdentification();
+  const { raterName, raterId, raterNameInput, setRaterNameInput, showRaterPrompt, handleRaterNameSubmit, resetRaterPrompt } = useRaterIdentification();
+
+  // Prompt mode: 'solo' = individueel, 'team' = samen met collega's
+  const [promptMode, setPromptMode] = useState<'solo' | 'team'>('solo');
 
   const { toast } = useToast();
 
@@ -151,30 +154,84 @@ const Compare = () => {
 
   // ─── Rater prompt ───
   if (showRaterPrompt) {
+    const isTeam = promptMode === 'team';
+    const canStart = isTeam ? raterNameInput.trim().length > 0 : true;
+
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="shadow-lg max-w-md w-full mx-4">
-          <CardContent className="p-6 space-y-4">
-            <h2 className="text-xl font-bold">Wie beoordeelt er?</h2>
-            <p className="text-sm text-muted-foreground">
-              Beoordeel je <strong>alleen</strong>? Klik dan direct op de knop hieronder — je hoeft niets in te vullen.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Beoordelen jullie met <strong>meerdere collega's</strong>? Vul dan je naam in, zodat de app bijhoudt wie welk oordeel gaf.
-            </p>
-            <Input
-              value={raterNameInput}
-              onChange={(e) => setRaterNameInput(e.target.value)}
-              placeholder="Alleen nodig bij meerdere beoordelaars"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleRaterNameSubmit(); }}
-            />
-            <div className="flex gap-2">
-              <Button onClick={handleRaterNameSubmit} className="flex-1" size="lg">
-                {raterNameInput.trim() ? 'Start met beoordelen' : 'Start met beoordelen'}
-              </Button>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="shadow-lg max-w-lg w-full">
+          <CardContent className="p-6 space-y-5">
+            <div>
+              <h2 className="text-2xl font-bold mb-1">Wie beoordeelt er?</h2>
+              <p className="text-sm text-muted-foreground">
+                Dit helpt de app bijhouden wie welk oordeel gegeven heeft.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Je naam wordt alleen lokaal op deze computer opgeslagen.
+
+            {/* Mode selector — two equally prominent cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                className={`text-left p-4 border-2 rounded-lg transition-colors ${
+                  !isTeam
+                    ? 'border-primary bg-primary/5'
+                    : 'hover:border-muted-foreground/40'
+                }`}
+                onClick={() => setPromptMode('solo')}
+              >
+                <div className="font-semibold mb-1">Individueel</div>
+                <div className="text-xs text-muted-foreground">
+                  Ik beoordeel alleen
+                </div>
+              </button>
+
+              <button
+                className={`text-left p-4 border-2 rounded-lg transition-colors ${
+                  isTeam
+                    ? 'border-primary bg-primary/5'
+                    : 'hover:border-muted-foreground/40'
+                }`}
+                onClick={() => setPromptMode('team')}
+              >
+                <div className="font-semibold mb-1 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" />
+                  Samen
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Met meerdere collega's
+                </div>
+              </button>
+            </div>
+
+            {/* Name field — always shown, required for team */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                {isTeam ? 'Jouw naam (verplicht)' : 'Jouw naam (optioneel)'}
+              </label>
+              <Input
+                value={raterNameInput}
+                onChange={(e) => setRaterNameInput(e.target.value)}
+                placeholder={isTeam ? 'Vul je naam in, bijv. Jan' : 'Bijv. Jan — of laat leeg'}
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter' && canStart) handleRaterNameSubmit(raterNameInput.trim() || undefined); }}
+              />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                {isTeam
+                  ? 'Elke collega vult zijn eigen naam in op zijn eigen apparaat. Zo is later zichtbaar wie wat beoordeeld heeft.'
+                  : 'Je kunt later altijd een collega toevoegen via het potloodje naast je naam.'}
+              </p>
+            </div>
+
+            <Button
+              onClick={() => handleRaterNameSubmit(raterNameInput.trim() || undefined)}
+              disabled={!canStart}
+              className="w-full"
+              size="lg"
+            >
+              Start met beoordelen
+            </Button>
+
+            <p className="text-xs text-muted-foreground text-center">
+              Je naam wordt alleen lokaal op dit apparaat opgeslagen.
             </p>
           </CardContent>
         </Card>
@@ -279,6 +336,18 @@ const Compare = () => {
               </div>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold">{assignment?.title}</h1>
+            {raterName && (
+              <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                beoordelaar: <strong>{raterName}</strong>
+                <button
+                  onClick={() => { resetRaterPrompt(); setPromptMode('solo'); }}
+                  className="text-muted-foreground hover:text-foreground"
+                  title="Naam wijzigen"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </p>
+            )}
           </div>
         </div>
         <div className="max-w-3xl mx-auto p-8">
@@ -380,9 +449,23 @@ const Compare = () => {
           </div>
           <div className="mb-2">
             <h1 className="text-xl sm:text-2xl font-bold">{assignment?.title}</h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground flex items-center flex-wrap gap-x-1">
               {totalJudgements} van ca. {expectedTotal} vergelijkingen gedaan
-              {raterName && <> • beoordelaar: <strong>{raterName}</strong></>}
+              {raterName && (
+                <>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1">
+                    beoordelaar: <strong>{raterName}</strong>
+                    <button
+                      onClick={() => { resetRaterPrompt(); setPromptMode('solo'); }}
+                      className="text-muted-foreground hover:text-foreground ml-0.5"
+                      title="Naam wijzigen"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                  </span>
+                </>
+              )}
             </p>
           </div>
           <Progress value={progress} className="h-2" />
