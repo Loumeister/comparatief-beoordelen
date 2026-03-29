@@ -84,6 +84,7 @@ export function RaterOverviewCard({ raterAnalysis }: RaterOverviewCardProps) {
                       {r.infit != null ? (
                         <span className={r.infit > 1.2 ? 'text-destructive font-medium' : 'text-muted-foreground'}>
                           {r.infitLabel}
+                          <span className="ml-1 text-xs opacity-60">({r.infit.toFixed(2)})</span>
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">te weinig data</span>

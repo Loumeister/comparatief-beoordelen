@@ -23,8 +23,8 @@ const Compare = () => {
   // Rater identification
   const { raterName, raterId, raterNameInput, setRaterNameInput, showRaterPrompt, handleRaterNameSubmit, resetRaterPrompt } = useRaterIdentification();
 
-  // Prompt mode: 'choice' = show solo/team cards, 'team' = show name input form
-  const [promptMode, setPromptMode] = useState<'choice' | 'team'>('choice');
+  // Prompt mode: 'solo' = individueel, 'team' = samen met collega's
+  const [promptMode, setPromptMode] = useState<'solo' | 'team'>('solo');
 
   const { toast } = useToast();
 
@@ -154,6 +154,9 @@ const Compare = () => {
 
   // ─── Rater prompt ───
   if (showRaterPrompt) {
+    const isTeam = promptMode === 'team';
+    const canStart = isTeam ? raterNameInput.trim().length > 0 : true;
+
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="shadow-lg max-w-lg w-full">
@@ -165,70 +168,69 @@ const Compare = () => {
               </p>
             </div>
 
-            {promptMode === 'choice' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Solo */}
-                <button
-                  className="text-left p-4 border-2 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
-                  onClick={() => handleRaterNameSubmit('Docent')}
-                >
-                  <div className="font-semibold mb-1">Ik beoordeel alleen</div>
-                  <div className="text-sm text-muted-foreground">
-                    Ga direct verder. Je naam wordt niet bijgehouden.
-                  </div>
-                </button>
-
-                {/* Team */}
-                <button
-                  className="text-left p-4 border-2 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
-                  onClick={() => setPromptMode('team')}
-                >
-                  <div className="font-semibold mb-1 flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    Samen met collega's
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Vul je naam in zodat later zichtbaar is wie welk oordeel gaf.
-                  </div>
-                </button>
-              </div>
-            )}
-
-            {promptMode === 'team' && (
-              <div className="space-y-4">
-                <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg text-sm text-muted-foreground">
-                  <strong>Waarom je naam invullen?</strong> Als meerdere collega's dezelfde teksten beoordelen, toont de app later wie wat beoordeeld heeft en waar jullie het oneens zijn. Dat helpt bij de nabespreking.
+            {/* Mode selector — two equally prominent cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                className={`text-left p-4 border-2 rounded-lg transition-colors ${
+                  !isTeam
+                    ? 'border-primary bg-primary/5'
+                    : 'hover:border-muted-foreground/40'
+                }`}
+                onClick={() => setPromptMode('solo')}
+              >
+                <div className="font-semibold mb-1">Individueel</div>
+                <div className="text-xs text-muted-foreground">
+                  Ik beoordeel alleen
                 </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">Jouw naam (bijv. Jan of Docent A)</label>
-                  <Input
-                    value={raterNameInput}
-                    onChange={(e) => setRaterNameInput(e.target.value)}
-                    placeholder="Vul je naam in..."
-                    autoFocus
-                    onKeyDown={(e) => { if (e.key === 'Enter' && raterNameInput.trim()) handleRaterNameSubmit(); }}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setPromptMode('choice')}
-                  >
-                    Terug
-                  </Button>
-                  <Button
-                    onClick={() => handleRaterNameSubmit()}
-                    disabled={!raterNameInput.trim()}
-                    className="flex-1"
-                    size="lg"
-                  >
-                    Start met beoordelen
-                  </Button>
-                </div>
-              </div>
-            )}
+              </button>
 
-            <p className="text-xs text-muted-foreground">
+              <button
+                className={`text-left p-4 border-2 rounded-lg transition-colors ${
+                  isTeam
+                    ? 'border-primary bg-primary/5'
+                    : 'hover:border-muted-foreground/40'
+                }`}
+                onClick={() => setPromptMode('team')}
+              >
+                <div className="font-semibold mb-1 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" />
+                  Samen
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Met meerdere collega's
+                </div>
+              </button>
+            </div>
+
+            {/* Name field — always shown, required for team */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                {isTeam ? 'Jouw naam (verplicht)' : 'Jouw naam (optioneel)'}
+              </label>
+              <Input
+                value={raterNameInput}
+                onChange={(e) => setRaterNameInput(e.target.value)}
+                placeholder={isTeam ? 'Vul je naam in, bijv. Jan' : 'Bijv. Jan — of laat leeg'}
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter' && canStart) handleRaterNameSubmit(raterNameInput.trim() || undefined); }}
+              />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                {isTeam
+                  ? 'Elke collega vult zijn eigen naam in op zijn eigen apparaat. Zo is later zichtbaar wie wat beoordeeld heeft.'
+                  : 'Je kunt later altijd een collega toevoegen via het potloodje naast je naam.'}
+              </p>
+            </div>
+
+            <Button
+              onClick={() => handleRaterNameSubmit(raterNameInput.trim() || undefined)}
+              disabled={!canStart}
+              className="w-full"
+              size="lg"
+            >
+              Start met beoordelen
+            </Button>
+
+            <p className="text-xs text-muted-foreground text-center">
               Je naam wordt alleen lokaal op dit apparaat opgeslagen.
             </p>
           </CardContent>
@@ -338,7 +340,7 @@ const Compare = () => {
               <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
                 beoordelaar: <strong>{raterName}</strong>
                 <button
-                  onClick={() => { resetRaterPrompt(); setPromptMode('choice'); }}
+                  onClick={() => { resetRaterPrompt(); setPromptMode('solo'); }}
                   className="text-muted-foreground hover:text-foreground"
                   title="Naam wijzigen"
                 >
@@ -455,7 +457,7 @@ const Compare = () => {
                   <span className="inline-flex items-center gap-1">
                     beoordelaar: <strong>{raterName}</strong>
                     <button
-                      onClick={() => { resetRaterPrompt(); setPromptMode('choice'); }}
+                      onClick={() => { resetRaterPrompt(); setPromptMode('solo'); }}
                       className="text-muted-foreground hover:text-foreground ml-0.5"
                       title="Naam wijzigen"
                     >
