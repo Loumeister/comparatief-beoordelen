@@ -20,6 +20,11 @@ describe('getReliabilityStatus', () => {
     expect(getReliabilityStatus([])).toBe('insufficient');
   });
 
+  it('returns "insufficient" when the comparison graph is disconnected', () => {
+    const results = Array.from({ length: 5 }, () => mkExportData(0.3));
+    expect(getReliabilityStatus(results, false)).toBe('insufficient');
+  });
+
   it('returns "reliable" when enough texts have SE <= 0.75', () => {
     // 8 out of 10 (80%) have SE <= 0.75 → exceeds COHORT_PCT_RELIABLE (70%)
     const results = [
