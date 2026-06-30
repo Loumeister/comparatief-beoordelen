@@ -98,9 +98,9 @@ export function assessReliability(
 
   const graphConnected = isConnected(texts, judgements);
 
-  const seList = currentResults.map((r) => r.standardError).sort((a, b) => a - b);
+  const seList = currentResults.map((r) => r.standardError).sort(compareStandardErrors);
   const medianSE = n % 2 === 1 ? seList[(n - 1) / 2] : (seList[n / 2 - 1] + seList[n / 2]) / 2;
-  const maxSE = Math.max(...seList);
+  const maxSE = seList[n - 1];
   const pctReliable = (currentResults.filter((r) => r.standardError <= SE_RELIABLE).length / n) * 100;
   const individualCriterionMet = pctReliable >= COHORT_PCT_RELIABLE;
   const cohortCriterionMet = medianSE <= COHORT_MEDIAN_OK && maxSE <= SE_MAX_EDGE;
@@ -199,6 +199,14 @@ export function assessReliability(
     maxGradeDelta,
     message,
   };
+}
+
+function compareStandardErrors(a: number, b: number): number {
+  const normalizedA = Number.isNaN(a) ? Infinity : a;
+  const normalizedB = Number.isNaN(b) ? Infinity : b;
+
+  if (normalizedA === normalizedB) return 0;
+  return normalizedA < normalizedB ? -1 : 1;
 }
 
 function formatSE(value: number): string {
