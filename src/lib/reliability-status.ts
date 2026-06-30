@@ -4,9 +4,13 @@
 import { SE_RELIABLE, SE_MAX_EDGE, COHORT_PCT_RELIABLE, COHORT_MEDIAN_OK } from "@/lib/constants";
 import type { ExportData } from "@/lib/export";
 
-export function getReliabilityStatus(results: ExportData[]): 'insufficient' | 'moderate' | 'reliable' {
+export function getReliabilityStatus(
+  results: ExportData[],
+  graphConnected: boolean = true,
+): 'insufficient' | 'moderate' | 'reliable' {
   const n = results.length;
   if (n === 0) return 'insufficient';
+  if (!graphConnected) return 'insufficient';
 
   const seList = results.map(r => r.standardError).sort((a, b) => a - b);
   const medianSE = n % 2 === 1 ? seList[(n - 1) / 2] : (seList[n / 2 - 1] + seList[n / 2]) / 2;
