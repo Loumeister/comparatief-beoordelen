@@ -8,9 +8,10 @@ import type { SplitHalfResult } from "@/lib/split-half";
 interface ReliabilityCardProps {
   results: ExportData[];
   splitHalf?: SplitHalfResult | null;
+  graphConnected?: boolean;
 }
 
-export function ReliabilityCard({ results, splitHalf }: ReliabilityCardProps) {
+export function ReliabilityCard({ results, splitHalf, graphConnected = true }: ReliabilityCardProps) {
   const n = results.length;
   if (n === 0) return null;
 
@@ -34,7 +35,11 @@ export function ReliabilityCard({ results, splitHalf }: ReliabilityCardProps) {
   let reliabilityStatus: 'insufficient' | 'moderate' | 'reliable';
   let ReliabilityIcon: typeof CheckCircle;
 
-  if (stopAdvice) {
+  if (!graphConnected) {
+    reliabilityStatus = 'insufficient';
+    reliabilityText = 'Nog niet genoeg vergelijkingen - ga verder met beoordelen';
+    ReliabilityIcon = XCircle;
+  } else if (stopAdvice) {
     reliabilityStatus = 'reliable';
     reliabilityText = 'Resultaten zijn betrouwbaar — je kunt stoppen met beoordelen';
     ReliabilityIcon = CheckCircle;
