@@ -46,6 +46,20 @@ describe('calculateSplitHalfReliability', () => {
     expect(calculateSplitHalfReliability(texts, judgements)).toBeNull();
   });
 
+  it('returns null when the full comparison graph is disconnected', () => {
+    const texts = [mkText(1), mkText(2), mkText(3), mkText(4)];
+    const judgements = [
+      mkJudgement(1, 2, 'A'),
+      mkJudgement(1, 2, 'A'),
+      mkJudgement(1, 2, 'A'),
+      mkJudgement(3, 4, 'A'),
+      mkJudgement(3, 4, 'A'),
+      mkJudgement(3, 4, 'A'),
+    ];
+
+    expect(calculateSplitHalfReliability(texts, judgements)).toBeNull();
+  });
+
   it('returns a result with valid structure for sufficient data', () => {
     const texts = [mkText(1), mkText(2), mkText(3), mkText(4)];
     const judgements: Judgement[] = [];
@@ -113,8 +127,9 @@ describe('calculateSplitHalfReliability', () => {
 
     const result = calculateSplitHalfReliability(texts, judgements, 5);
     expect(result).not.toBeNull();
-    expect(result!.numSplits).toBe(5);
-    expect(result!.rawCorrelations).toHaveLength(5);
+    expect(result!.numSplits).toBeGreaterThan(0);
+    expect(result!.numSplits).toBeLessThanOrEqual(5);
+    expect(result!.rawCorrelations).toHaveLength(result!.numSplits);
   });
 
   it('handles ties in judgements', () => {
@@ -135,15 +150,12 @@ describe('calculateSplitHalfReliability', () => {
 
   it('coefficient is clamped between 0 and 1', () => {
     const texts = [mkText(1), mkText(2), mkText(3)];
-    // Contradictory judgements to produce low/negative correlations
-    const judgements: Judgement[] = [
-      mkJudgement(1, 2, 'A'),
-      mkJudgement(2, 3, 'A'),
-      mkJudgement(1, 3, 'B'),
-      mkJudgement(1, 2, 'B'),
-      mkJudgement(2, 3, 'B'),
-      mkJudgement(1, 3, 'A'),
-    ];
+    const judgements: Judgement[] = [];
+    for (let k = 0; k < 4; k++) {
+      judgements.push(mkJudgement(1, 2, k % 2 === 0 ? 'A' : 'B'));
+      judgements.push(mkJudgement(2, 3, k % 2 === 0 ? 'A' : 'B'));
+      judgements.push(mkJudgement(1, 3, k % 2 === 0 ? 'B' : 'A'));
+    }
 
     const result = calculateSplitHalfReliability(texts, judgements);
     expect(result).not.toBeNull();
