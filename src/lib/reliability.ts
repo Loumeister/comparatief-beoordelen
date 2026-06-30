@@ -1,4 +1,11 @@
 import { Text, Judgement } from "./db";
+import { isConnected } from "./graph";
+import {
+  COHORT_MEDIAN_OK,
+  COHORT_PCT_RELIABLE,
+  SE_MAX_EDGE,
+  SE_RELIABLE,
+} from "@/lib/constants";
 
 interface BTResult {
   textId: number;
@@ -12,6 +19,10 @@ export interface ReliabilityAssessment {
   isReliable: boolean;
   coreReliable: boolean;
   corePercentage: number;
+  graphConnected: boolean;
+  pctReliable: number;
+  medianSE: number;
+  maxSE: number;
   topHasLadder: boolean;
   bottomHasLadder: boolean;
   convergenceOk: boolean;
@@ -54,16 +65,16 @@ function hasLadderEvidence(
 
 /**
  * Robuuste betrouwbaarheidscheck met:
- * 1. Kernset (middelste 80%) heeft SE ≤ threshold voor ≥80%
- * 2. Uitersten (top/bottom 10%) hebben ladder-bewijs
- * 3. Convergentie: Kendall's τ ≥ 0.98 én max grade Δ ≤ 0.1
+ * 1. De vergelijkingsgraaf moet verbonden zijn
+ * 2. Stopregel volgens constants: genoeg individuele SE's of cohort-SE ok
+ * 3. Optionele convergentie: Kendall's τ ≥ 0.98 én max grade Δ ≤ 0.1
  */
 export function assessReliability(
   currentResults: BTResult[],
   texts: Text[],
   judgements: Judgement[],
   previousResults?: { textId: number; rank: number; grade: number }[],
-  seThreshold: number = 0.35
+  seThreshold: number = SE_RELIABLE
 ): ReliabilityAssessment {
   const n = currentResults.length;
 
@@ -72,6 +83,10 @@ export function assessReliability(
       isReliable: false,
       coreReliable: false,
       corePercentage: 0,
+      graphConnected: false,
+      pctReliable: 0,
+      medianSE: Infinity,
+      maxSE: Infinity,
       topHasLadder: false,
       bottomHasLadder: false,
       convergenceOk: false,
@@ -81,7 +96,16 @@ export function assessReliability(
     };
   }
 
-  // 1. KERNSET (middelste 80%, percentielen 10-90)
+  const graphConnected = isConnected(texts, judgements);
+
+  const seList = currentResults.map((r) => r.standardError).sort((a, b) => a - b);
+  const medianSE = n % 2 === 1 ? seList[(n - 1) / 2] : (seList[n / 2 - 1] + seList[n / 2]) / 2;
+  const maxSE = Math.max(...seList);
+  const pctReliable = (currentResults.filter((r) => r.standardError <= seThreshold).length / n) * 100;
+  const individualCriterionMet = pctReliable >= COHORT_PCT_RELIABLE;
+  const cohortCriterionMet = medianSE <= COHORT_MEDIAN_OK && maxSE <= SE_MAX_EDGE;
+
+  // KERNSET (middelste 80%, percentielen 10-90) blijft beschikbaar als diagnose.
   const sorted = [...currentResults].sort((a, b) => b.theta - a.theta);
   const lo = Math.floor(0.1 * n);
   const hi = Math.ceil(0.9 * n);
@@ -90,6 +114,7 @@ export function assessReliability(
   const coreReliableCount = core.filter((r) => r.standardError <= seThreshold).length;
   const corePercentage = core.length > 0 ? (coreReliableCount / core.length) * 100 : 0;
   const coreReliable = corePercentage >= 80;
+  const stopCriterionMet = individualCriterionMet || cohortCriterionMet;
 
   // 2. UITERSTEN ladder-bewijs (top/bottom 10%, minstens 1 tekst per kant)
   let topHasLadder = true;
@@ -142,16 +167,19 @@ export function assessReliability(
   }
 
   // EINDBESLISSING
-  const isReliable = coreReliable && topHasLadder && bottomHasLadder && convergenceOk;
+  const isReliable = graphConnected && stopCriterionMet && convergenceOk;
 
   let message = "";
   if (isReliable) {
     message = "Genoeg resultaten om cijfers te rapporteren.";
   } else {
     const issues: string[] = [];
-    if (!coreReliable) issues.push(`kernset slechts ${Math.round(corePercentage)}% betrouwbaar`);
-    if (!topHasLadder) issues.push("top mist ladder-bewijs");
-    if (!bottomHasLadder) issues.push("bodem mist ladder-bewijs");
+    if (!graphConnected) issues.push("vergelijkingsnetwerk is nog niet verbonden");
+    if (!stopCriterionMet) {
+      issues.push(
+        `${Math.round(pctReliable)}% betrouwbaar, mediaan SE ${medianSE.toFixed(2)}, max SE ${maxSE.toFixed(2)}`
+      );
+    }
     if (!convergenceOk) issues.push("rangorde nog niet stabiel");
     message = `Meer vergelijkingen nodig: ${issues.join(", ")}.`;
   }
@@ -160,6 +188,10 @@ export function assessReliability(
     isReliable,
     coreReliable,
     corePercentage,
+    graphConnected,
+    pctReliable,
+    medianSE,
+    maxSE,
     topHasLadder,
     bottomHasLadder,
     convergenceOk,
