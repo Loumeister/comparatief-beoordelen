@@ -3,6 +3,7 @@
 
 import { SE_RELIABLE, SE_MAX_EDGE, COHORT_PCT_RELIABLE, COHORT_MEDIAN_OK } from "@/lib/constants";
 import type { ExportData } from "@/lib/export";
+import { compareStandardErrors } from "@/lib/standard-error";
 
 export function getReliabilityStatus(
   results: ExportData[],
@@ -23,12 +24,4 @@ export function getReliabilityStatus(
   if (individualCriterionMet || cohortCriterionMet) return 'reliable';
   if (medianSE <= 1.00) return 'moderate';
   return 'insufficient';
-}
-
-function compareStandardErrors(a: number, b: number): number {
-  const normalizedA = Number.isNaN(a) ? Infinity : a;
-  const normalizedB = Number.isNaN(b) ? Infinity : b;
-
-  if (normalizedA === normalizedB) return 0;
-  return normalizedA < normalizedB ? -1 : 1;
 }
