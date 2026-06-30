@@ -72,15 +72,21 @@ export function ReliabilityCard({ results, splitHalf, graphConnected = true }: R
           <ReliabilityIcon className={`w-5 h-5 ${iconColor}`} />
           <div className="flex-1">
             <h3 className="font-semibold text-lg">{reliabilityText}</h3>
-            <p className="text-sm text-muted-foreground">
-              {Math.round(pctReliable)}% van de teksten heeft een betrouwbare score
-              {countInsufficient > 0 && <> • {countInsufficient} tekst{countInsufficient !== 1 ? 'en' : ''} nog onvoldoende vergeleken</>}
-            </p>
+            {!graphConnected ? (
+              <p className="text-sm text-muted-foreground">
+                Niet alle teksten zijn onderling verbonden via vergelijkingen. Voeg meer vergelijkingen toe zodat elke tekst in de rangorde kan worden geplaatst.
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {Math.round(pctReliable)}% van de teksten heeft een betrouwbare score
+                {countInsufficient > 0 && <> • {countInsufficient} tekst{countInsufficient !== 1 ? 'en' : ''} nog onvoldoende vergeleken</>}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Progress bar */}
-        {cohortCriterionMet && !individualCriterionMet ? (
+        {/* Progress bar — only meaningful when the comparison graph is connected */}
+        {!graphConnected ? null : cohortCriterionMet && !individualCriterionMet ? (
           <div>
             <div className="relative h-3 w-full overflow-hidden rounded-full bg-secondary/20">
               <div
@@ -121,21 +127,23 @@ export function ReliabilityCard({ results, splitHalf, graphConnected = true }: R
           </div>
         )}
 
-        {/* Legend for progress bar colors */}
-        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-sm bg-secondary" />
-            Betrouwbaar
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-sm bg-primary" />
-            Bijna klaar
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-sm bg-destructive" />
-            Meer nodig
-          </span>
-        </div>
+        {/* Legend for progress bar colors — only shown when progress bar is visible */}
+        {graphConnected && (
+          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded-sm bg-secondary" />
+              Betrouwbaar
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded-sm bg-primary" />
+              Bijna klaar
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded-sm bg-destructive" />
+              Meer nodig
+            </span>
+          </div>
+        )}
 
         {/* PLAN-13: Split-half reliability coefficient */}
         {splitHalf && (
