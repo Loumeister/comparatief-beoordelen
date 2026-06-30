@@ -240,6 +240,27 @@ describe('assessReliability', () => {
     expect(assessment.message).not.toContain('NaN');
   });
 
+  it('sorts non-finite SE values without destabilizing the median', () => {
+    const texts = Array.from({ length: 5 }, (_, i) => mkText(i + 1));
+    const results = [
+      mkBTResult(1, 2, Infinity, 1, 8),
+      mkBTResult(2, 1, Infinity, 2, 7),
+      mkBTResult(3, 0, 0.5, 3, 6),
+      mkBTResult(4, -1, 0.5, 4, 5),
+      mkBTResult(5, -2, 0.5, 5, 4),
+    ];
+    const judgements: Judgement[] = [];
+    for (let i = 0; i < 5; i++) {
+      for (let j = i + 1; j < 5; j++) {
+        judgements.push(mkJudgement(i + 1, j + 1, 'A'));
+      }
+    }
+
+    const assessment = assessReliability(results, texts, judgements);
+    expect(assessment.medianSE).toBe(0.5);
+    expect(assessment.maxSE).toBe(Infinity);
+  });
+
   it('ladder evidence requires non-trivial outcomes (not all EQUAL)', () => {
     const texts = Array.from({ length: 5 }, (_, i) => mkText(i + 1));
     const results = Array.from({ length: 5 }, (_, i) =>
