@@ -1,5 +1,6 @@
-import { Text, Judgement } from "./db";
+import type { Text, Judgement } from "./db";
 import { isConnected } from "./graph";
+import { compareStandardErrors } from "./standard-error";
 import {
   COHORT_MEDIAN_OK,
   COHORT_PCT_RELIABLE,
@@ -199,14 +200,6 @@ export function assessReliability(
     maxGradeDelta,
     message,
   };
-}
-
-function compareStandardErrors(a: number, b: number): number {
-  const normalizedA = Number.isNaN(a) ? Infinity : a;
-  const normalizedB = Number.isNaN(b) ? Infinity : b;
-
-  if (normalizedA === normalizedB) return 0;
-  return normalizedA < normalizedB ? -1 : 1;
 }
 
 function formatSE(value: number): string {
