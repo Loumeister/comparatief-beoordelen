@@ -166,7 +166,9 @@ export interface SplitHalfResult {
  * 4. Apply Spearman-Brown correction: r_full = 2 * r_half / (1 + r_half)
  * 5. Repeat for `numSplits` random splits and average
  *
- * Returns null if there are too few judgements (<6) to do a meaningful split.
+ * Returns null when there are too few judgements/texts for a meaningful split,
+ * when the full comparison graph is disconnected, or when no connected split
+ * halves can be sampled.
  */
 export function calculateSplitHalfReliability(
   texts: Text[],
