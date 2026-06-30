@@ -4,6 +4,7 @@
 // rank correlation, applies Spearman-Brown correction, and averages over splits.
 
 import type { Judgement, Text } from './db';
+import { isConnected } from './graph';
 
 /**
  * Lightweight BT fit: returns only theta vector (no SE, grading, infit).
@@ -165,7 +166,9 @@ export interface SplitHalfResult {
  * 4. Apply Spearman-Brown correction: r_full = 2 * r_half / (1 + r_half)
  * 5. Repeat for `numSplits` random splits and average
  *
- * Returns null if there are too few judgements (<6) to do a meaningful split.
+ * Returns null when there are too few judgements/texts for a meaningful split,
+ * when the full comparison graph is disconnected, or when no connected split
+ * halves can be sampled.
  */
 export function calculateSplitHalfReliability(
   texts: Text[],
@@ -174,6 +177,7 @@ export function calculateSplitHalfReliability(
   lambda: number = 0.1,
 ): SplitHalfResult | null {
   if (judgements.length < 6 || texts.length < 3) return null;
+  if (!isConnected(texts, judgements)) return null;
 
   const rawCorrelations: number[] = [];
   const seed = 42;
@@ -185,6 +189,7 @@ export function calculateSplitHalfReliability(
     const mid = Math.floor(shuffled.length / 2);
     const halfA = shuffled.slice(0, mid);
     const halfB = shuffled.slice(mid);
+    if (!isConnected(texts, halfA) || !isConnected(texts, halfB)) continue;
 
     const thetasA = fitBTThetas(texts, halfA, lambda);
     const thetasB = fitBTThetas(texts, halfB, lambda);

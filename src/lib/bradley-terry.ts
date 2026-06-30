@@ -10,19 +10,15 @@ interface BTResult {
   label: string;
   grade: number;
   reliability: string;
-  infit?: number;       // infit mean-square (1.0 = perfect fit)
-  infitLabel?: string;  // "Goed passend" / "Afwijkend patroon"
-  // Signaal over graafconnectiviteit (voor UI/pairing)
+  infit?: number;
+  infitLabel?: string;
   isGraphConnected?: boolean;
   components?: number;
 }
 
 /**
- * Bradley–Terry met ridge-regularisatie en VOLLEDIGE Hessian voor SE
- * - Precompute n_ij (aantal vergelijkingen) en w_ij (wins van i tegen j; ties = 0.5)
- * - Newton-Raphson/IRLS met per-iteratie centering Σθ=0 (voor stabiliteit)
- * - SE uit inverse van de gereduceerde, volledige Hessian (Cholesky op SPD)
- * - Check op graafconnectiviteit (nuttig voor pairing/waarschuwing)
+ * Bradley-Terry with ridge regularization and full-Hessian standard errors.
+ * Ties are represented as half-wins for each text.
  */
 export function calculateBradleyTerry(
   texts: Text[],
@@ -39,13 +35,10 @@ export function calculateBradleyTerry(
   const n = texts.length;
   if (n === 0) return [];
 
-  // index mapping
   const idxOf = new Map<number, number>(texts.map((t, i) => [t.id!, i]));
 
-  // Precompute n_ij en w_ij
   const n_ij: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
-  const w_ij: number[][] = Array.from({ length: n }, () => Array(n).fill(0)); // wins voor i tegen j
-  const exposure = new Array(n).fill(0);
+  const w_ij: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
 
   for (const j of judgements) {
     const ia = idxOf.get(j.textAId);
@@ -54,30 +47,24 @@ export function calculateBradleyTerry(
 
     n_ij[ia][ib] += 1;
     n_ij[ib][ia] += 1;
-    exposure[ia] += 1;
-    exposure[ib] += 1;
 
     if (j.winner === "A") w_ij[ia][ib] += 1;
     else if (j.winner === "B") w_ij[ib][ia] += 1;
     else if (j.winner === "EQUAL") {
-      // 0,5-split approach (blijft ongewijzigd in deze minimale upgrade)
       w_ij[ia][ib] += 0.5;
       w_ij[ib][ia] += 0.5;
     }
   }
 
-  // Init theta
   const theta = new Array(n).fill(0);
 
-  // Newton-Raphson (diag Hessian voor de updates) + per-iteratie centering
   const maxIter = 100;
   const tol = 1e-6;
   for (let iter = 0; iter < maxIter; iter++) {
     const grad = new Array(n).fill(0);
-    const Hdiag = new Array(n).fill(lambda); // ridge op diag
+    const Hdiag = new Array(n).fill(lambda);
 
     for (let i = 0; i < n; i++) {
-      // wins_i = Σ_j w_ij
       let wins_i = 0;
       for (let j = 0; j < n; j++) {
         if (i === j) continue;
@@ -85,37 +72,29 @@ export function calculateBradleyTerry(
       }
       grad[i] = wins_i - lambda * theta[i];
 
-      // Σ_j n_ij * p_ij en Hessian diag
       for (let j = 0; j < n; j++) {
         const nij = n_ij[i][j];
         if (i === j || nij === 0) continue;
-        const pij = 1 / (1 + Math.exp(theta[j] - theta[i])); // P(i>j)
+        const pij = 1 / (1 + Math.exp(theta[j] - theta[i]));
         grad[i] -= nij * pij;
         Hdiag[i] += nij * pij * (1 - pij);
       }
     }
 
-    // Damped update om oscillaties te voorkomen
-    const damping = 1.0; // evt. 0.5–1.0
     let maxChange = 0;
     for (let i = 0; i < n; i++) {
-      const delta = damping * (grad[i] / Math.max(Hdiag[i], 1e-12));
+      const delta = grad[i] / Math.max(Hdiag[i], 1e-12);
       theta[i] += delta;
       if (Math.abs(delta) > maxChange) maxChange = Math.abs(delta);
     }
 
-    // Centering: Σθ = 0
     const meanTheta = theta.reduce((a, b) => a + b, 0) / n;
     for (let i = 0; i < n; i++) theta[i] -= meanTheta;
 
     if (maxChange < tol) break;
   }
 
-  // ---------- VOLLEDIGE HESSIAN voor SE (bij finale theta) ----------
-  // H_ii = lambda + Σ_j n_ij p_ij(1-p_ij)
-  // H_ij = - n_ij p_ij(1-p_ij) (i != j)
   const H: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
-  // Pass 1: diagonaal — loop alle j!=i voor Hii accumulatie
   for (let i = 0; i < n; i++) {
     let Hii = lambda;
     for (let j = 0; j < n; j++) {
@@ -127,7 +106,6 @@ export function calculateBradleyTerry(
     }
     H[i][i] = Hii;
   }
-  // Pass 2: off-diagonaal — elk paar (i,j) precies één keer bezoeken
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
       const nij = n_ij[i][j];
@@ -139,53 +117,22 @@ export function calculateBradleyTerry(
     }
   }
 
-  // Graafconnectiviteit (op basis van n_ij > 0)
   const compCount = countGraphComponents(n_ij);
 
-  // SE's via gereduceerde inverse (fix 1 referentie om de nul-som gauge te hanteren)
-  // PLAN-8: Kies de best-verbonden tekst (hoogste exposure) als referentie.
-  // Dit minimaliseert de benaderingsfout omdat goed-verbonden nodes de meeste
-  // informatie dragen in het netwerk.
-  let ref = 0;
-  for (let i = 1; i < n; i++) {
-    if (exposure[i] > exposure[ref]) ref = i;
-  }
-  const { variancesReduced, ok } = invertReducedForVariances(H, ref);
-
-  // Map variances terug naar volledige vector:
-  // In deze gauge is var(ref) niet gedefinieerd; we benaderen die conservatief
-  // als het gemiddelde van de nabije variances (praktisch voor reliability)
   const se = new Array(n).fill(Infinity);
+  const { variances, ok } = invertForCenteredVariances(H);
   if (ok) {
-    let avgVar = 0;
-    let cnt = 0;
     for (let i = 0; i < n; i++) {
-      if (i === ref) continue;
-      const v = variancesReduced[indexAfterRef(i, ref)];
-      if (Number.isFinite(v)) {
-        se[i] = Math.sqrt(Math.max(v, 0));
-        avgVar += v;
-        cnt++;
-      }
+      const v = variances[i];
+      if (Number.isFinite(v)) se[i] = Math.sqrt(Math.max(v, 0));
     }
-    const refVar = cnt > 0 ? Math.max(avgVar / cnt, 0) : Infinity;
-    se[ref] = Number.isFinite(refVar) ? Math.sqrt(refVar) : Infinity;
   } else {
-    // Fallback: gebruik diagonale benadering 1/√H[i][i]
-    // Dit is minder nauwkeurig maar geeft een redelijke schatting
     for (let i = 0; i < n; i++) {
       const Hii = H[i][i];
-      if (Hii > 1e-12) {
-        se[i] = 1 / Math.sqrt(Hii);
-      } else {
-        se[i] = Infinity;
-      }
+      se[i] = Hii > 1e-12 ? 1 / Math.sqrt(Hii) : Infinity;
     }
   }
 
-  // ---------- PLAN-3: INFIT MEAN-SQUARE per tekst ----------
-  // infit_i = Σ (observed - expected)² / Σ var_ij
-  // Verwachte waarde = 1.0; >1.3 = underfit (onvoorspelbaar), <0.7 = overfit
   const infitNum = new Array(n).fill(0);
   const infitDen = new Array(n).fill(0);
   for (const j of judgements) {
@@ -193,13 +140,13 @@ export function calculateBradleyTerry(
     const ib = idxOf.get(j.textBId);
     if (ia == null || ib == null || ia === ib) continue;
 
-    const p_ab = 1 / (1 + Math.exp(theta[ib] - theta[ia])); // P(A wint)
+    const p_ab = 1 / (1 + Math.exp(theta[ib] - theta[ia]));
     const v = p_ab * (1 - p_ab);
     const obs = j.winner === "A" ? 1 : j.winner === "B" ? 0 : 0.5;
     const r2 = (obs - p_ab) ** 2;
 
     infitNum[ia] += r2;
-    infitNum[ib] += r2; // symmetrisch: residual² is gelijk voor beide kanten
+    infitNum[ib] += r2;
     infitDen[ia] += v;
     infitDen[ib] += v;
   }
@@ -208,13 +155,11 @@ export function calculateBradleyTerry(
     if (infitDen[i] > 0) infit[i] = infitNum[i] / infitDen[i];
   }
 
-  // Normaliseer (μ=0), bereken σ voor z-score
   const mu = theta.reduce((a, b) => a + b, 0) / n;
   const centered = theta.map((t) => t - mu);
   const variance = centered.reduce((s, t) => s + t * t, 0) / Math.max(n, 1);
   const sigma = Math.sqrt(Math.max(variance, 1e-12));
 
-  // Bouw resultaten
   const outBasic = texts.map((t, i) => ({
     textId: t.id!,
     theta: centered[i],
@@ -248,7 +193,7 @@ export function calculateBradleyTerry(
     return "Goed passend";
   }
 
-  const results: BTResult[] = outBasic.map((r, i) => ({
+  return outBasic.map((r, i) => ({
     textId: r.textId,
     theta: r.theta,
     standardError: r.standardError,
@@ -261,13 +206,8 @@ export function calculateBradleyTerry(
     isGraphConnected: compCount === 1,
     components: compCount,
   }));
-
-  return results;
 }
 
-/* ================== Helpers: matrix/graph utils ================== */
-
-/** Aantal componenten in de ongerichte graaf met edges waar n_ij>0. */
 function countGraphComponents(n_ij: number[][]): number {
   const n = n_ij.length;
   if (n <= 1) return n;
@@ -300,50 +240,35 @@ function countGraphComponents(n_ij: number[][]): number {
   return comps;
 }
 
-/** Index mapping voor het reduceren van H: sla de rij/kolom 'ref' over. */
-function indexAfterRef(i: number, ref: number): number {
-  return i < ref ? i : i - 1;
-}
-
-/**
- * Inverteer de gereduceerde SPD-matrix H_rr (n-1 x n-1) via Cholesky en
- * geef de diagonaal van de inverse terug (variancesReduced).
- */
-function invertReducedForVariances(H: number[][], ref: number): { variancesReduced: number[]; ok: boolean } {
+function invertForCenteredVariances(H: number[][]): { variances: number[]; ok: boolean } {
   const n = H.length;
-  if (n <= 1) return { variancesReduced: [], ok: false };
+  if (n <= 1) return { variances: [Infinity], ok: false };
 
-  // Bouw H_rr (zonder 'ref' rij/kolom)
-  const m = n - 1;
-  const Hr: number[][] = Array.from({ length: m }, () => Array(m).fill(0));
-  for (let i = 0; i < n; i++) {
-    if (i === ref) continue;
-    for (let j = 0; j < n; j++) {
-      if (j === ref) continue;
-      Hr[indexAfterRef(i, ref)][indexAfterRef(j, ref)] = H[i][j];
+  const L = choleskyDecompose(H);
+  if (!L) return { variances: new Array(n).fill(Infinity), ok: false };
+
+  const diag = new Array(n).fill(0);
+  const rowSums = new Array(n).fill(0);
+  let grandSum = 0;
+
+  for (let k = 0; k < n; k++) {
+    const ek = new Array(n).fill(0);
+    ek[k] = 1;
+    const y = forwardSubstitution(L, ek);
+    const x = backSubstitutionTranspose(L, y);
+    diag[k] = x[k];
+    for (let i = 0; i < n; i++) {
+      rowSums[i] += x[i];
+      grandSum += x[i];
     }
   }
 
-  // Cholesky decompositie Hr = L L^T (Hr moet SPD zijn)
-  const L = choleskyDecompose(Hr);
-  if (!L) return { variancesReduced: new Array(m).fill(Infinity), ok: false };
+  const grandMean = grandSum / (n * n);
+  const variances = new Array(n).fill(0).map((_, i) => diag[i] - 2 * (rowSums[i] / n) + grandMean);
 
-  // Diagonaal van Hr^{-1} efficiënt via kolom-voor-kolom solves:
-  // Voor elke e_k: los Hr x = e_k -> x; dan var_k = x_k.
-  // (We kunnen ook alle kolommen doen en alleen diag nemen.)
-  const variances: number[] = new Array(m).fill(0);
-  for (let k = 0; k < m; k++) {
-    const ek = new Array(m).fill(0);
-    ek[k] = 1;
-    const y = forwardSubstitution(L, ek);
-    const x = backSubstitutionTranspose(L, y); // opl voor Hr x = e_k
-    variances[k] = x[k];
-  }
-
-  return { variancesReduced: variances, ok: true };
+  return { variances, ok: true };
 }
 
-/** Cholesky (lower-triangular) voor symmetrische positief-def. matrix. */
 function choleskyDecompose(A: number[][]): number[][] | null {
   const n = A.length;
   const L: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
@@ -352,7 +277,7 @@ function choleskyDecompose(A: number[][]): number[][] | null {
       let sum = A[i][j];
       for (let k = 0; k < j; k++) sum -= L[i][k] * L[j][k];
       if (i === j) {
-        if (sum <= 1e-12) return null; // niet SPD (numeriek)
+        if (sum <= 1e-12) return null;
         L[i][j] = Math.sqrt(sum);
       } else {
         L[i][j] = sum / L[j][j];
@@ -374,7 +299,6 @@ function forwardSubstitution(L: number[][], b: number[]): number[] {
 }
 
 function backSubstitutionTranspose(L: number[][], y: number[]): number[] {
-  // lost L^T x = y op
   const n = L.length;
   const x = new Array(n).fill(0);
   for (let i = n - 1; i >= 0; i--) {
