@@ -15,9 +15,9 @@ export function ReliabilityCard({ results, splitHalf, graphConnected = true }: R
   const n = results.length;
   if (n === 0) return null;
 
-  const seList = results.map(r => r.standardError).sort((a, b) => a - b);
+  const seList = results.map(r => r.standardError).sort(compareStandardErrors);
   const medianSE = n % 2 === 1 ? seList[(n - 1) / 2] : (seList[n / 2 - 1] + seList[n / 2]) / 2;
-  const maxSE = Math.max(...seList);
+  const maxSE = seList[n - 1];
 
   const countReliable = results.filter(r => r.standardError <= SE_RELIABLE).length;
   const countModerate = results.filter(r => r.standardError > SE_RELIABLE && r.standardError <= 1.00).length;
@@ -172,4 +172,12 @@ export function ReliabilityCard({ results, splitHalf, graphConnected = true }: R
       </CardContent>
     </Card>
   );
+}
+
+function compareStandardErrors(a: number, b: number): number {
+  const normalizedA = Number.isNaN(a) ? Infinity : a;
+  const normalizedB = Number.isNaN(b) ? Infinity : b;
+
+  if (normalizedA === normalizedB) return 0;
+  return normalizedA < normalizedB ? -1 : 1;
 }
