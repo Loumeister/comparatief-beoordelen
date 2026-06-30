@@ -247,18 +247,24 @@ function invertForCenteredVariances(H: number[][]): { variances: number[]; ok: b
   const L = choleskyDecompose(H);
   if (!L) return { variances: new Array(n).fill(Infinity), ok: false };
 
-  const inv: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+  const diag = new Array(n).fill(0);
+  const rowSums = new Array(n).fill(0);
+  let grandSum = 0;
+
   for (let k = 0; k < n; k++) {
     const ek = new Array(n).fill(0);
     ek[k] = 1;
     const y = forwardSubstitution(L, ek);
     const x = backSubstitutionTranspose(L, y);
-    for (let i = 0; i < n; i++) inv[i][k] = x[i];
+    diag[k] = x[k];
+    for (let i = 0; i < n; i++) {
+      rowSums[i] += x[i];
+      grandSum += x[i];
+    }
   }
 
-  const rowMeans = inv.map((row) => row.reduce((a, b) => a + b, 0) / n);
-  const grandMean = rowMeans.reduce((a, b) => a + b, 0) / n;
-  const variances = new Array(n).fill(0).map((_, i) => inv[i][i] - 2 * rowMeans[i] + grandMean);
+  const grandMean = grandSum / (n * n);
+  const variances = new Array(n).fill(0).map((_, i) => diag[i] - 2 * (rowSums[i] / n) + grandMean);
 
   return { variances, ok: true };
 }
