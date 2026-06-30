@@ -104,4 +104,16 @@ describe('getReliabilityStatus', () => {
     ];
     expect(getReliabilityStatus(results)).toBe('reliable');
   });
+
+  it('sorts non-finite SE values without destabilizing the median', () => {
+    const results = [
+      mkExportData(Infinity),
+      mkExportData(Infinity),
+      mkExportData(0.5),
+      mkExportData(0.5),
+      mkExportData(0.5),
+    ];
+
+    expect(getReliabilityStatus(results)).toBe('moderate');
+  });
 });
