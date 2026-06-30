@@ -101,7 +101,7 @@ export function assessReliability(
   const seList = currentResults.map((r) => r.standardError).sort((a, b) => a - b);
   const medianSE = n % 2 === 1 ? seList[(n - 1) / 2] : (seList[n / 2 - 1] + seList[n / 2]) / 2;
   const maxSE = Math.max(...seList);
-  const pctReliable = (currentResults.filter((r) => r.standardError <= seThreshold).length / n) * 100;
+  const pctReliable = (currentResults.filter((r) => r.standardError <= SE_RELIABLE).length / n) * 100;
   const individualCriterionMet = pctReliable >= COHORT_PCT_RELIABLE;
   const cohortCriterionMet = medianSE <= COHORT_MEDIAN_OK && maxSE <= SE_MAX_EDGE;
 
@@ -177,7 +177,7 @@ export function assessReliability(
     if (!graphConnected) issues.push("vergelijkingsnetwerk is nog niet verbonden");
     if (!stopCriterionMet) {
       issues.push(
-        `${Math.round(pctReliable)}% betrouwbaar, mediaan SE ${medianSE.toFixed(2)}, max SE ${maxSE.toFixed(2)}`
+        `${Math.round(pctReliable)}% betrouwbaar, mediaan SE ${formatSE(medianSE)}, max SE ${formatSE(maxSE)}`
       );
     }
     if (!convergenceOk) issues.push("rangorde nog niet stabiel");
@@ -199,6 +199,10 @@ export function assessReliability(
     maxGradeDelta,
     message,
   };
+}
+
+function formatSE(value: number): string {
+  return Number.isFinite(value) ? value.toFixed(2) : "onbekend";
 }
 
 function calculateKendallTau(ranks1: number[], ranks2: number[]): number {
