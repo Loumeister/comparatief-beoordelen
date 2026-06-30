@@ -200,6 +200,46 @@ describe('assessReliability', () => {
     expect(strictAssessment.coreReliable).toBe(false);
   });
 
+  it('does not let a custom diagnostic threshold change the stop criterion', () => {
+    const texts = Array.from({ length: 10 }, (_, i) => mkText(i + 1));
+    const results = Array.from({ length: 10 }, (_, i) =>
+      mkBTResult(i + 1, 2 - i * 0.4, i < 7 ? 0.7 : 1.5, i + 1, 8 - i * 0.5)
+    );
+    const judgements: Judgement[] = [];
+    for (let i = 0; i < 10; i++) {
+      for (let j = i + 1; j < Math.min(i + 4, 10); j++) {
+        for (let k = 0; k < 4; k++) {
+          judgements.push(mkJudgement(i + 1, j + 1, 'A'));
+        }
+      }
+    }
+
+    const assessment = assessReliability(results, texts, judgements, undefined, 0.2);
+    expect(assessment.coreReliable).toBe(false);
+    expect(assessment.pctReliable).toBe(70);
+    expect(assessment.isReliable).toBe(true);
+  });
+
+  it('formats non-finite SE values safely in the guidance message', () => {
+    const texts = [mkText(1), mkText(2), mkText(3)];
+    const results = [
+      mkBTResult(1, 1, Infinity, 1, 8),
+      mkBTResult(2, 0, Infinity, 2, 7),
+      mkBTResult(3, -1, Infinity, 3, 6),
+    ];
+    const judgements = [
+      mkJudgement(1, 2, 'A'),
+      mkJudgement(2, 3, 'A'),
+    ];
+
+    const assessment = assessReliability(results, texts, judgements);
+    expect(assessment.isReliable).toBe(false);
+    expect(assessment.message).toContain('mediaan SE onbekend');
+    expect(assessment.message).toContain('max SE onbekend');
+    expect(assessment.message).not.toContain('Infinity');
+    expect(assessment.message).not.toContain('NaN');
+  });
+
   it('ladder evidence requires non-trivial outcomes (not all EQUAL)', () => {
     const texts = Array.from({ length: 5 }, (_, i) => mkText(i + 1));
     const results = Array.from({ length: 5 }, (_, i) =>
