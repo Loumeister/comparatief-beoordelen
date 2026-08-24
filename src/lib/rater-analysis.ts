@@ -97,7 +97,7 @@ export function analyzeRaters(
         ? 'Mogelijk onzorgvuldig'
         : infit > 1.2
           ? 'Inconsistent patroon'
-          : 'Consistent';
+          : 'Goed consistent';
     }
 
     // Determine display name
