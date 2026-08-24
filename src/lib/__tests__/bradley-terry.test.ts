@@ -117,6 +117,29 @@ describe('calculateBradleyTerry', () => {
     }
   });
 
+  it('keeps standard errors stable when text order changes', () => {
+    const texts = [mkText(1), mkText(2), mkText(3), mkText(4)];
+    const judgements = [
+      mkJudgement(1, 2, 'A'),
+      mkJudgement(1, 3, 'A'),
+      mkJudgement(1, 4, 'A'),
+      mkJudgement(2, 3, 'A'),
+      mkJudgement(2, 4, 'B'),
+      mkJudgement(3, 4, 'A'),
+      mkJudgement(1, 2, 'A'),
+      mkJudgement(2, 3, 'A'),
+      mkJudgement(3, 4, 'A'),
+    ];
+
+    const original = calculateBradleyTerry(texts, judgements);
+    const reordered = calculateBradleyTerry([...texts].reverse(), judgements);
+    const reorderedById = new Map(reordered.map((result) => [result.textId, result]));
+
+    for (const result of original) {
+      expect(reorderedById.get(result.textId)?.standardError).toBeCloseTo(result.standardError, 10);
+    }
+  });
+
   it('SE decreases with more comparisons', () => {
     const texts = [mkText(1), mkText(2), mkText(3)];
     const fewJudgements = [

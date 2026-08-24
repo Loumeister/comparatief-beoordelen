@@ -242,29 +242,21 @@ function countGraphComponents(n_ij: number[][]): number {
 
 function invertForCenteredVariances(H: number[][]): { variances: number[]; ok: boolean } {
   const n = H.length;
-  if (n <= 1) return { variances: [Infinity], ok: false };
+  if (n === 0) return { variances: [], ok: false };
+  if (n === 1) return { variances: [Infinity], ok: false };
 
-  const L = choleskyDecompose(H);
+  const centeredH = H.map((row) => row.map((value) => value + 1 / n));
+  const L = choleskyDecompose(centeredH);
   if (!L) return { variances: new Array(n).fill(Infinity), ok: false };
 
-  const diag = new Array(n).fill(0);
-  const rowSums = new Array(n).fill(0);
-  let grandSum = 0;
-
+  const variances = new Array(n).fill(0);
   for (let k = 0; k < n; k++) {
     const ek = new Array(n).fill(0);
     ek[k] = 1;
     const y = forwardSubstitution(L, ek);
     const x = backSubstitutionTranspose(L, y);
-    diag[k] = x[k];
-    for (let i = 0; i < n; i++) {
-      rowSums[i] += x[i];
-      grandSum += x[i];
-    }
+    variances[k] = Math.max(x[k] - 1 / n, 0);
   }
-
-  const grandMean = grandSum / (n * n);
-  const variances = new Array(n).fill(0).map((_, i) => diag[i] - 2 * (rowSums[i] / n) + grandMean);
 
   return { variances, ok: true };
 }
