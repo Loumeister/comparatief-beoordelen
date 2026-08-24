@@ -59,7 +59,7 @@ const Results = () => {
     );
   }
 
-  const reliabilityStatus = getReliabilityStatus(results);
+  const reliabilityStatus = getReliabilityStatus(results, connected === true);
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -131,7 +131,7 @@ const Results = () => {
           </Card>
         )}
 
-        <ReliabilityCard results={results} splitHalf={splitHalf} />
+        <ReliabilityCard results={results} splitHalf={splitHalf} graphConnected={connected === true} />
 
         {raterAnalysis && <RaterOverviewCard raterAnalysis={raterAnalysis} />}
         {raterAnalysis && <DisagreementsCard raterAnalysis={raterAnalysis} />}
